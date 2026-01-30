@@ -15,10 +15,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Python Binding
 
-- [ ] **PY-01**: Upgrade PyO3 from 0.22 to 0.27+ with maturin 1.11+
-- [ ] **PY-02**: Native asyncio integration for async/await support
-- [ ] **PY-03**: API compatibility with fugle-marketdata-python (method signatures, response types)
-- [ ] **PY-04**: Complete PEP 484 type hints for all public APIs
+- [x] **PY-01**: Upgrade PyO3 from 0.22 to 0.27+ with maturin 1.11+ ✓
+- [x] **PY-02**: Native asyncio integration for async/await support ✓
+- [x] **PY-03**: API compatibility with fugle-marketdata-python (method signatures, response types) ✓
+- [x] **PY-04**: Complete PEP 484 type hints for all public APIs ✓
 - [ ] **PY-05**: Publish manylinux wheels to PyPI
 
 ### Node.js Binding
@@ -87,10 +87,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BUILD-01 | Phase 1 | Complete |
 | BUILD-02 | Phase 1 | Complete |
 | BUILD-03 | Phase 1 | Complete |
-| PY-01 | Phase 2 | Pending |
-| PY-02 | Phase 2 | Pending |
-| PY-03 | Phase 2 | Pending |
-| PY-04 | Phase 2 | Pending |
+| PY-01 | Phase 2 | Complete |
+| PY-02 | Phase 2 | Complete |
+| PY-03 | Phase 2 | Complete |
+| PY-04 | Phase 2 | Complete |
 | PY-05 | Phase 5 | Pending |
 | JS-01 | Phase 3 | Pending |
 | JS-02 | Phase 3 | Pending |

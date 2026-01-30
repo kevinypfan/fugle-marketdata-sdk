@@ -13,7 +13,7 @@ Transform the fugle-marketdata-sdk from an extracted prototype into a production
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Build Infrastructure Modernization** - Unified workspace and CI/CD foundation ✓
-- [ ] **Phase 2: Python Binding Enhancement** - Upgrade to PyO3 0.27+ with full async support
+- [x] **Phase 2: Python Binding Enhancement** - Upgrade to PyO3 0.27+ with full async support ✓
 - [ ] **Phase 3: Node.js Binding Enhancement** - Upgrade to napi-rs 3.6+ with TypeScript improvements
 - [ ] **Phase 4: C# Binding Replacement** - Migrate from UniFFI to csbindgen with Task async
 - [ ] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet
@@ -49,11 +49,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Upgrade PyO3 to 0.27 with async runtime foundation
-- [ ] 02-02-PLAN.md — Convert REST client to native async/await API
-- [ ] 02-03-PLAN.md — Add WebSocket async iterator and auto-reconnect
-- [ ] 02-04-PLAN.md — Create type stubs and PEP 561 compliance
-- [ ] 02-05-PLAN.md — Validate async functionality with integration tests
+- [x] 02-01-PLAN.md — Upgrade PyO3 to 0.27 with async runtime foundation ✓
+- [x] 02-02-PLAN.md — Convert REST client to native async/await API ✓
+- [x] 02-03-PLAN.md — Add WebSocket async iterator and auto-reconnect ✓
+- [x] 02-04-PLAN.md — Create type stubs and PEP 561 compliance ✓
+- [x] 02-05-PLAN.md — Validate async functionality with integration tests ✓
 
 ### Phase 3: Node.js Binding Enhancement
 **Goal**: Upgrade Node.js binding to napi-rs 3.6+ with improved TypeScript definitions and API compatibility with fugle-marketdata-node
@@ -121,7 +121,7 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Build Infrastructure | 3/3 | Complete ✓ | 2026-01-31 |
-| 2. Python Binding | 0/5 | In progress | - |
+| 2. Python Binding | 5/5 | Complete ✓ | 2026-01-31 |
 | 3. Node.js Binding | 0/TBD | Not started | - |
 | 4. C# Binding | 0/TBD | Not started | - |
 | 5. Distribution | 0/TBD | Not started | - |
