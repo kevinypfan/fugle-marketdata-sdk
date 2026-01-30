@@ -51,3 +51,423 @@ pub extern "C" fn fugle_rest_client_free(handle: *mut RestClientHandle) {
         }));
     }
 }
+
+// ============================================================================
+// Stock Intraday Endpoints
+// ============================================================================
+
+/// Get intraday quote for a stock symbol (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_stock_quote_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.stock().intraday().quote().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(quote)) => {
+                    let json = serde_json::to_string(&quote).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get intraday trades for a stock symbol (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_stock_trades_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.stock().intraday().trades().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(trades)) => {
+                    let json = serde_json::to_string(&trades).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get intraday ticker info for a stock symbol (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_stock_ticker_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.stock().intraday().ticker().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(ticker)) => {
+                    let json = serde_json::to_string(&ticker).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get intraday candles for a stock symbol (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_stock_candles_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.stock().intraday().candles().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(candles)) => {
+                    let json = serde_json::to_string(&candles).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get intraday volumes for a stock symbol (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_stock_volumes_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.stock().intraday().volumes().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(volumes)) => {
+                    let json = serde_json::to_string(&volumes).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+// ============================================================================
+// FutOpt Intraday Endpoints
+// ============================================================================
+
+/// Get intraday quote for a FutOpt contract (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_futopt_quote_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.futopt().intraday().quote().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(quote)) => {
+                    let json = serde_json::to_string(&quote).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get intraday ticker info for a FutOpt contract (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_futopt_ticker_async(
+    handle: *const RestClientHandle,
+    symbol: *const c_char,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let symbol = unsafe { cstr_to_string(symbol) }
+            .ok_or(ERROR_INVALID_ARG)?;
+        let client = unsafe { &(*handle).client };
+
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.futopt().intraday().ticker().symbol(&symbol).send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(ticker)) => {
+                    let json = serde_json::to_string(&ticker).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
+
+/// Get available FutOpt products (async)
+#[no_mangle]
+pub extern "C" fn fugle_rest_futopt_products_async(
+    handle: *const RestClientHandle,
+    callback: ResultCallback,
+    user_data: *mut c_void,
+) {
+    let result = catch_panic(AssertUnwindSafe(|| {
+        if handle.is_null() {
+            return Err(ERROR_INVALID_ARG);
+        }
+
+        let client = unsafe { &(*handle).client };
+        let client_clone = client.clone();
+        let callback_addr = callback as usize;
+        let user_data_addr = user_data as usize;
+
+        RUNTIME.spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                client_clone.futopt().intraday().products().send()
+            }).await;
+
+            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
+            let user_data = user_data_addr as *mut c_void;
+
+            match result {
+                Ok(Ok(products)) => {
+                    let json = serde_json::to_string(&products).unwrap_or_default();
+                    let c_json = string_to_cstring(&json);
+                    callback(user_data, c_json, SUCCESS);
+                }
+                Ok(Err(e)) => {
+                    callback(user_data, ptr::null(), error_to_code(&e));
+                }
+                Err(_) => {
+                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                }
+            }
+        });
+
+        Ok(())
+    }));
+
+    if result.is_err() {
+        callback(user_data, ptr::null(), ERROR_INTERNAL);
+    }
+}
