@@ -112,6 +112,7 @@ fn marketdata_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<websocket::WebSocketClient>()?;
     m.add_class::<websocket::StockWebSocketClient>()?;
     m.add_class::<websocket::FutOptWebSocketClient>()?;
+    m.add_class::<websocket::ReconnectConfig>()?;
 
     // Register iterator class
     m.add_class::<iterator::MessageIterator>()?;

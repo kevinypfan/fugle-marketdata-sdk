@@ -26,12 +26,85 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3_async_runtimes::tokio::future_into_py;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::callback::CallbackRegistry;
 use crate::errors;
+
+/// Auto-reconnect configuration
+///
+/// Controls automatic reconnection behavior when connection is lost.
+///
+/// # Example (Python)
+///
+/// ```python
+/// from marketdata_py import ReconnectConfig
+///
+/// config = ReconnectConfig(
+///     enabled=True,
+///     max_retries=5,
+///     base_delay_ms=1000,
+///     max_delay_ms=30000
+/// )
+/// ```
+#[pyclass]
+#[derive(Clone)]
+pub struct ReconnectConfig {
+    /// Whether auto-reconnect is enabled
+    #[pyo3(get, set)]
+    pub enabled: bool,
+    /// Maximum number of reconnection attempts (0 = unlimited)
+    #[pyo3(get, set)]
+    pub max_retries: u32,
+    /// Base delay in milliseconds for exponential backoff
+    #[pyo3(get, set)]
+    pub base_delay_ms: u64,
+    /// Maximum delay in milliseconds (caps exponential backoff)
+    #[pyo3(get, set)]
+    pub max_delay_ms: u64,
+}
+
+#[pymethods]
+impl ReconnectConfig {
+    /// Create a new reconnect configuration
+    ///
+    /// Args:
+    ///     enabled: Whether auto-reconnect is enabled (default: True)
+    ///     max_retries: Maximum reconnection attempts, 0 for unlimited (default: 5)
+    ///     base_delay_ms: Base delay for exponential backoff (default: 1000ms)
+    ///     max_delay_ms: Maximum delay cap (default: 30000ms = 30s)
+    #[new]
+    #[pyo3(signature = (enabled=true, max_retries=5, base_delay_ms=1000, max_delay_ms=30000))]
+    pub fn new(enabled: bool, max_retries: u32, base_delay_ms: u64, max_delay_ms: u64) -> Self {
+        Self {
+            enabled,
+            max_retries,
+            base_delay_ms,
+            max_delay_ms,
+        }
+    }
+
+    /// Create a default reconnect configuration (enabled with 5 retries)
+    #[staticmethod]
+    pub fn default_config() -> Self {
+        Self::new(true, 5, 1000, 30000)
+    }
+
+    /// Create a disabled reconnect configuration
+    #[staticmethod]
+    pub fn disabled() -> Self {
+        Self::new(false, 0, 1000, 30000)
+    }
+}
+
+impl Default for ReconnectConfig {
+    fn default() -> Self {
+        Self::new(true, 5, 1000, 30000)
+    }
+}
 
 /// Python WebSocket client for Fugle market data streaming
 ///
@@ -506,6 +579,209 @@ impl StockWebSocketClient {
             .as_ref()
             .map(|s| s.inner.subscription_keys())
             .unwrap_or_default()
+    }
+
+    /// Connect to WebSocket server (async version)
+    ///
+    /// Returns an awaitable that completes when connection is established.
+    /// Releases GIL during connection, enabling concurrent Python tasks.
+    ///
+    /// Raises:
+    ///     MarketDataError: If connection fails
+    ///
+    /// Example:
+    ///     ```python
+    ///     await ws.stock.connect_async()
+    ///     ```
+    pub fn connect_async<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        // Ensure runtime exists
+        self.ensure_runtime().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(e)
+        })?;
+
+        let api_key = self.api_key.clone();
+        let callbacks = Arc::clone(&self.callbacks);
+        let state_arc = Arc::clone(&self.state);
+        let has_message_callbacks = self.has_message_callbacks();
+        let message_thread_stop = Arc::clone(&self.message_thread_stop);
+        let message_thread_handle = Arc::clone(&self.message_thread_handle);
+
+        future_into_py(py, async move {
+            // Create WebSocket client
+            let auth = marketdata_core::AuthRequest::with_api_key(&api_key);
+            let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
+            let ws_client = marketdata_core::WebSocketClient::new(config);
+
+            // Get message receiver before connect
+            let receiver = ws_client.messages();
+
+            // Connect without holding GIL
+            ws_client.connect().await
+                .map_err(|e| crate::errors::to_py_err(e))?;
+
+            // Clone receiver for potential background thread
+            let receiver_for_thread = Arc::clone(&receiver);
+
+            // Store state
+            let state = WebSocketState {
+                inner: ws_client,
+                receiver,
+            };
+
+            let mut state_guard = state_arc.lock()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+            *state_guard = Some(state);
+
+            // Start background message thread if callbacks registered
+            if has_message_callbacks {
+                message_thread_stop.store(false, Ordering::SeqCst);
+                let callbacks_clone = Arc::clone(&callbacks);
+                let stop_flag = Arc::clone(&message_thread_stop);
+
+                #[allow(deprecated)]
+                let handle = std::thread::spawn(move || {
+                    while !stop_flag.load(Ordering::SeqCst) {
+                        match receiver_for_thread.receive_timeout(Duration::from_millis(100)) {
+                            Ok(Some(msg)) => {
+                                Python::with_gil(|py| {
+                                    if let Ok(dict) = message_to_dict(py, &msg) {
+                                        let args = pyo3::types::PyTuple::new(py, [dict.into_any()])
+                                            .expect("Failed to create tuple");
+                                        callbacks_clone.invoke(py, crate::callback::EventType::Message, &args);
+                                    }
+                                });
+                            }
+                            Ok(None) => {}
+                            Err(_) => break,
+                        }
+                    }
+                });
+
+                if let Ok(mut guard) = message_thread_handle.lock() {
+                    *guard = Some(handle);
+                }
+            }
+
+            // Invoke connect callbacks with GIL
+            Python::with_gil(|py| {
+                callbacks.invoke_connect(py);
+            });
+
+            Ok(())
+        })
+    }
+
+    /// Disconnect from WebSocket server (async version)
+    ///
+    /// Returns an awaitable that completes when disconnection finishes.
+    ///
+    /// Example:
+    ///     ```python
+    ///     await ws.stock.disconnect_async()
+    ///     ```
+    pub fn disconnect_async<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        // Stop background message thread first
+        self.stop_message_thread();
+
+        let state_arc = Arc::clone(&self.state);
+        let callbacks = Arc::clone(&self.callbacks);
+
+        future_into_py(py, async move {
+            let mut state_guard = state_arc.lock()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+            if let Some(state) = state_guard.take() {
+                let _ = state.inner.disconnect().await;
+
+                // Invoke disconnect callbacks with GIL
+                Python::with_gil(|py| {
+                    callbacks.invoke_disconnect(py, Some(1000), "Normal closure");
+                });
+            }
+
+            Ok(())
+        })
+    }
+
+    /// Subscribe to a channel (async version)
+    ///
+    /// Args:
+    ///     channel: Channel name (trades, candles, books, aggregates, indices)
+    ///     symbol: Stock symbol (e.g., "2330")
+    ///     odd_lot: Whether to subscribe to odd lot data (default: False)
+    ///
+    /// Returns:
+    ///     Awaitable that completes when subscription is confirmed
+    ///
+    /// Example:
+    ///     ```python
+    ///     await ws.stock.subscribe_async("trades", "2330")
+    ///     ```
+    #[pyo3(signature = (channel, symbol, odd_lot=false))]
+    pub fn subscribe_async<'py>(
+        &self,
+        py: Python<'py>,
+        channel: String,
+        symbol: String,
+        odd_lot: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let state_arc = Arc::clone(&self.state);
+
+        future_into_py(py, async move {
+            let state_guard = state_arc.lock()
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+            let state = state_guard.as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first."))?;
+
+            // Parse channel
+            let ch = match channel.to_lowercase().as_str() {
+                "trades" => marketdata_core::Channel::Trades,
+                "candles" => marketdata_core::Channel::Candles,
+                "books" => marketdata_core::Channel::Books,
+                "aggregates" => marketdata_core::Channel::Aggregates,
+                "indices" => marketdata_core::Channel::Indices,
+                _ => {
+                    return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "Invalid channel: '{}'. Valid channels: trades, candles, books, aggregates, indices",
+                        channel
+                    )));
+                }
+            };
+
+            // Create subscription
+            let sub = marketdata_core::StockSubscription::new(ch, &symbol).with_odd_lot(odd_lot);
+
+            // Subscribe without holding GIL
+            state.inner.subscribe_channel(sub).await
+                .map_err(crate::errors::to_py_err)?;
+
+            Ok(())
+        })
+    }
+
+    /// Async context manager support: enter
+    ///
+    /// Example:
+    ///     ```python
+    ///     async with ws.stock as client:
+    ///         await client.subscribe("trades", "2330")
+    ///     ```
+    fn __aenter__<'py>(slf: PyRef<'py, Self>, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        slf.connect_async(py)
+    }
+
+    /// Async context manager support: exit
+    ///
+    /// Automatically disconnects when exiting async with block.
+    fn __aexit__<'py>(
+        &self,
+        py: Python<'py>,
+        _exc_type: &Bound<'py, PyAny>,
+        _exc_value: &Bound<'py, PyAny>,
+        _traceback: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.disconnect_async(py)
     }
 }
 
