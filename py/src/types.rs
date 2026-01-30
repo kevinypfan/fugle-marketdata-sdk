@@ -6,7 +6,6 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::IntoPyObjectExt;
 use serde_json::Value;
 
 /// Convert a Quote to a Python dict
@@ -76,7 +75,7 @@ pub fn quote_to_dict(py: Python<'_>, quote: &marketdata_core::Quote) -> PyResult
     dict.set_item("isClose", quote.is_close)?;
     dict.set_item("lastUpdated", quote.last_updated)?;
 
-    Ok(dict.into())
+    Ok(dict.unbind())
 }
 
 /// Convert a FutOptQuote to a Python dict
@@ -154,73 +153,91 @@ pub fn futopt_quote_to_dict(
 
     dict.set_item("lastUpdated", quote.last_updated)?;
 
-    Ok(dict.into())
+    Ok(dict.unbind())
 }
 
 /// Convert a serde_json::Value to a Python object
 ///
 /// Used for generic API responses that return JSON data
-fn json_value_to_py<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny>> {
+pub fn json_value_to_py(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
+    use pyo3::IntoPyObject;
+
     match value {
-        Value::Null => Ok(py.None().into_bound(py)),
-        Value::Bool(b) => Ok(b.into_bound_py_any(py)?),
+        Value::Null => Ok(py.None()),
+        Value::Bool(b) => Ok(b.into_pyobject(py)?.to_owned().unbind().into_any()),
         Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                Ok(i.into_bound_py_any(py)?)
+                Ok(i.into_pyobject(py)?.to_owned().unbind().into_any())
             } else if let Some(f) = n.as_f64() {
-                Ok(f.into_bound_py_any(py)?)
+                Ok(f.into_pyobject(py)?.to_owned().unbind().into_any())
             } else {
-                Ok(n.to_string().into_bound_py_any(py)?)
+                Ok(n.to_string().into_pyobject(py)?.to_owned().unbind().into_any())
             }
         }
-        Value::String(s) => Ok(s.into_bound_py_any(py)?),
+        Value::String(s) => Ok(s.into_pyobject(py)?.to_owned().unbind().into_any()),
         Value::Array(arr) => {
             let list = PyList::empty(py);
             for item in arr {
                 list.append(json_value_to_py(py, item)?)?;
             }
-            Ok(list.into_any())
+            Ok(list.unbind().into_any())
         }
         Value::Object(obj) => {
             let dict = PyDict::new(py);
             for (key, val) in obj {
                 dict.set_item(key, json_value_to_py(py, val)?)?;
             }
-            Ok(dict.into_any())
+            Ok(dict.unbind().into_any())
         }
     }
 }
 
 /// Convert a Ticker to a Python dict
+#[allow(deprecated)]  // downcast deprecated in PyO3 0.27
 pub fn ticker_to_dict(py: Python<'_>, ticker: &marketdata_core::Ticker) -> PyResult<Py<PyDict>> {
     let json_val = serde_json::to_value(ticker)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
-    let bound_any = json_value_to_py(py, &json_val)?;
-    Ok(bound_any.unbind().cast::<PyDict>(py)?)
+    let py_any = json_value_to_py(py, &json_val)?;
+    let bound = py_any.bind(py);
+    let dict: &Bound<'_, PyDict> = bound.downcast()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("Expected dict from JSON object"))?;
+    Ok(dict.clone().unbind())
 }
 
 /// Convert IntradayCandlesResponse to a Python dict
+#[allow(deprecated)]  // downcast deprecated in PyO3 0.27
 pub fn candles_to_dict(py: Python<'_>, candles: &marketdata_core::IntradayCandlesResponse) -> PyResult<Py<PyDict>> {
     let json_val = serde_json::to_value(candles)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
-    let bound_any = json_value_to_py(py, &json_val)?;
-    Ok(bound_any.unbind().cast::<PyDict>(py)?)
+    let py_any = json_value_to_py(py, &json_val)?;
+    let bound = py_any.bind(py);
+    let dict: &Bound<'_, PyDict> = bound.downcast()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("Expected dict from JSON object"))?;
+    Ok(dict.clone().unbind())
 }
 
 /// Convert TradesResponse to a Python dict
+#[allow(deprecated)]  // downcast deprecated in PyO3 0.27
 pub fn trades_to_dict(py: Python<'_>, trades: &marketdata_core::TradesResponse) -> PyResult<Py<PyDict>> {
     let json_val = serde_json::to_value(trades)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
-    let bound_any = json_value_to_py(py, &json_val)?;
-    Ok(bound_any.unbind().cast::<PyDict>(py)?)
+    let py_any = json_value_to_py(py, &json_val)?;
+    let bound = py_any.bind(py);
+    let dict: &Bound<'_, PyDict> = bound.downcast()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("Expected dict from JSON object"))?;
+    Ok(dict.clone().unbind())
 }
 
 /// Convert VolumesResponse to a Python dict
+#[allow(deprecated)]  // downcast deprecated in PyO3 0.27
 pub fn volumes_to_dict(py: Python<'_>, volumes: &marketdata_core::VolumesResponse) -> PyResult<Py<PyDict>> {
     let json_val = serde_json::to_value(volumes)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
-    let bound_any = json_value_to_py(py, &json_val)?;
-    Ok(bound_any.unbind().cast::<PyDict>(py)?)
+    let py_any = json_value_to_py(py, &json_val)?;
+    let bound = py_any.bind(py);
+    let dict: &Bound<'_, PyDict> = bound.downcast()
+        .map_err(|_| pyo3::exceptions::PyTypeError::new_err("Expected dict from JSON object"))?;
+    Ok(dict.clone().unbind())
 }
 
 // Note: PyO3 tests require Python linking and are tested via maturin develop + pytest

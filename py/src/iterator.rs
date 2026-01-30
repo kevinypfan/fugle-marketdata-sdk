@@ -189,7 +189,7 @@ impl MessageIterator {
             match result {
                 Ok(Some(msg)) => {
                     // Convert to Python dict with GIL
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let dict = message_to_dict(py, &msg)?;
                         Ok(Some(dict.into_any()))
                     })
