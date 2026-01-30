@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 1 of 6 (Build Infrastructure Modernization)
-Plan: 2 of TBD in current phase
+Plan: 3 of TBD in current phase
 Status: In progress
-Last activity: 2026-01-30 — Completed 01-02-PLAN.md (Build Orchestration)
+Last activity: 2026-01-30 — Completed 01-03-PLAN.md (CI/CD Workflows)
 
-Progress: [██░░░░░░░░] ~15%
+Progress: [██░░░░░░░░] ~20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 3 min
-- Total execution time: 0.10 hours
+- Total plans completed: 3
+- Average duration: 4 min
+- Total execution time: 0.18 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-build-infrastructure | 2 | 6min | 3min |
+| 01-build-infrastructure | 3 | 11min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (2min)
-- Trend: Improving efficiency, simple infra plans executing quickly
+- Last 5 plans: 01-01 (4min), 01-02 (2min), 01-03 (5min)
+- Trend: Consistent execution, infrastructure plans averaging 3-5 minutes
 
 *Updated after each plan completion*
 
@@ -51,6 +51,9 @@ Recent decisions affecting current work:
 - **01-02:** Standardize package names: fugle-marketdata (Python), @fugle/marketdata (Node.js)
 - **01-02:** Use --cargo-name flag in napi build scripts for workspace compatibility
 - **01-02:** Separate dev/release targets for each binding language in Makefile
+- **01-03:** Use path-based workflow triggering (dorny/paths-filter) to run only affected language workflows
+- **01-03:** Test minimal language versions (Python 3.8, Node 18) on Linux only, current versions on all platforms
+- **01-03:** Use Swatinem/rust-cache with workspace paths to prevent cache key collisions between bindings
 
 ### Pending Todos
 
@@ -85,7 +88,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-30T10:28:18Z
-Stopped at: Completed 01-02-PLAN.md execution (Build Orchestration)
-Resume file: .planning/phases/01-build-infrastructure/01-02-SUMMARY.md
+Last session: 2026-01-30T15:55:24Z
+Stopped at: Completed 01-03-PLAN.md execution (CI/CD Workflows)
+Resume file: .planning/phases/01-build-infrastructure/01-03-SUMMARY.md
 Next: Continue Phase 1 with additional infrastructure plans, or proceed to Phase 2 Python Modernization
