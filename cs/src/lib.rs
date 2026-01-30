@@ -1,9 +1,11 @@
 //! C# bindings for marketdata-core via csbindgen
 
 mod errors;
+mod rest_client;
 mod types;
 
 pub use errors::*;
+pub use rest_client::*;
 pub use types::*;
 
 use std::ffi::c_char;
