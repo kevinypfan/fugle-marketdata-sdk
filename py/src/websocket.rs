@@ -159,8 +159,11 @@ impl WebSocketClient {
 }
 
 /// Internal WebSocket state (not Send/Sync safe, managed via Mutex)
+///
+/// The `inner` is wrapped in Arc to allow cloning the reference out of
+/// the Mutex before async operations (avoiding holding MutexGuard across await).
 struct WebSocketState {
-    inner: marketdata_core::WebSocketClient,
+    inner: Arc<marketdata_core::WebSocketClient>,
     receiver: Arc<marketdata_core::MessageReceiver>,
 }
 
@@ -227,7 +230,7 @@ impl StockWebSocketClient {
                 match receiver.receive_timeout(Duration::from_millis(100)) {
                     Ok(Some(msg)) => {
                         // Acquire GIL and invoke callback
-                        Python::with_gil(|py| {
+                        Python::attach(|py| {
                             if let Ok(dict) = message_to_dict(py, &msg) {
                                 let args = pyo3::types::PyTuple::new(py, [dict.into_any()]).expect("Failed to create tuple");
                                 callbacks.invoke(
@@ -291,11 +294,13 @@ impl StockWebSocketClient {
     ///
     ///     ws.stock.on("message", on_message)
     ///     ```
+    #[pyo3(signature = (event, callback))]
     pub fn on(&self, event: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         self.callbacks.register(event, callback)
     }
 
     /// Remove all callbacks for an event type
+    #[pyo3(signature = (event))]
     pub fn off(&self, event: &str) -> PyResult<()> {
         self.callbacks.unregister(event)
     }
@@ -345,7 +350,7 @@ impl StockWebSocketClient {
 
                 // Store state
                 let state = WebSocketState {
-                    inner: ws_client,
+                    inner: Arc::new(ws_client),
                     receiver,
                 };
 
@@ -368,6 +373,7 @@ impl StockWebSocketClient {
     }
 
     /// Disconnect from WebSocket server
+    #[pyo3(signature = ())]
     pub fn disconnect(&self, py: Python<'_>) -> PyResult<()> {
         // Stop background message thread first
         self.stop_message_thread();
@@ -395,6 +401,7 @@ impl StockWebSocketClient {
     }
 
     /// Check if currently connected
+    #[pyo3(signature = ())]
     pub fn is_connected(&self) -> bool {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
@@ -423,6 +430,7 @@ impl StockWebSocketClient {
     ///
     /// Returns true if disconnect() has been called and client is closed.
     /// Once closed, the client cannot be reused - create a new instance.
+    #[pyo3(signature = ())]
     pub fn is_closed(&self) -> bool {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
@@ -514,6 +522,7 @@ impl StockWebSocketClient {
     ///
     /// Args:
     ///     subscription_id: The subscription ID returned from subscribe
+    #[pyo3(signature = (subscription_id))]
     pub fn unsubscribe(&self, subscription_id: &str) -> PyResult<()> {
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
@@ -569,6 +578,7 @@ impl StockWebSocketClient {
     }
 
     /// Get list of active subscription keys
+    #[pyo3(signature = ())]
     pub fn subscriptions(&self) -> Vec<String> {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
@@ -624,7 +634,7 @@ impl StockWebSocketClient {
 
             // Store state
             let state = WebSocketState {
-                inner: ws_client,
+                inner: Arc::new(ws_client),
                 receiver,
             };
 
@@ -643,7 +653,7 @@ impl StockWebSocketClient {
                     while !stop_flag.load(Ordering::SeqCst) {
                         match receiver_for_thread.receive_timeout(Duration::from_millis(100)) {
                             Ok(Some(msg)) => {
-                                Python::with_gil(|py| {
+                                Python::attach(|py| {
                                     if let Ok(dict) = message_to_dict(py, &msg) {
                                         let args = pyo3::types::PyTuple::new(py, [dict.into_any()])
                                             .expect("Failed to create tuple");
@@ -663,7 +673,7 @@ impl StockWebSocketClient {
             }
 
             // Invoke connect callbacks with GIL
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 callbacks.invoke_connect(py);
             });
 
@@ -687,14 +697,19 @@ impl StockWebSocketClient {
         let callbacks = Arc::clone(&self.callbacks);
 
         future_into_py(py, async move {
-            let mut state_guard = state_arc.lock()
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+            // Extract state from mutex without holding guard across await
+            let state_opt = {
+                let mut state_guard = state_arc.lock()
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+                state_guard.take()
+            };
+            // Guard is dropped here
 
-            if let Some(state) = state_guard.take() {
+            if let Some(state) = state_opt {
                 let _ = state.inner.disconnect().await;
 
                 // Invoke disconnect callbacks with GIL
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     callbacks.invoke_disconnect(py, Some(1000), "Normal closure");
                 });
             }
@@ -728,13 +743,7 @@ impl StockWebSocketClient {
         let state_arc = Arc::clone(&self.state);
 
         future_into_py(py, async move {
-            let state_guard = state_arc.lock()
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-
-            let state = state_guard.as_ref()
-                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first."))?;
-
-            // Parse channel
+            // Parse channel first (doesn't need lock)
             let ch = match channel.to_lowercase().as_str() {
                 "trades" => marketdata_core::Channel::Trades,
                 "candles" => marketdata_core::Channel::Candles,
@@ -752,8 +761,18 @@ impl StockWebSocketClient {
             // Create subscription
             let sub = marketdata_core::StockSubscription::new(ch, &symbol).with_odd_lot(odd_lot);
 
-            // Subscribe without holding GIL
-            state.inner.subscribe_channel(sub).await
+            // Clone the Arc<WebSocketClient> out of mutex to avoid holding guard across await
+            let ws_client = {
+                let state_guard = state_arc.lock()
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+                let state = state_guard.as_ref()
+                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first."))?;
+                Arc::clone(&state.inner)
+            };
+            // Guard is dropped here
+
+            // Subscribe without holding mutex
+            ws_client.subscribe_channel(sub).await
                 .map_err(crate::errors::to_py_err)?;
 
             Ok(())
@@ -838,11 +857,13 @@ impl FutOptWebSocketClient {
     /// Args:
     ///     event: Event type string
     ///     callback: Python callable to invoke
+    #[pyo3(signature = (event, callback))]
     pub fn on(&self, event: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         self.callbacks.register(event, callback)
     }
 
     /// Remove all callbacks for an event type
+    #[pyo3(signature = (event))]
     pub fn off(&self, event: &str) -> PyResult<()> {
         self.callbacks.unregister(event)
     }
@@ -851,6 +872,7 @@ impl FutOptWebSocketClient {
     ///
     /// Raises:
     ///     MarketDataError: If connection fails
+    #[pyo3(signature = ())]
     pub fn connect(&self, py: Python<'_>) -> PyResult<()> {
         // Ensure runtime exists
         self.ensure_runtime().map_err(|e| {
@@ -883,7 +905,7 @@ impl FutOptWebSocketClient {
             Ok(()) => {
                 // Store state
                 let state = WebSocketState {
-                    inner: ws_client,
+                    inner: Arc::new(ws_client),
                     receiver,
                 };
 
@@ -901,6 +923,7 @@ impl FutOptWebSocketClient {
     }
 
     /// Disconnect from WebSocket server
+    #[pyo3(signature = ())]
     pub fn disconnect(&self, py: Python<'_>) -> PyResult<()> {
         let mut state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
@@ -925,6 +948,7 @@ impl FutOptWebSocketClient {
     }
 
     /// Check if currently connected
+    #[pyo3(signature = ())]
     pub fn is_connected(&self) -> bool {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
@@ -953,6 +977,7 @@ impl FutOptWebSocketClient {
     ///
     /// Returns true if disconnect() has been called and client is closed.
     /// Once closed, the client cannot be reused - create a new instance.
+    #[pyo3(signature = ())]
     pub fn is_closed(&self) -> bool {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
@@ -1055,6 +1080,7 @@ impl FutOptWebSocketClient {
     ///
     /// Args:
     ///     subscription_id: The subscription ID returned from subscribe
+    #[pyo3(signature = (subscription_id))]
     pub fn unsubscribe(&self, subscription_id: &str) -> PyResult<()> {
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
@@ -1107,6 +1133,7 @@ impl FutOptWebSocketClient {
     }
 
     /// Get list of active subscription keys
+    #[pyo3(signature = ())]
     pub fn subscriptions(&self) -> Vec<String> {
         let state_guard = match self.state.lock() {
             Ok(g) => g,

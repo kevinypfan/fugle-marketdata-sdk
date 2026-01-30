@@ -182,6 +182,7 @@ impl StockIntradayClient {
     ///     ```python
     ///     ticker = await client.stock.intraday.ticker("2330")
     ///     ```
+    #[pyo3(signature = (symbol))]
     pub fn ticker<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
@@ -248,6 +249,7 @@ impl StockIntradayClient {
     ///     ```python
     ///     trades = await client.stock.intraday.trades("2330")
     ///     ```
+    #[pyo3(signature = (symbol))]
     pub fn trades<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
@@ -280,6 +282,7 @@ impl StockIntradayClient {
     ///     ```python
     ///     volumes = await client.stock.intraday.volumes("2330")
     ///     ```
+    #[pyo3(signature = (symbol))]
     pub fn volumes<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
