@@ -12,7 +12,7 @@ Transform the fugle-marketdata-sdk from an extracted prototype into a production
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Build Infrastructure Modernization** - Unified workspace and CI/CD foundation
+- [x] **Phase 1: Build Infrastructure Modernization** - Unified workspace and CI/CD foundation ✓
 - [ ] **Phase 2: Python Binding Enhancement** - Upgrade to PyO3 0.27+ with full async support
 - [ ] **Phase 3: Node.js Binding Enhancement** - Upgrade to napi-rs 3.6+ with TypeScript improvements
 - [ ] **Phase 4: C# Binding Replacement** - Migrate from UniFFI to csbindgen with Task async
@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Create Cargo workspace and migrate member crates
-- [ ] 01-02-PLAN.md — Create Makefile and update version configs
-- [ ] 01-03-PLAN.md — Create GitHub Actions CI/CD workflows
+- [x] 01-01-PLAN.md — Create Cargo workspace and migrate member crates ✓
+- [x] 01-02-PLAN.md — Create Makefile and update version configs ✓
+- [x] 01-03-PLAN.md — Create GitHub Actions CI/CD workflows ✓
 
 ### Phase 2: Python Binding Enhancement
 **Goal**: Modernize Python binding to PyO3 0.27+ with native asyncio support and full API compatibility with fugle-marketdata-python
@@ -116,8 +116,8 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Build Infrastructure | 0/3 | Ready to execute | - |
-| 2. Python Binding | 0/TBD | Not started | - |
+| 1. Build Infrastructure | 3/3 | Complete ✓ | 2026-01-31 |
+| 2. Python Binding | 0/TBD | Ready to plan | - |
 | 3. Node.js Binding | 0/TBD | Not started | - |
 | 4. C# Binding | 0/TBD | Not started | - |
 | 5. Distribution | 0/TBD | Not started | - |
