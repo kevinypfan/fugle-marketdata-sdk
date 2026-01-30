@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 2 Complete - Ready for Phase 3 (Node.js Binding)
+**Current focus:** Phase 3 - Node.js Binding Enhancement (In Progress)
 
 ## Current Position
 
-Phase: 2 of 6 (Python Binding Enhancement) - COMPLETE
-Plan: 5 of 5 in current phase (all plans complete)
-Status: Phase 2 complete with full async Python binding and test suite
-Last activity: 2026-01-31 — Completed 02-05-PLAN.md (integration tests)
+Phase: 3 of 6 (Node.js Binding Enhancement)
+Plan: 2 of 5 in current phase
+Status: Completed 03-02 (Async REST API)
+Last activity: 2026-01-31 — Completed 03-02-PLAN.md (REST async conversion)
 
-Progress: [███░░░░░░░] 33% (2 of 6 phases complete)
+Progress: [████░░░░░░] 40% (~10 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 10
 - Average duration: 7 min
-- Total execution time: 0.8 hours
+- Total execution time: ~1.2 hours
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [███░░░░░░░] 33% (2 of 6 phases complete)
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
+| 03-nodejs-binding | 2 | ~18min | 9min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (9min), 02-02 (6min), 02-03 (7min), 02-04 (8min), 02-05 (8min)
-- Trend: Phase 2 plans consistent at ~7-8min average
+- Last 5 plans: 02-03 (7min), 02-04 (8min), 02-05 (8min), 03-01 (~9min), 03-02 (9min)
+- Trend: Consistent 8-9min for binding enhancements
 
 *Updated after each plan completion*
 
@@ -69,6 +70,10 @@ Recent decisions affecting current work:
 - **02-05:** Use pytest-asyncio auto mode for automatic async test discovery
 - **02-05:** Skip integration tests automatically when FUGLE_API_KEY not set
 - **02-05:** API compatibility tests verify structural parity without network calls
+- **03-01:** napi-rs 3.4 pinned for Rust 1.87 compatibility (3.8+ requires Rust 1.88)
+- **03-01:** ThreadsafeFunction wrapped in Arc for safe cross-thread callback access
+- **03-02:** Use spawn_blocking for REST methods to bridge sync ureq to async Promise
+- **03-02:** TypeScript definitions updated to Promise<any> return types
 
 ### Pending Todos
 
@@ -92,8 +97,10 @@ None yet.
 - ⚠️ PENDING: Historical/snapshot endpoints blocked until core implementation available
 
 **Phase 3 (Node.js):**
-- napi-rs 2.16 → 3.6 has ThreadsafeFunction API changes requiring WebSocket callback refactoring
-- Memory leak testing needed for Buffer/TypedArray handling
+- ✅ RESOLVED: napi-rs 3.4 upgrade complete with Arc<ThreadsafeFunction> pattern in 03-01
+- ✅ RESOLVED: REST async conversion complete with spawn_blocking in 03-02
+- ⚠️ PENDING: WebSocket async iterator pattern (03-03)
+- ⚠️ PENDING: Memory leak testing for Buffer/TypedArray handling
 
 **Phase 4 (C#):**
 - UniFFI → csbindgen migration requires complete API redesign from UDL to extern "C" FFI
@@ -111,6 +118,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 02-05-PLAN.md (integration tests) - Phase 2 complete
+Stopped at: Completed 03-02-PLAN.md (REST async conversion)
 Resume file: N/A
-Next: Execute Phase 3 (Node.js Binding Enhancement)
+Next: Execute 03-03-PLAN.md (WebSocket async enhancement)
