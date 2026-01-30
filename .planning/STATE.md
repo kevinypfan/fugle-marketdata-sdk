@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 2 of 6 (Python Binding Enhancement)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-31 — Completed 02-02-PLAN.md (REST Async Conversion)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-31 — Completed 02-03-PLAN.md (WebSocket Async Iterator)
 
-Progress: [██░░░░░░░░] 22% (1.34 of 6 phases complete)
+Progress: [██░░░░░░░░] 33% (2.00 of 6 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: 5 min
-- Total execution time: 0.42 hours
+- Total execution time: 0.53 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
-| 02-python-binding | 2 | 15min | 8min |
+| 02-python-binding | 3 | 22min | 7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (2min), 01-03 (5min), 02-01 (9min), 02-02 (6min)
-- Trend: Phase 2 async conversion faster than PyO3 upgrade but longer than Phase 1
+- Last 5 plans: 01-03 (5min), 02-01 (9min), 02-02 (6min), 02-03 (7min)
+- Trend: Phase 2 async work consistent ~7min per plan
 
 *Updated after each plan completion*
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - **02-02:** Use spawn_blocking to wrap sync ureq HTTP calls (core uses blocking HTTP, not async)
 - **02-02:** Type conversion via serde_json::to_value then custom Python dict converters
 - **02-02:** Scope limited to intraday endpoints until core implements historical/snapshot
+- **02-03:** Keep std::sync::mpsc for FFI compatibility, use spawn_blocking for async polling without holding GIL
+- **02-03:** Dual API pattern: preserve callback (on/off) while adding async methods (connect_async, subscribe_async)
+- **02-03:** Timeout-based deadlock detection in GIL safety tests (pytest-timeout 10-15s)
 
 ### Pending Todos
 
@@ -76,7 +79,9 @@ None yet.
 - ✅ RESOLVED: PyO3 0.27 upgrade completed with Bound API migration in 02-01
 - ✅ RESOLVED: pyo3-async-runtimes 0.27 added and ready for async API in 02-02
 - ✅ RESOLVED: REST async conversion complete for intraday endpoints in 02-02
+- ✅ RESOLVED: WebSocket async iterator and async methods complete in 02-03
 - ⚠️ PENDING: Historical/snapshot endpoints blocked until core implementation available
+- ⚠️ PENDING: Pre-existing compilation errors in client.rs and types.rs need resolution
 
 **Phase 3 (Node.js):**
 - napi-rs 2.16 → 3.6 has ThreadsafeFunction API changes requiring WebSocket callback refactoring
@@ -98,6 +103,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 02-02-PLAN.md (REST Async Conversion)
-Resume file: .planning/phases/02-python-binding/02-02-SUMMARY.md
-Next: Continue Phase 2 with Plan 02-03 (WebSocket Async) or `/gsd:plan-next`
+Stopped at: Completed 02-03-PLAN.md (WebSocket Async Iterator)
+Resume file: .planning/phases/02-python-binding/02-03-SUMMARY.md
+Next: Phase 2 complete. Begin Phase 3 (Node.js Binding Enhancement) with `/gsd:plan-next`
