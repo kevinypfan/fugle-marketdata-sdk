@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+    <RootNamespace>Fugle.MarketData</RootNamespace>
+    <AssemblyName>Fugle.MarketData</AssemblyName>
+    <Version>0.2.0</Version>
+    <Authors>Fugle Community</Authors>
+    <Description>C# binding for Fugle MarketData API - intraday stock and futures/options market data</Description>
+    <PackageProjectUrl>https://github.com/fugle-dev/fugle-marketdata-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/fugle-dev/fugle-marketdata-sdk</RepositoryUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <!-- Enable records in netstandard2.0 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="IsExternalInit" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
