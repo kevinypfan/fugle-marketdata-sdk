@@ -22,3 +22,7 @@ features = ["pyo3/extension-module"]
 [tool.pytest.ini_options]
 timeout = 30
 asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (require API key)"
+]
