@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      python: ${{ steps.filter.outputs.python }}
+      nodejs: ${{ steps.filter.outputs.nodejs }}
+      csharp: ${{ steps.filter.outputs.csharp }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            python:
+              - 'py/**'
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            nodejs:
+              - 'js/**'
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            csharp:
+              - 'uniffi/**'
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
+  python:
+    name: Python Bindings
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
+    uses: ./.github/workflows/python.yml
+
+  nodejs:
+    name: Node.js Bindings
+    needs: changes
+    if: ${{ needs.changes.outputs.nodejs == 'true' }}
+    uses: ./.github/workflows/nodejs.yml
+
+  csharp:
+    name: C# Bindings
+    needs: changes
+    if: ${{ needs.changes.outputs.csharp == 'true' }}
+    uses: ./.github/workflows/csharp.yml
