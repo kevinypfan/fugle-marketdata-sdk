@@ -81,10 +81,14 @@ Plans:
   2. C# API follows PascalCase naming conventions and .NET patterns matching FubonNeo SDK structure
   3. WebSocket streaming delivers events through C# EventHandler pattern with background polling
   4. FFI boundaries handle Rust panics gracefully without corrupting .NET runtime
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 04-01: TBD during planning
+- [ ] 04-01-PLAN.md — Create cs/ crate with csbindgen and error handling foundation
+- [ ] 04-02-PLAN.md — Implement REST client extern "C" exports with async callbacks
+- [ ] 04-03-PLAN.md — Implement WebSocket client extern "C" exports with polling
+- [ ] 04-04-PLAN.md — Create C# project with models, exceptions, and RestClient
+- [ ] 04-05-PLAN.md — Create WebSocketClient wrapper and test suite
 
 ### Phase 5: Cross-Platform Distribution
 **Goal**: Automate package publishing with platform-specific builds for PyPI, npm, and NuGet registries
@@ -126,6 +130,6 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 | 1. Build Infrastructure | 3/3 | Complete ✓ | 2026-01-31 |
 | 2. Python Binding | 5/5 | Complete ✓ | 2026-01-31 |
 | 3. Node.js Binding | 4/4 | Complete ✓ | 2026-01-31 |
-| 4. C# Binding | 0/TBD | Not started | - |
+| 4. C# Binding | 0/5 | Planning complete | - |
 | 5. Distribution | 0/TBD | Not started | - |
 | 6. Testing | 0/TBD | Not started | - |
