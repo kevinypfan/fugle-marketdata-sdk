@@ -98,7 +98,7 @@ impl StockIntradayClient {
     /// console.log(quote.symbol);     // "2330"
     /// console.log(quote.bids);       // [{price: 579.0, size: 100}, ...]
     /// ```
-    #[napi]
+    #[napi(ts_return_type = "Promise<QuoteResponse>")]
     pub async fn quote(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -120,7 +120,7 @@ impl StockIntradayClient {
     ///
     /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
     /// @returns Promise resolving to Ticker object with last trade info
-    #[napi]
+    #[napi(ts_return_type = "Promise<TickerResponse>")]
     pub async fn ticker(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -142,7 +142,7 @@ impl StockIntradayClient {
     /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
     /// @param timeframe - Candle timeframe: "1", "5", "10", "15", "30", "60" (minutes)
     /// @returns Promise resolving to Candles response with OHLCV data
-    #[napi]
+    #[napi(ts_return_type = "Promise<CandlesResponse>")]
     pub async fn candles(&self, symbol: String, timeframe: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -169,7 +169,7 @@ impl StockIntradayClient {
     ///
     /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
     /// @returns Promise resolving to Trades response with recent trade history
-    #[napi]
+    #[napi(ts_return_type = "Promise<TradesResponse>")]
     pub async fn trades(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -190,7 +190,7 @@ impl StockIntradayClient {
     ///
     /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
     /// @returns Promise resolving to Volumes response with volume at each price level
-    #[napi]
+    #[napi(ts_return_type = "Promise<VolumesResponse>")]
     pub async fn volumes(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -245,7 +245,7 @@ impl FutOptIntradayClient {
     /// console.log(quote.lastPrice);  // 17550.0
     /// console.log(quote.symbol);     // "TXFC4"
     /// ```
-    #[napi]
+    #[napi(ts_return_type = "Promise<QuoteResponse>")]
     pub async fn quote(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -266,7 +266,7 @@ impl FutOptIntradayClient {
     ///
     /// @param symbol - Contract symbol (e.g., "TXFC4")
     /// @returns Promise resolving to Ticker object with last trade info
-    #[napi]
+    #[napi(ts_return_type = "Promise<TickerResponse>")]
     pub async fn ticker(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -288,7 +288,7 @@ impl FutOptIntradayClient {
     /// @param symbol - Contract symbol (e.g., "TXFC4")
     /// @param timeframe - Candle timeframe: "1", "5", "10", "15", "30", "60" (minutes)
     /// @returns Promise resolving to Candles response with OHLCV data
-    #[napi]
+    #[napi(ts_return_type = "Promise<CandlesResponse>")]
     pub async fn candles(&self, symbol: String, timeframe: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -315,7 +315,7 @@ impl FutOptIntradayClient {
     ///
     /// @param symbol - Contract symbol (e.g., "TXFC4")
     /// @returns Promise resolving to Trades response with recent trade history
-    #[napi]
+    #[napi(ts_return_type = "Promise<TradesResponse>")]
     pub async fn trades(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -336,7 +336,7 @@ impl FutOptIntradayClient {
     ///
     /// @param symbol - Contract symbol (e.g., "TXFC4")
     /// @returns Promise resolving to Volumes response with volume at each price level
-    #[napi]
+    #[napi(ts_return_type = "Promise<VolumesResponse>")]
     pub async fn volumes(&self, symbol: String) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
@@ -358,7 +358,7 @@ impl FutOptIntradayClient {
     /// @param typ - Type: "FUTURE" or "OPTION" (required)
     /// @param contractType - Contract type filter (optional): "I" (index), "R" (rate), "B" (bond), "C" (currency), "S" (stock), "E" (ETF)
     /// @returns Promise resolving to Products response with available contracts
-    #[napi]
+    #[napi(ts_return_type = "Promise<ProductsResponse>", ts_args_type = "type: FutOptType, contractType?: ContractType")]
     pub async fn products(&self, typ: String, contract_type: Option<String>) -> napi::Result<Value> {
         use marketdata_core::models::futopt::{ContractType, FutOptType};
 
