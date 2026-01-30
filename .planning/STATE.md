@@ -12,16 +12,16 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 Phase: 4 of 6 (C# Binding Replacement) - IN PROGRESS
 Plan: 3 of 5 in current phase - COMPLETE
 Status: Phase 4 In Progress
-Last activity: 2026-01-30 - Completed 04-03-PLAN.md (WebSocket FFI with polling-based message retrieval)
+Last activity: 2026-01-31 - Completed 04-02-PLAN.md (REST client FFI with async callbacks)
 
-Progress: [████████░░] 56% (~14 of 25 plans complete)
+Progress: [████████░░] 60% (~15 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: 6 min
-- Total execution time: ~1.6 hours
+- Total execution time: ~1.7 hours
 
 **By Phase:**
 
@@ -30,10 +30,10 @@ Progress: [████████░░] 56% (~14 of 25 plans complete)
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
 | 03-nodejs-binding | 4 | 32min | 8min |
-| 04-csharp-binding | 2 | 5min | 3min |
+| 04-csharp-binding | 3 | 9min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (10min), 03-03 (8min), 03-04 (4min), 04-01 (2min), 04-03 (3min)
+- Last 5 plans: 03-03 (8min), 03-04 (4min), 04-01 (2min), 04-03 (3min), 04-02 (4min)
 - Trend: Phase 4 plans fast due to existing patterns from Python/Node.js
 
 *Updated after each plan completion*
@@ -85,6 +85,9 @@ Recent decisions affecting current work:
 - **04-01:** Error codes use negative integers (SUCCESS=0, errors=-1 to -999) for C-style FFI
 - **04-01:** catch_unwind wraps all FFI boundaries to prevent process abort on panic
 - **04-01:** Global tokio RUNTIME (Lazy<Runtime>) for async operation bridging
+- **04-02:** Callback pattern for async REST endpoints with (user_data, result_json, error_code)
+- **04-02:** Convert callback/user_data pointers to usize for Send trait compatibility across async boundaries
+- **04-02:** JSON serialization for all REST responses via serde_json
 - **04-03:** Single generic subscribe/unsubscribe API for both stock and futopt (endpoint type selected at connect time)
 - **04-03:** Message polling with MESSAGE_AVAILABLE/NO_MESSAGE status codes for non-blocking C# consumption
 - **04-03:** State codes as c_int constants (DISCONNECTED=0, CONNECTING=1, CONNECTED=2, RECONNECTING=3)
@@ -113,10 +116,10 @@ None yet.
 
 **Phase 4 (C#):**
 - 04-01 COMPLETE: csbindgen FFI foundation with error codes and panic recovery
+- 04-02 COMPLETE: REST client FFI with 8 async callback endpoints (stock/futopt intraday)
 - 04-03 COMPLETE: WebSocket FFI with polling-based message retrieval and generic subscription API
-- 04-02 IN PROGRESS: REST API has Send trait errors with callback pattern (needs alternative async bridging)
 - NEXT: 04-04 C# wrapper layer (RestClient and WebSocketClient classes)
-- REST callback pattern may need TaskCompletionSource approach instead of raw callbacks
+- Send trait issue resolved via usize pointer conversion pattern
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -128,7 +131,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-30
-Stopped at: Completed 04-03-PLAN.md (WebSocket FFI with polling-based message retrieval)
+Last session: 2026-01-31
+Stopped at: Completed 04-02-PLAN.md (REST client FFI with async callbacks)
 Resume file: N/A
-Next: Phase 4 - C# Binding (04-04-PLAN.md - C# wrapper layer, or fix 04-02 REST callback Send issues)
+Next: Phase 4 - C# Binding (04-04-PLAN.md - C# wrapper layer)
