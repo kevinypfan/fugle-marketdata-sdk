@@ -16,8 +16,8 @@ marketdata-core.workspace = true
 napi.workspace = true
 napi-derive.workspace = true
 
-# Async runtime (for WebSocket)
-tokio = { workspace = true, features = ["rt", "time", "sync"] }
+# Async runtime (for WebSocket and spawn_blocking)
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "time", "sync"] }
 
 # Serialization
 serde.workspace = true
