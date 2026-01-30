@@ -64,10 +64,13 @@ Plans:
   2. TypeScript users see accurate type definitions with no `any` types in public API surface
   3. Node.js users can replace `require('@fugle/marketdata')` with this SDK without changing method signatures or response structures
   4. WebSocket streaming emits events through EventEmitter pattern without memory leaks or event loop blocking
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: TBD during planning
+- [ ] 03-01-PLAN.md — Upgrade napi-rs to 3.6+ with ThreadsafeFunction refactoring
+- [ ] 03-02-PLAN.md — Convert REST client to async/Promise-returning API
+- [ ] 03-03-PLAN.md — Create comprehensive TypeScript type definitions
+- [ ] 03-04-PLAN.md — Add API compatibility and integration tests
 
 ### Phase 4: C# Binding Replacement
 **Goal**: Replace UniFFI architecture with csbindgen for idiomatic .NET interop with Task-based async support
@@ -122,7 +125,7 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 |-------|----------------|--------|-----------|
 | 1. Build Infrastructure | 3/3 | Complete ✓ | 2026-01-31 |
 | 2. Python Binding | 5/5 | Complete ✓ | 2026-01-31 |
-| 3. Node.js Binding | 0/TBD | Not started | - |
+| 3. Node.js Binding | 0/4 | Planned | - |
 | 4. C# Binding | 0/TBD | Not started | - |
 | 5. Distribution | 0/TBD | Not started | - |
 | 6. Testing | 0/TBD | Not started | - |
