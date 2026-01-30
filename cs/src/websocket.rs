@@ -95,7 +95,7 @@ pub extern "C" fn fugle_ws_connect(
             tokio::spawn(async move {
                 loop {
                     // Poll for messages from core client (non-blocking)
-                    if let Some(msg_result) = message_receiver.try_receive() {
+                    if let Some(msg_result) = (*message_receiver).try_receive() {
                         // Forward message as JSON string
                         if let Ok(json) = serde_json::to_string(&msg_result) {
                             let _ = tx_forward.send(json);

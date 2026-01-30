@@ -52,6 +52,20 @@ pub extern "C" fn fugle_rest_client_free(handle: *mut RestClientHandle) {
     }
 }
 
+// Helper function to invoke callback from error handling path
+unsafe fn invoke_callback(callback_addr: usize, user_data_addr: usize, error_code: c_int) {
+    let callback: ResultCallback = std::mem::transmute(callback_addr);
+    let user_data = user_data_addr as *mut c_void;
+    callback(user_data, ptr::null(), error_code);
+}
+
+// Helper function to invoke callback with result
+unsafe fn invoke_callback_with_result(callback_addr: usize, user_data_addr: usize, json: *const c_char, error_code: c_int) {
+    let callback: ResultCallback = std::mem::transmute(callback_addr);
+    let user_data = user_data_addr as *mut c_void;
+    callback(user_data, json, error_code);
+}
+
 // ============================================================================
 // Stock Intraday Endpoints
 // ============================================================================
@@ -64,6 +78,9 @@ pub extern "C" fn fugle_rest_stock_quote_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -72,30 +89,24 @@ pub extern "C" fn fugle_rest_stock_quote_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.stock().intraday().quote().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(quote)) => {
-                    let json = serde_json::to_string(&quote).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -104,7 +115,7 @@ pub extern "C" fn fugle_rest_stock_quote_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -116,6 +127,9 @@ pub extern "C" fn fugle_rest_stock_trades_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -124,30 +138,24 @@ pub extern "C" fn fugle_rest_stock_trades_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.stock().intraday().trades().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(trades)) => {
-                    let json = serde_json::to_string(&trades).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -156,7 +164,7 @@ pub extern "C" fn fugle_rest_stock_trades_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -168,6 +176,9 @@ pub extern "C" fn fugle_rest_stock_ticker_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -176,30 +187,24 @@ pub extern "C" fn fugle_rest_stock_ticker_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.stock().intraday().ticker().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(ticker)) => {
-                    let json = serde_json::to_string(&ticker).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -208,7 +213,7 @@ pub extern "C" fn fugle_rest_stock_ticker_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -220,6 +225,9 @@ pub extern "C" fn fugle_rest_stock_candles_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -228,30 +236,24 @@ pub extern "C" fn fugle_rest_stock_candles_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.stock().intraday().candles().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(candles)) => {
-                    let json = serde_json::to_string(&candles).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -260,7 +262,7 @@ pub extern "C" fn fugle_rest_stock_candles_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -272,6 +274,9 @@ pub extern "C" fn fugle_rest_stock_volumes_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -280,30 +285,24 @@ pub extern "C" fn fugle_rest_stock_volumes_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.stock().intraday().volumes().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(volumes)) => {
-                    let json = serde_json::to_string(&volumes).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -312,7 +311,7 @@ pub extern "C" fn fugle_rest_stock_volumes_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -328,6 +327,9 @@ pub extern "C" fn fugle_rest_futopt_quote_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -336,30 +338,24 @@ pub extern "C" fn fugle_rest_futopt_quote_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.futopt().intraday().quote().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(quote)) => {
-                    let json = serde_json::to_string(&quote).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -368,7 +364,7 @@ pub extern "C" fn fugle_rest_futopt_quote_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -380,6 +376,9 @@ pub extern "C" fn fugle_rest_futopt_ticker_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -388,30 +387,24 @@ pub extern "C" fn fugle_rest_futopt_ticker_async(
         let symbol = unsafe { cstr_to_string(symbol) }
             .ok_or(ERROR_INVALID_ARG)?;
         let client = unsafe { &(*handle).client };
-
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.futopt().intraday().ticker().symbol(&symbol).send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(ticker)) => {
-                    let json = serde_json::to_string(&ticker).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -420,7 +413,7 @@ pub extern "C" fn fugle_rest_futopt_ticker_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
 
@@ -431,6 +424,9 @@ pub extern "C" fn fugle_rest_futopt_products_async(
     callback: ResultCallback,
     user_data: *mut c_void,
 ) {
+    let callback_addr = callback as usize;
+    let user_data_addr = user_data as usize;
+
     let result = catch_panic(AssertUnwindSafe(|| {
         if handle.is_null() {
             return Err(ERROR_INVALID_ARG);
@@ -438,28 +434,23 @@ pub extern "C" fn fugle_rest_futopt_products_async(
 
         let client = unsafe { &(*handle).client };
         let client_clone = client.clone();
-        let callback_addr = callback as usize;
-        let user_data_addr = user_data as usize;
 
         RUNTIME.spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
                 client_clone.futopt().intraday().products().send()
             }).await;
 
-            let callback: ResultCallback = unsafe { std::mem::transmute(callback_addr) };
-            let user_data = user_data_addr as *mut c_void;
-
             match result {
-                Ok(Ok(products)) => {
-                    let json = serde_json::to_string(&products).unwrap_or_default();
+                Ok(Ok(data)) => {
+                    let json = serde_json::to_string(&data).unwrap_or_default();
                     let c_json = string_to_cstring(&json);
-                    callback(user_data, c_json, SUCCESS);
+                    unsafe { invoke_callback_with_result(callback_addr, user_data_addr, c_json, SUCCESS) };
                 }
                 Ok(Err(e)) => {
-                    callback(user_data, ptr::null(), error_to_code(&e));
+                    unsafe { invoke_callback(callback_addr, user_data_addr, error_to_code(&e)) };
                 }
                 Err(_) => {
-                    callback(user_data, ptr::null(), ERROR_INTERNAL);
+                    unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
                 }
             }
         });
@@ -468,6 +459,6 @@ pub extern "C" fn fugle_rest_futopt_products_async(
     }));
 
     if result.is_err() {
-        callback(user_data, ptr::null(), ERROR_INTERNAL);
+        unsafe { invoke_callback(callback_addr, user_data_addr, ERROR_INTERNAL) };
     }
 }
