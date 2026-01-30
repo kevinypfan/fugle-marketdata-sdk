@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 2 - Python Binding Enhancement
+**Current focus:** Phase 2 Complete - Ready for Phase 3 (Node.js Binding)
 
 ## Current Position
 
-Phase: 2 of 6 (Python Binding Enhancement)
-Plan: 4 of 5 in current phase (02-05 integration tests remaining)
-Status: Type stubs and package structure complete
-Last activity: 2026-01-31 — Completed 02-04-PLAN.md (type stubs)
+Phase: 2 of 6 (Python Binding Enhancement) - COMPLETE
+Plan: 5 of 5 in current phase (all plans complete)
+Status: Phase 2 complete with full async Python binding and test suite
+Last activity: 2026-01-31 — Completed 02-05-PLAN.md (integration tests)
 
-Progress: [██░░░░░░░░] 23% (1.80 of 6 phases complete)
+Progress: [███░░░░░░░] 33% (2 of 6 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 6 min
-- Total execution time: 0.67 hours
+- Total plans completed: 8
+- Average duration: 7 min
+- Total execution time: 0.8 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
-| 02-python-binding | 4 | 30min | 8min |
+| 02-python-binding | 5 | 38min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (9min), 02-02 (6min), 02-03 (7min), 02-04 (8min)
+- Last 5 plans: 02-01 (9min), 02-02 (6min), 02-03 (7min), 02-04 (8min), 02-05 (8min)
 - Trend: Phase 2 plans consistent at ~7-8min average
 
 *Updated after each plan completion*
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - **02-03:** Timeout-based deadlock detection in GIL safety tests (pytest-timeout 10-15s)
 - **02-04:** Use python-source = '.' with module-name for maturin mixed layout
 - **02-04:** Add pyo3 signature attributes to all methods with optional parameters
+- **02-05:** Use pytest-asyncio auto mode for automatic async test discovery
+- **02-05:** Skip integration tests automatically when FUGLE_API_KEY not set
+- **02-05:** API compatibility tests verify structural parity without network calls
 
 ### Pending Todos
 
@@ -75,7 +78,7 @@ None yet.
 
 **Phase 1 (Workspace Migration):**
 - ✅ RESOLVED: Workspace structure successfully migrated in 01-01
-- Python binding requires dev headers (will address in Phase 2)
+- ✅ RESOLVED: Python binding dev headers handled in Phase 2
 
 **Phase 2 (Python):**
 - ✅ RESOLVED: PyO3 0.27 upgrade completed with Bound API migration in 02-01
@@ -85,8 +88,8 @@ None yet.
 - ✅ RESOLVED: MutexGuard+await issues fixed (Arc<WebSocketClient> pattern)
 - ✅ RESOLVED: Python::with_gil deprecation fixed (→ Python::attach)
 - ✅ RESOLVED: Type stubs and PEP 561 compliance complete in 02-04
+- ✅ RESOLVED: Integration tests and API compatibility verification complete in 02-05
 - ⚠️ PENDING: Historical/snapshot endpoints blocked until core implementation available
-- ⚠️ PENDING: 02-05 integration tests not yet executed
 
 **Phase 3 (Node.js):**
 - napi-rs 2.16 → 3.6 has ThreadsafeFunction API changes requiring WebSocket callback refactoring
@@ -108,6 +111,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 02-04-PLAN.md (type stubs and package structure)
+Stopped at: Completed 02-05-PLAN.md (integration tests) - Phase 2 complete
 Resume file: N/A
-Next: Execute 02-05 (integration tests) to complete Phase 2
+Next: Execute Phase 3 (Node.js Binding Enhancement)
