@@ -30,10 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. CI pipeline automatically builds and tests all bindings on Linux, macOS, and Windows
   3. Version numbers sync automatically across core library and all language bindings
   4. Build artifacts are cached and reused across bindings, reducing total build time by 50%+
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD during planning
+- [ ] 01-01-PLAN.md — Create Cargo workspace and migrate member crates
+- [ ] 01-02-PLAN.md — Create Makefile and update version configs
+- [ ] 01-03-PLAN.md — Create GitHub Actions CI/CD workflows
 
 ### Phase 2: Python Binding Enhancement
 **Goal**: Modernize Python binding to PyO3 0.27+ with native asyncio support and full API compatibility with fugle-marketdata-python
@@ -114,7 +116,7 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Build Infrastructure | 0/TBD | Not started | - |
+| 1. Build Infrastructure | 0/3 | Ready to execute | - |
 | 2. Python Binding | 0/TBD | Not started | - |
 | 3. Node.js Binding | 0/TBD | Not started | - |
 | 4. C# Binding | 0/TBD | Not started | - |
