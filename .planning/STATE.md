@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 2 of 6 (Python Binding Enhancement)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-31 — Completed 02-03-PLAN.md (WebSocket Async Iterator)
+Plan: 4 of 5 in current phase (02-05 integration tests remaining)
+Status: Type stubs and package structure complete
+Last activity: 2026-01-31 — Completed 02-04-PLAN.md (type stubs)
 
-Progress: [██░░░░░░░░] 33% (2.00 of 6 phases complete)
+Progress: [██░░░░░░░░] 23% (1.80 of 6 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 5 min
-- Total execution time: 0.53 hours
+- Total plans completed: 7
+- Average duration: 6 min
+- Total execution time: 0.67 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
-| 02-python-binding | 3 | 22min | 7min |
+| 02-python-binding | 4 | 30min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (5min), 02-01 (9min), 02-02 (6min), 02-03 (7min)
-- Trend: Phase 2 async work consistent ~7min per plan
+- Last 5 plans: 02-01 (9min), 02-02 (6min), 02-03 (7min), 02-04 (8min)
+- Trend: Phase 2 plans consistent at ~7-8min average
 
 *Updated after each plan completion*
 
@@ -64,6 +64,8 @@ Recent decisions affecting current work:
 - **02-03:** Keep std::sync::mpsc for FFI compatibility, use spawn_blocking for async polling without holding GIL
 - **02-03:** Dual API pattern: preserve callback (on/off) while adding async methods (connect_async, subscribe_async)
 - **02-03:** Timeout-based deadlock detection in GIL safety tests (pytest-timeout 10-15s)
+- **02-04:** Use python-source = '.' with module-name for maturin mixed layout
+- **02-04:** Add pyo3 signature attributes to all methods with optional parameters
 
 ### Pending Todos
 
@@ -80,8 +82,11 @@ None yet.
 - ✅ RESOLVED: pyo3-async-runtimes 0.27 added and ready for async API in 02-02
 - ✅ RESOLVED: REST async conversion complete for intraday endpoints in 02-02
 - ✅ RESOLVED: WebSocket async iterator and async methods complete in 02-03
+- ✅ RESOLVED: MutexGuard+await issues fixed (Arc<WebSocketClient> pattern)
+- ✅ RESOLVED: Python::with_gil deprecation fixed (→ Python::attach)
+- ✅ RESOLVED: Type stubs and PEP 561 compliance complete in 02-04
 - ⚠️ PENDING: Historical/snapshot endpoints blocked until core implementation available
-- ⚠️ PENDING: Pre-existing compilation errors in client.rs and types.rs need resolution
+- ⚠️ PENDING: 02-05 integration tests not yet executed
 
 **Phase 3 (Node.js):**
 - napi-rs 2.16 → 3.6 has ThreadsafeFunction API changes requiring WebSocket callback refactoring
@@ -103,6 +108,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 02-03-PLAN.md (WebSocket Async Iterator)
-Resume file: .planning/phases/02-python-binding/02-03-SUMMARY.md
-Next: Phase 2 complete. Begin Phase 3 (Node.js Binding Enhancement) with `/gsd:plan-next`
+Stopped at: Completed 02-04-PLAN.md (type stubs and package structure)
+Resume file: N/A
+Next: Execute 02-05 (integration tests) to complete Phase 2
