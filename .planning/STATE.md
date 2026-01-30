@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 3 of 6 (Node.js Binding Enhancement)
-Plan: 1 of 5 in current phase
-Status: Completed 03-01 (napi-rs 3.x Upgrade)
-Last activity: 2026-01-31 — Completed 03-01-PLAN.md (napi-rs upgrade with Arc<ThreadsafeFunction>)
+Plan: 3 of 4 in current phase
+Status: Completed 03-03 (TypeScript Type Definitions)
+Last activity: 2026-01-31 — Completed 03-03-PLAN.md (TypeScript type definitions)
 
-Progress: [███░░░░░░░] 36% (~9 of 25 plans complete)
+Progress: [████░░░░░░] 44% (~11 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 11
 - Average duration: 7 min
-- Total execution time: ~1.1 hours
+- Total execution time: ~1.3 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [███░░░░░░░] 36% (~9 of 25 plans complete)
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
-| 03-nodejs-binding | 1 | 10min | 10min |
+| 03-nodejs-binding | 3 | 28min | 9min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (6min), 02-03 (7min), 02-04 (8min), 02-05 (8min), 03-01 (10min)
-- Trend: Node.js binding upgrade took slightly longer due to version compatibility investigation
+- Last 5 plans: 02-04 (8min), 02-05 (8min), 03-01 (10min), 03-02 (10min), 03-03 (8min)
+- Trend: Consistent execution time for Node.js binding plans
 
 *Updated after each plan completion*
 
@@ -73,6 +73,11 @@ Recent decisions affecting current work:
 - **03-01:** napi-rs 3.4 pinned for Rust 1.87 compatibility (3.8+ requires Rust 1.88)
 - **03-01:** ThreadsafeFunction wrapped in Arc for safe cross-thread callback access
 - **03-01:** @napi-rs/cli upgraded to 3.5.1 for napi-rs 3.x compatibility
+- **03-02:** All REST methods converted to async with spawn_blocking for non-blocking I/O
+- **03-02:** tokio rt-multi-thread feature required for spawn_blocking
+- **03-03:** Separate types.d.ts with postbuild script to prepend to generated index.d.ts
+- **03-03:** Use #[napi(ts_return_type = "Promise<T>")] for explicit TypeScript return types
+- **03-03:** Runtime validation via validate_types.js to verify TS matches Rust JSON
 
 ### Pending Todos
 
@@ -98,8 +103,8 @@ None yet.
 **Phase 3 (Node.js):**
 - ✅ RESOLVED: napi-rs 3.4 upgrade complete with Arc<ThreadsafeFunction> pattern in 03-01
 - ✅ RESOLVED: @napi-rs/cli upgraded to 3.5.1 for build compatibility in 03-01
-- ⚠️ PENDING: REST async conversion (03-02)
-- ⚠️ PENDING: WebSocket async iterator pattern (03-03)
+- ✅ RESOLVED: REST async conversion complete in 03-02
+- ✅ RESOLVED: TypeScript type definitions complete in 03-03 (no 'any' types)
 - ⚠️ PENDING: Memory leak testing for Buffer/TypedArray handling
 
 **Phase 4 (C#):**
@@ -118,6 +123,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 03-01-PLAN.md (napi-rs upgrade with Arc<ThreadsafeFunction>)
+Stopped at: Completed 03-03-PLAN.md (TypeScript type definitions)
 Resume file: N/A
-Next: Execute 03-02-PLAN.md (REST client Promise API upgrade)
+Next: Execute 03-04-PLAN.md (Documentation and examples)
