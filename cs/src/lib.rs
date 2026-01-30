@@ -3,10 +3,12 @@
 mod errors;
 mod rest_client;
 mod types;
+mod websocket;
 
 pub use errors::*;
 pub use rest_client::*;
 pub use types::*;
+pub use websocket::*;
 
 use std::ffi::c_char;
 
