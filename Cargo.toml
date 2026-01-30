@@ -30,10 +30,10 @@ url = "2.5"
 pyo3 = { version = "0.27", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
 
-# Node.js binding dependencies
+# Node.js binding dependencies (using 2.x for Rust 1.87 compatibility, 3.x requires 1.88+)
 napi = { version = "2.16", features = ["napi8", "async", "serde-json", "tokio_rt"] }
 napi-derive = "2.16"
-napi-build = "2.1.3"
+napi-build = "2.1"
 
 # C# binding dependencies (UniFFI for now, csbindgen in Phase 4)
 uniffi = { version = "0.28", features = ["cli"] }
