@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 1 of 6 (Build Infrastructure Modernization)
-Plan: 1 of TBD in current phase
+Plan: 2 of TBD in current phase
 Status: In progress
-Last activity: 2026-01-30 — Completed 01-01-PLAN.md (Workspace Migration)
+Last activity: 2026-01-30 — Completed 01-02-PLAN.md (Build Orchestration)
 
-Progress: [█░░░░░░░░░] ~10%
+Progress: [██░░░░░░░░] ~15%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 4 min
-- Total execution time: 0.07 hours
+- Total plans completed: 2
+- Average duration: 3 min
+- Total execution time: 0.10 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-build-infrastructure | 1 | 4min | 4min |
+| 01-build-infrastructure | 2 | 6min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min)
-- Trend: First plan baseline established
+- Last 5 plans: 01-01 (4min), 01-02 (2min)
+- Trend: Improving efficiency, simple infra plans executing quickly
 
 *Updated after each plan completion*
 
@@ -48,6 +48,9 @@ Recent decisions affecting current work:
 - **01-01:** Use workspace resolver 2 to prevent feature unification pitfalls
 - **01-01:** Bump version to 0.2.0 for workspace migration milestone
 - **01-01:** Keep core-only deps (ureq, tokio-tungstenite, etc.) in core/Cargo.toml only
+- **01-02:** Standardize package names: fugle-marketdata (Python), @fugle/marketdata (Node.js)
+- **01-02:** Use --cargo-name flag in napi build scripts for workspace compatibility
+- **01-02:** Separate dev/release targets for each binding language in Makefile
 
 ### Pending Todos
 
@@ -82,7 +85,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-30 23:50:20Z
-Stopped at: Completed 01-01-PLAN.md execution (Workspace Migration)
-Resume file: .planning/phases/01-build-infrastructure/01-01-SUMMARY.md
+Last session: 2026-01-30T10:28:18Z
+Stopped at: Completed 01-02-PLAN.md execution (Build Orchestration)
+Resume file: .planning/phases/01-build-infrastructure/01-02-SUMMARY.md
 Next: Continue Phase 1 with additional infrastructure plans, or proceed to Phase 2 Python Modernization
