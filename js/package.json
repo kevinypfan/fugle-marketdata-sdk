@@ -17,6 +17,7 @@
   "license": "MIT",
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1",
+    "jest": "^29.7.0",
     "typed-emitter": "^2.1.0"
   },
   "engines": {
@@ -29,7 +30,9 @@
     "postbuild": "node scripts/postbuild.js",
     "prepublishOnly": "napi prepublish -t npm",
     "version": "napi version",
-    "validate-types": "node validate_types.js"
+    "validate-types": "node validate_types.js",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage"
   },
   "repository": {
     "type": "git",
