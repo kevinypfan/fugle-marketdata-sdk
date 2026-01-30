@@ -146,6 +146,7 @@ impl StockIntradayClient {
     ///     print(f"Change: {quote['change']}")
     ///     ```
     #[pyo3(signature = (symbol, odd_lot=false))]
+    #[allow(deprecated)]  // allow_threads is deprecated in PyO3 0.27 but replacement not yet available
     pub fn quote(&self, py: Python<'_>, symbol: &str, odd_lot: bool) -> PyResult<Py<PyDict>> {
         // Clone the necessary data before releasing GIL
         let client = self.inner.clone();
@@ -222,6 +223,7 @@ impl FutOptIntradayClient {
     ///     ah_quote = client.futopt.intraday.quote("TXFC4", after_hours=True)
     ///     ```
     #[pyo3(signature = (symbol, after_hours=false))]
+    #[allow(deprecated)]  // allow_threads is deprecated in PyO3 0.27 but replacement not yet available
     pub fn quote(&self, py: Python<'_>, symbol: &str, after_hours: bool) -> PyResult<Py<PyDict>> {
         // Clone the necessary data before releasing GIL
         let client = self.inner.clone();

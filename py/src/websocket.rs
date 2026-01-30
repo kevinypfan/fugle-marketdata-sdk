@@ -148,6 +148,7 @@ impl StockWebSocketClient {
         // Reset stop flag
         stop_flag.store(false, Ordering::SeqCst);
 
+        #[allow(deprecated)]  // with_gil is deprecated in PyO3 0.27, use attach instead
         let handle = std::thread::spawn(move || {
             while !stop_flag.load(Ordering::SeqCst) {
                 match receiver.receive_timeout(Duration::from_millis(100)) {
@@ -155,7 +156,7 @@ impl StockWebSocketClient {
                         // Acquire GIL and invoke callback
                         Python::with_gil(|py| {
                             if let Ok(dict) = message_to_dict(py, &msg) {
-                                let args = pyo3::types::PyTuple::new(py, vec![dict.bind(py)]).expect("Failed to create tuple");
+                                let args = pyo3::types::PyTuple::new(py, [dict.into_any()]).expect("Failed to create tuple");
                                 callbacks.invoke(
                                     py,
                                     crate::callback::EventType::Message,
@@ -868,7 +869,7 @@ pub fn message_to_dict(py: Python<'_>, msg: &marketdata_core::WebSocketMessage) 
         dict.set_item("data", py_data)?;
     }
 
-    Ok(dict.into())
+    Ok(dict.unbind())
 }
 
 /// Convert serde_json::Value to Py<PyAny>
@@ -878,35 +879,35 @@ fn json_value_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<Py
     match value {
         serde_json::Value::Null => Ok(py.None()),
         serde_json::Value::Bool(b) => {
-            Ok(b.into_pyobject(py)?.to_owned().into_any().unbind())
+            Ok(b.into_pyobject(py)?.to_owned().unbind().into_any())
         }
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                Ok(i.into_pyobject(py)?.to_owned().into_any().unbind())
+                Ok(i.into_pyobject(py)?.to_owned().unbind().into_any())
             } else if let Some(u) = n.as_u64() {
-                Ok(u.into_pyobject(py)?.to_owned().into_any().unbind())
+                Ok(u.into_pyobject(py)?.to_owned().unbind().into_any())
             } else if let Some(f) = n.as_f64() {
-                Ok(f.into_pyobject(py)?.to_owned().into_any().unbind())
+                Ok(f.into_pyobject(py)?.to_owned().unbind().into_any())
             } else {
                 Ok(py.None())
             }
         }
         serde_json::Value::String(s) => {
-            Ok(s.into_pyobject(py)?.to_owned().into_any().unbind())
+            Ok(s.into_pyobject(py)?.to_owned().unbind().into_any())
         }
         serde_json::Value::Array(arr) => {
             let list = pyo3::types::PyList::empty(py);
             for item in arr {
                 list.append(json_value_to_py(py, item)?)?;
             }
-            Ok(list.into())
+            Ok(list.unbind().into_any())
         }
         serde_json::Value::Object(obj) => {
             let dict = PyDict::new(py);
             for (k, v) in obj {
                 dict.set_item(k, json_value_to_py(py, v)?)?;
             }
-            Ok(dict.into())
+            Ok(dict.unbind().into_any())
         }
     }
 }

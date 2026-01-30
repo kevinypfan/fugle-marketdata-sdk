@@ -167,7 +167,7 @@ impl CallbackRegistry {
     /// Invoke message callbacks with a WebSocket message dict
     #[allow(dead_code)]
     pub fn invoke_message(&self, py: Python<'_>, msg_dict: Py<pyo3::types::PyDict>) {
-        let args = pyo3::types::PyTuple::new(py, vec![msg_dict.bind(py)]).expect("Failed to create tuple");
+        let args = pyo3::types::PyTuple::new(py, [msg_dict.into_any()]).expect("Failed to create tuple");
         self.invoke(py, EventType::Message, &args);
     }
 
@@ -180,9 +180,9 @@ impl CallbackRegistry {
     /// Invoke disconnect callbacks with optional code and reason
     pub fn invoke_disconnect(&self, py: Python<'_>, code: Option<u16>, reason: &str) {
         use pyo3::IntoPyObject;
-        let code_obj = code.into_pyobject(py).expect("Failed to convert code");
-        let reason_obj = reason.into_pyobject(py).expect("Failed to convert reason");
-        let args = pyo3::types::PyTuple::new(py, vec![code_obj.into_any(), reason_obj.into_any()]).expect("Failed to create tuple");
+        let code_obj: Py<PyAny> = code.into_pyobject(py).expect("Failed to convert code").into();
+        let reason_obj: Py<PyAny> = reason.into_pyobject(py).expect("Failed to convert reason").unbind().into_any();
+        let args = pyo3::types::PyTuple::new(py, [code_obj, reason_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Disconnect, &args);
     }
 
@@ -190,8 +190,8 @@ impl CallbackRegistry {
     #[allow(dead_code)]
     pub fn invoke_reconnect(&self, py: Python<'_>, attempt: u32) {
         use pyo3::IntoPyObject;
-        let attempt_obj = attempt.into_pyobject(py).expect("Failed to convert attempt");
-        let args = pyo3::types::PyTuple::new(py, vec![attempt_obj.into_any()]).expect("Failed to create tuple");
+        let attempt_obj: Py<PyAny> = attempt.into_pyobject(py).expect("Failed to convert attempt").unbind().into_any();
+        let args = pyo3::types::PyTuple::new(py, [attempt_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Reconnect, &args);
     }
 
@@ -199,9 +199,9 @@ impl CallbackRegistry {
     #[allow(dead_code)]
     pub fn invoke_error(&self, py: Python<'_>, message: &str, code: i32) {
         use pyo3::IntoPyObject;
-        let msg_obj = message.into_pyobject(py).expect("Failed to convert message");
-        let code_obj = code.into_pyobject(py).expect("Failed to convert code");
-        let args = pyo3::types::PyTuple::new(py, vec![msg_obj.into_any(), code_obj.into_any()]).expect("Failed to create tuple");
+        let msg_obj: Py<PyAny> = message.into_pyobject(py).expect("Failed to convert message").unbind().into_any();
+        let code_obj: Py<PyAny> = code.into_pyobject(py).expect("Failed to convert code").unbind().into_any();
+        let args = pyo3::types::PyTuple::new(py, [msg_obj, code_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Error, &args);
     }
 }

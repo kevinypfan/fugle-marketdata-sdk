@@ -85,7 +85,7 @@ impl MessageIterator {
         match result {
             Ok(Some(msg)) => {
                 let dict = message_to_dict(py, &msg)?;
-                Ok(Some(dict.into()))
+                Ok(Some(dict.into_any()))
             }
             Ok(None) => {
                 // Timeout with no message - return None but don't stop iteration
@@ -109,7 +109,7 @@ impl MessageIterator {
         match self.receiver.try_receive() {
             Some(msg) => {
                 let dict = message_to_dict(py, &msg)?;
-                Ok(Some(dict.into()))
+                Ok(Some(dict.into_any()))
             }
             None => Ok(None),
         }
@@ -131,7 +131,7 @@ impl MessageIterator {
         match self.receiver.receive_timeout(timeout) {
             Ok(Some(msg)) => {
                 let dict = message_to_dict(py, &msg)?;
-                Ok(Some(dict.into()))
+                Ok(Some(dict.into_any()))
             }
             Ok(None) => Ok(None),
             Err(e) => Err(crate::errors::to_py_err(e)),
