@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 4 of 6 (C# Binding Replacement) - IN PROGRESS
-Plan: 1 of 4 in current phase - COMPLETE
-Status: Phase 4 Started
-Last activity: 2026-01-31 - Completed 04-01-PLAN.md (C# binding foundation with csbindgen)
+Plan: 3 of 5 in current phase - COMPLETE
+Status: Phase 4 In Progress
+Last activity: 2026-01-30 - Completed 04-03-PLAN.md (WebSocket FFI with polling-based message retrieval)
 
-Progress: [████████░░] 52% (~13 of 25 plans complete)
+Progress: [████████░░] 56% (~14 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: 6 min
-- Total execution time: ~1.5 hours
+- Total execution time: ~1.6 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [████████░░] 52% (~13 of 25 plans complete)
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
 | 03-nodejs-binding | 4 | 32min | 8min |
-| 04-csharp-binding | 1 | 2min | 2min |
+| 04-csharp-binding | 2 | 5min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (10min), 03-02 (10min), 03-03 (8min), 03-04 (4min), 04-01 (2min)
-- Trend: 04-01 very fast due to foundation-only (no logic implementation)
+- Last 5 plans: 03-02 (10min), 03-03 (8min), 03-04 (4min), 04-01 (2min), 04-03 (3min)
+- Trend: Phase 4 plans fast due to existing patterns from Python/Node.js
 
 *Updated after each plan completion*
 
@@ -85,6 +85,10 @@ Recent decisions affecting current work:
 - **04-01:** Error codes use negative integers (SUCCESS=0, errors=-1 to -999) for C-style FFI
 - **04-01:** catch_unwind wraps all FFI boundaries to prevent process abort on panic
 - **04-01:** Global tokio RUNTIME (Lazy<Runtime>) for async operation bridging
+- **04-03:** Single generic subscribe/unsubscribe API for both stock and futopt (endpoint type selected at connect time)
+- **04-03:** Message polling with MESSAGE_AVAILABLE/NO_MESSAGE status codes for non-blocking C# consumption
+- **04-03:** State codes as c_int constants (DISCONNECTED=0, CONNECTING=1, CONNECTED=2, RECONNECTING=3)
+- **04-03:** Tokio spawn task forwards messages from core MessageReceiver to mpsc::channel for C# polling
 
 ### Pending Todos
 
@@ -109,9 +113,10 @@ None yet.
 
 **Phase 4 (C#):**
 - 04-01 COMPLETE: csbindgen FFI foundation with error codes and panic recovery
-- NEXT: 04-02 REST API async bridging with TaskCompletionSource pattern
-- C# async bridging strategy needs prototype validation (Task.Run vs. spawn+poll)
-- Research identified this as highest complexity phase
+- 04-03 COMPLETE: WebSocket FFI with polling-based message retrieval and generic subscription API
+- 04-02 IN PROGRESS: REST API has Send trait errors with callback pattern (needs alternative async bridging)
+- NEXT: 04-04 C# wrapper layer (RestClient and WebSocketClient classes)
+- REST callback pattern may need TaskCompletionSource approach instead of raw callbacks
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -123,7 +128,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: Completed 04-01-PLAN.md (C# binding foundation with csbindgen)
+Last session: 2026-01-30
+Stopped at: Completed 04-03-PLAN.md (WebSocket FFI with polling-based message retrieval)
 Resume file: N/A
-Next: Phase 4 - C# Binding (04-02-PLAN.md - REST API async bridging)
+Next: Phase 4 - C# Binding (04-04-PLAN.md - C# wrapper layer, or fix 04-02 REST callback Send issues)
