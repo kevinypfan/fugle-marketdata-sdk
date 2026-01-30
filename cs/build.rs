@@ -12,6 +12,10 @@ fn main() {
 
     Builder::default()
         .input_extern_file("src/lib.rs")
+        .input_extern_file("src/errors.rs")
+        .input_extern_file("src/types.rs")
+        .input_extern_file("src/rest_client.rs")
+        .input_extern_file("src/websocket.rs")
         .csharp_dll_name("fugle_marketdata")
         .csharp_class_name("NativeMethods")
         .csharp_namespace("Fugle.MarketData.Native")
