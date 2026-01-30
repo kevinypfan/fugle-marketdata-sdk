@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 3 - Node.js Binding Enhancement (In Progress)
+**Current focus:** Phase 3 Complete - Ready for Phase 4 (C# Binding)
 
 ## Current Position
 
-Phase: 3 of 6 (Node.js Binding Enhancement)
-Plan: 3 of 4 in current phase
-Status: Completed 03-03 (TypeScript Type Definitions)
-Last activity: 2026-01-31 — Completed 03-03-PLAN.md (TypeScript type definitions)
+Phase: 3 of 6 (Node.js Binding Enhancement) - COMPLETE
+Plan: 4 of 4 in current phase - COMPLETE
+Status: Phase 3 Complete
+Last activity: 2026-01-31 - Completed 03-04-PLAN.md (API compatibility and integration tests)
 
-Progress: [████░░░░░░] 44% (~11 of 25 plans complete)
+Progress: [████████░░] 48% (~12 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: 7 min
-- Total execution time: ~1.3 hours
+- Total execution time: ~1.4 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [████░░░░░░] 44% (~11 of 25 plans complete)
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
-| 03-nodejs-binding | 3 | 28min | 9min |
+| 03-nodejs-binding | 4 | 32min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: 02-04 (8min), 02-05 (8min), 03-01 (10min), 03-02 (10min), 03-03 (8min)
-- Trend: Consistent execution time for Node.js binding plans
+- Last 5 plans: 02-05 (8min), 03-01 (10min), 03-02 (10min), 03-03 (8min), 03-04 (4min)
+- Trend: Consistent execution time, 03-04 faster due to test-only changes
 
 *Updated after each plan completion*
 
@@ -44,8 +44,8 @@ Progress: [████░░░░░░] 44% (~11 of 25 plans complete)
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Priority order: Python → Node.js → C# (Python most mature, C# needs architectural rework)
-- C# requires csbindgen (not UniFFI) — UniFFI targets mobile platforms, csbindgen is .NET-appropriate
+- Priority order: Python -> Node.js -> C# (Python most mature, C# needs architectural rework)
+- C# requires csbindgen (not UniFFI) - UniFFI targets mobile platforms, csbindgen is .NET-appropriate
 - Phase 1 workspace migration unblocks parallel Python/Node.js work in Phases 2/3
 - **01-01:** Use workspace resolver 2 to prevent feature unification pitfalls
 - **01-01:** Bump version to 0.2.0 for workspace migration milestone
@@ -78,6 +78,8 @@ Recent decisions affecting current work:
 - **03-03:** Separate types.d.ts with postbuild script to prepend to generated index.d.ts
 - **03-03:** Use #[napi(ts_return_type = "Promise<T>")] for explicit TypeScript return types
 - **03-03:** Runtime validation via validate_types.js to verify TS matches Rust JSON
+- **03-04:** Use isPromiseLike() helper for napi-rs Promise detection (cross-runtime compatibility)
+- **03-04:** Integration tests use describe.skip pattern for CI-friendly conditional execution
 
 ### Pending Todos
 
@@ -86,29 +88,22 @@ None yet.
 ### Blockers/Concerns
 
 **Phase 1 (Workspace Migration):**
-- ✅ RESOLVED: Workspace structure successfully migrated in 01-01
-- ✅ RESOLVED: Python binding dev headers handled in Phase 2
+- COMPLETE: All plans executed successfully
 
 **Phase 2 (Python):**
-- ✅ RESOLVED: PyO3 0.27 upgrade completed with Bound API migration in 02-01
-- ✅ RESOLVED: pyo3-async-runtimes 0.27 added and ready for async API in 02-02
-- ✅ RESOLVED: REST async conversion complete for intraday endpoints in 02-02
-- ✅ RESOLVED: WebSocket async iterator and async methods complete in 02-03
-- ✅ RESOLVED: MutexGuard+await issues fixed (Arc<WebSocketClient> pattern)
-- ✅ RESOLVED: Python::with_gil deprecation fixed (→ Python::attach)
-- ✅ RESOLVED: Type stubs and PEP 561 compliance complete in 02-04
-- ✅ RESOLVED: Integration tests and API compatibility verification complete in 02-05
-- ⚠️ PENDING: Historical/snapshot endpoints blocked until core implementation available
+- COMPLETE: All plans executed successfully
+- PENDING: Historical/snapshot endpoints blocked until core implementation available
 
 **Phase 3 (Node.js):**
-- ✅ RESOLVED: napi-rs 3.4 upgrade complete with Arc<ThreadsafeFunction> pattern in 03-01
-- ✅ RESOLVED: @napi-rs/cli upgraded to 3.5.1 for build compatibility in 03-01
-- ✅ RESOLVED: REST async conversion complete in 03-02
-- ✅ RESOLVED: TypeScript type definitions complete in 03-03 (no 'any' types)
-- ⚠️ PENDING: Memory leak testing for Buffer/TypedArray handling
+- COMPLETE: All 4 plans executed successfully
+- 03-01: napi-rs 3.4 upgrade with Arc<ThreadsafeFunction>
+- 03-02: Async REST methods with spawn_blocking
+- 03-03: TypeScript type definitions (813 lines, no `any` types)
+- 03-04: Jest test suite (45 structural + 15 conditional tests)
+- PENDING: Memory leak testing for Buffer/TypedArray handling (deferred to Phase 6)
 
 **Phase 4 (C#):**
-- UniFFI → csbindgen migration requires complete API redesign from UDL to extern "C" FFI
+- UniFFI -> csbindgen migration requires complete API redesign from UDL to extern "C" FFI
 - C# async bridging strategy needs prototype validation (Task.Run vs. spawn+poll)
 - Research identified this as highest complexity phase
 
@@ -123,6 +118,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 03-03-PLAN.md (TypeScript type definitions)
+Stopped at: Completed 03-04-PLAN.md (API compatibility and integration tests)
 Resume file: N/A
-Next: Execute 03-04-PLAN.md (Documentation and examples)
+Next: Phase 4 - C# Binding (04-01-PLAN.md)
