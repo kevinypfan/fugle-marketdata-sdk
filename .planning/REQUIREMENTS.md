@@ -84,32 +84,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUILD-01 | TBD | Pending |
-| BUILD-02 | TBD | Pending |
-| BUILD-03 | TBD | Pending |
-| PY-01 | TBD | Pending |
-| PY-02 | TBD | Pending |
-| PY-03 | TBD | Pending |
-| PY-04 | TBD | Pending |
-| PY-05 | TBD | Pending |
-| JS-01 | TBD | Pending |
-| JS-02 | TBD | Pending |
-| JS-03 | TBD | Pending |
-| JS-04 | TBD | Pending |
-| JS-05 | TBD | Pending |
-| CS-01 | TBD | Pending |
-| CS-02 | TBD | Pending |
-| CS-03 | TBD | Pending |
-| CS-04 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
+| BUILD-01 | Phase 1 | Pending |
+| BUILD-02 | Phase 1 | Pending |
+| BUILD-03 | Phase 1 | Pending |
+| PY-01 | Phase 2 | Pending |
+| PY-02 | Phase 2 | Pending |
+| PY-03 | Phase 2 | Pending |
+| PY-04 | Phase 2 | Pending |
+| PY-05 | Phase 5 | Pending |
+| JS-01 | Phase 3 | Pending |
+| JS-02 | Phase 3 | Pending |
+| JS-03 | Phase 3 | Pending |
+| JS-04 | Phase 3 | Pending |
+| JS-05 | Phase 5 | Pending |
+| CS-01 | Phase 4 | Pending |
+| CS-02 | Phase 4 | Pending |
+| CS-03 | Phase 4 | Pending |
+| CS-04 | Phase 5 | Pending |
+| TEST-01 | Phase 6 | Pending |
+| TEST-02 | Phase 6 | Pending |
+| TEST-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2025-01-30*
-*Last updated: 2025-01-30 after initial definition*
+*Last updated: 2026-01-30 after roadmap creation*
