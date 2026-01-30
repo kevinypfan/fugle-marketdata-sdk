@@ -4,7 +4,7 @@
 //! Mirrors the official SDK's API: `client.stock.intraday.quote()` pattern.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3_async_runtimes::tokio::future_into_py;
 
 use crate::errors;
 use crate::types;
@@ -134,39 +134,167 @@ impl StockIntradayClient {
     ///     odd_lot: Whether to query odd lot data (default: False)
     ///
     /// Returns:
-    ///     dict: Quote data including prices, order book, and trading info
+    ///     Awaitable[dict]: Quote data including prices, order book, and trading info
     ///
     /// Raises:
     ///     MarketDataError: If the request fails
     ///
     /// Example:
     ///     ```python
-    ///     quote = client.stock.intraday.quote("2330")
+    ///     quote = await client.stock.intraday.quote("2330")
     ///     print(f"Last price: {quote['lastPrice']}")
     ///     print(f"Change: {quote['change']}")
     ///     ```
     #[pyo3(signature = (symbol, odd_lot=false))]
-    #[allow(deprecated)]  // allow_threads is deprecated in PyO3 0.27 but replacement not yet available
-    pub fn quote(&self, py: Python<'_>, symbol: &str, odd_lot: bool) -> PyResult<Py<PyDict>> {
-        // Clone the necessary data before releasing GIL
+    pub fn quote<'py>(&self, py: Python<'py>, symbol: String, odd_lot: bool) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
-        let symbol_owned = symbol.to_string();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                let mut builder = intraday.quote().symbol(&symbol);
+                if odd_lot {
+                    builder = builder.odd_lot(true);
+                }
+                builder.send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
 
-        // Release GIL during blocking HTTP call
-        let result = py.allow_threads(move || {
-            let stock = client.stock();
-            let intraday = stock.intraday();
-            let mut builder = intraday.quote().symbol(&symbol_owned);
-            if odd_lot {
-                builder = builder.odd_lot(true);
+            match result {
+                Ok(quote) => Python::attach(|py| types::quote_to_dict(py, &quote)),
+                Err(e) => Err(errors::to_py_err(e)),
             }
-            builder.send()
-        });
+        })
+    }
 
-        match result {
-            Ok(quote) => types::quote_to_dict(py, &quote),
-            Err(e) => Err(errors::to_py_err(e)),
-        }
+    /// Get ticker information for a stock symbol
+    ///
+    /// Args:
+    ///     symbol: Stock symbol (e.g., "2330" for TSMC)
+    ///
+    /// Returns:
+    ///     Awaitable[dict]: Ticker data
+    ///
+    /// Raises:
+    ///     MarketDataError: If the request fails
+    ///
+    /// Example:
+    ///     ```python
+    ///     ticker = await client.stock.intraday.ticker("2330")
+    ///     ```
+    pub fn ticker<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                intraday.ticker().symbol(&symbol).send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(ticker) => Python::attach(|py| types::ticker_to_dict(py, &ticker)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Get candlestick chart data
+    ///
+    /// Args:
+    ///     symbol: Stock symbol (e.g., "2330" for TSMC)
+    ///     timeframe: Timeframe in minutes (default: "1")
+    ///
+    /// Returns:
+    ///     Awaitable[dict]: Candlestick data
+    ///
+    /// Raises:
+    ///     MarketDataError: If the request fails
+    ///
+    /// Example:
+    ///     ```python
+    ///     candles = await client.stock.intraday.candles("2330", "5")
+    ///     ```
+    #[pyo3(signature = (symbol, timeframe="1".to_string()))]
+    pub fn candles<'py>(&self, py: Python<'py>, symbol: String, timeframe: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                intraday.candles().symbol(&symbol).timeframe(&timeframe).send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(candles) => Python::attach(|py| types::candles_to_dict(py, &candles)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Get trade ticks data
+    ///
+    /// Args:
+    ///     symbol: Stock symbol (e.g., "2330" for TSMC)
+    ///
+    /// Returns:
+    ///     Awaitable[dict]: Trade ticks data
+    ///
+    /// Raises:
+    ///     MarketDataError: If the request fails
+    ///
+    /// Example:
+    ///     ```python
+    ///     trades = await client.stock.intraday.trades("2330")
+    ///     ```
+    pub fn trades<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                intraday.trades().symbol(&symbol).send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(trades) => Python::attach(|py| types::trades_to_dict(py, &trades)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Get volume data
+    ///
+    /// Args:
+    ///     symbol: Stock symbol (e.g., "2330" for TSMC)
+    ///
+    /// Returns:
+    ///     Awaitable[dict]: Volume data
+    ///
+    /// Raises:
+    ///     MarketDataError: If the request fails
+    ///
+    /// Example:
+    ///     ```python
+    ///     volumes = await client.stock.intraday.volumes("2330")
+    ///     ```
+    pub fn volumes<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                intraday.volumes().symbol(&symbol).send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(volumes) => Python::attach(|py| types::volumes_to_dict(py, &volumes)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
     }
 }
 
@@ -209,7 +337,7 @@ impl FutOptIntradayClient {
     ///     after_hours: Whether to query after-hours session data (default: False)
     ///
     /// Returns:
-    ///     dict: Quote data including prices, order book, and trading info
+    ///     Awaitable[dict]: Quote data including prices, order book, and trading info
     ///
     /// Raises:
     ///     MarketDataError: If the request fails
@@ -217,33 +345,31 @@ impl FutOptIntradayClient {
     /// Example:
     ///     ```python
     ///     # Regular session
-    ///     quote = client.futopt.intraday.quote("TXFC4")
+    ///     quote = await client.futopt.intraday.quote("TXFC4")
     ///
     ///     # After-hours session
-    ///     ah_quote = client.futopt.intraday.quote("TXFC4", after_hours=True)
+    ///     ah_quote = await client.futopt.intraday.quote("TXFC4", after_hours=True)
     ///     ```
     #[pyo3(signature = (symbol, after_hours=false))]
-    #[allow(deprecated)]  // allow_threads is deprecated in PyO3 0.27 but replacement not yet available
-    pub fn quote(&self, py: Python<'_>, symbol: &str, after_hours: bool) -> PyResult<Py<PyDict>> {
-        // Clone the necessary data before releasing GIL
+    pub fn quote<'py>(&self, py: Python<'py>, symbol: String, after_hours: bool) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
-        let symbol_owned = symbol.to_string();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.quote().symbol(&symbol);
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                builder.send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
 
-        // Release GIL during blocking HTTP call
-        let result = py.allow_threads(move || {
-            let futopt = client.futopt();
-            let intraday = futopt.intraday();
-            let mut builder = intraday.quote().symbol(&symbol_owned);
-            if after_hours {
-                builder = builder.after_hours();
+            match result {
+                Ok(quote) => Python::attach(|py| types::futopt_quote_to_dict(py, &quote)),
+                Err(e) => Err(errors::to_py_err(e)),
             }
-            builder.send()
-        });
-
-        match result {
-            Ok(quote) => types::futopt_quote_to_dict(py, &quote),
-            Err(e) => Err(errors::to_py_err(e)),
-        }
+        })
     }
 }
 
