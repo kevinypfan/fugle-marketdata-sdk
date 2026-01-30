@@ -1,0 +1,39 @@
+[package]
+name = "marketdata-uniffi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "UniFFI bindings for Fugle marketdata-core (EXPERIMENTAL)"
+
+# Metadata to indicate experimental status
+[package.metadata]
+status = "experimental"
+stability = "alpha"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "marketdata_uniffi"
+
+[dependencies]
+# Core dependency
+marketdata-core.workspace = true
+
+# UniFFI for cross-language bindings
+uniffi = { version = "0.28", features = ["cli"] }
+
+# Serialization for JSON return values
+serde_json = { workspace = true }
+
+# Error derive macro
+thiserror = { workspace = true }
+
+# Async runtime for blocking operations
+tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }
+
+[dev-dependencies]
+# Testing utilities
+tokio = { workspace = true, features = ["macros"] }

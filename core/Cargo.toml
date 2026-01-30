@@ -1,0 +1,38 @@
+[package]
+name = "marketdata-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Workspace-inherited dependencies
+tokio.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+futures-util.workspace = true
+url.workspace = true
+
+# Core-only dependencies
+ureq = { version = "2.10", features = ["json"] }
+tokio-tungstenite = { version = "0.28", features = ["native-tls"] }
+exponential-backoff = "2.0"
+indexmap = "2.2"
+
+[features]
+# FFI bindings will be added in Phase 6
+python = []
+js = []
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+tokio-test = "0.4"
+
+[[bench]]
+name = "rest_latency"
+harness = false
+
+[[bench]]
+name = "websocket_throughput"
+harness = false
