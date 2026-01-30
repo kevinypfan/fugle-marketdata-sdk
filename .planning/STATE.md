@@ -10,28 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 2 of 6 (Python Binding Enhancement)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-01-31 — Completed Phase 1 (Build Infrastructure Modernization)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-31 — Completed 02-01-PLAN.md (PyO3 0.27 upgrade)
 
-Progress: [██░░░░░░░░] 17% (1 of 6 phases complete)
+Progress: [██░░░░░░░░] 17% (1.17 of 6 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 4 min
-- Total execution time: 0.18 hours
+- Total plans completed: 4
+- Average duration: 5 min
+- Total execution time: 0.33 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-build-infrastructure | 3 | 11min | 4min |
+| 02-python-binding | 1 | 9min | 9min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (2min), 01-03 (5min)
-- Trend: Consistent execution, infrastructure plans averaging 3-5 minutes
+- Last 5 plans: 01-01 (4min), 01-02 (2min), 01-03 (5min), 02-01 (9min)
+- Trend: Phase 2 plan (API migration) took longer than Phase 1 (config changes)
 
 *Updated after each plan completion*
 
@@ -54,6 +55,9 @@ Recent decisions affecting current work:
 - **01-03:** Use path-based workflow triggering (dorny/paths-filter) to run only affected language workflows
 - **01-03:** Test minimal language versions (Python 3.8, Node 18) on Linux only, current versions on all platforms
 - **01-03:** Use Swatinem/rust-cache with workspace paths to prevent cache key collisions between bindings
+- **02-01:** Use pyo3-async-runtimes (not deprecated pyo3-asyncio) for asyncio integration
+- **02-01:** Map core errors to specific Python exception types (ApiError, AuthError, etc.) for better error handling
+- **02-01:** Exception hierarchy with inheritance: RateLimitError extends ApiError extends MarketDataError
 
 ### Pending Todos
 
@@ -66,8 +70,8 @@ None yet.
 - Python binding requires dev headers (will address in Phase 2)
 
 **Phase 2 (Python):**
-- PyO3 0.22 → 0.27 upgrade path needs validation for breaking changes
-- GIL deadlock prevention requires pyo3-async-runtimes integration testing
+- ✅ RESOLVED: PyO3 0.27 upgrade completed with Bound API migration in 02-01
+- ✅ RESOLVED: pyo3-async-runtimes 0.27 added and ready for async API in 02-02
 
 **Phase 3 (Node.js):**
 - napi-rs 2.16 → 3.6 has ThreadsafeFunction API changes requiring WebSocket callback refactoring
@@ -89,6 +93,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Phase 1 complete and verified
-Resume file: .planning/phases/01-build-infrastructure/01-VERIFICATION.md
-Next: Plan Phase 2 with `/gsd:discuss-phase 2` or `/gsd:plan-phase 2`
+Stopped at: Completed 02-01-PLAN.md (PyO3 0.27 upgrade)
+Resume file: .planning/phases/02-python-binding/02-01-SUMMARY.md
+Next: Continue Phase 2 with Plan 02-02 (Async API) or `/gsd:plan-next`
