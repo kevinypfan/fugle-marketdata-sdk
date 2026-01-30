@@ -151,7 +151,7 @@ impl StockWebSocketClient {
     /// ws.stock.on('connect', () => console.log('Connected'));
     /// ws.stock.on('error', (err) => console.error(err));
     /// ```
-    #[napi]
+    #[napi(ts_args_type = "event: WebSocketEvent, callback: (data: string) => void")]
     pub fn on(&self, event: String, callback: ThreadsafeFunction<String>) -> napi::Result<()> {
         let mut callbacks = self
             .callbacks
@@ -307,7 +307,7 @@ impl StockWebSocketClient {
     /// Subscribe to a channel
     ///
     /// @param options - Subscription options: { channel: string, symbol: string, intradayOddLot?: boolean }
-    #[napi]
+    #[napi(ts_args_type = "options: StockSubscribeOptions")]
     pub fn subscribe(&self, options: serde_json::Value) -> napi::Result<()> {
         let channel_str = options
             .get("channel")
@@ -435,7 +435,7 @@ impl FutOptWebSocketClient {
     ///
     /// @param event - Event type: "message", "connect", "disconnect", "reconnect", "error"
     /// @param callback - JavaScript callback function receiving string data
-    #[napi]
+    #[napi(ts_args_type = "event: WebSocketEvent, callback: (data: string) => void")]
     pub fn on(&self, event: String, callback: ThreadsafeFunction<String>) -> napi::Result<()> {
         let mut callbacks = self
             .callbacks
@@ -597,7 +597,7 @@ impl FutOptWebSocketClient {
     /// Subscribe to a channel
     ///
     /// @param options - Subscription options: { channel: string, symbol: string, afterHours?: boolean }
-    #[napi]
+    #[napi(ts_args_type = "options: FutOptSubscribeOptions")]
     pub fn subscribe(&self, options: serde_json::Value) -> napi::Result<()> {
         let channel_str = options
             .get("channel")

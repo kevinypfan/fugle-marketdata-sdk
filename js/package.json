@@ -16,17 +16,20 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "^3.5.1"
+    "@napi-rs/cli": "^3.5.1",
+    "typed-emitter": "^2.1.0"
   },
   "engines": {
     "node": ">= 16"
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build -p marketdata-js --platform --release",
-    "build:debug": "napi build -p marketdata-js --platform",
+    "build": "napi build -p marketdata-js --platform --release && node scripts/postbuild.js",
+    "build:debug": "napi build -p marketdata-js --platform && node scripts/postbuild.js",
+    "postbuild": "node scripts/postbuild.js",
     "prepublishOnly": "napi prepublish -t npm",
-    "version": "napi version"
+    "version": "napi version",
+    "validate-types": "node validate_types.js"
   },
   "repository": {
     "type": "git",
@@ -46,6 +49,7 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "types.d.ts",
     "*.node"
   ]
 }
