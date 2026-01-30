@@ -46,10 +46,14 @@ Plans:
   2. Python users import the SDK and see full IDE autocomplete with type hints for all public APIs
   3. Python users can replace `import fugle_marketdata` with `import marketdata_py` in existing code without changing method calls or response handling
   4. WebSocket streaming delivers real-time data through Python iterator pattern without GIL-related deadlocks
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 02-01: TBD during planning
+- [ ] 02-01-PLAN.md — Upgrade PyO3 to 0.27 with async runtime foundation
+- [ ] 02-02-PLAN.md — Convert REST client to native async/await API
+- [ ] 02-03-PLAN.md — Add WebSocket async iterator and auto-reconnect
+- [ ] 02-04-PLAN.md — Create type stubs and PEP 561 compliance
+- [ ] 02-05-PLAN.md — Validate async functionality with integration tests
 
 ### Phase 3: Node.js Binding Enhancement
 **Goal**: Upgrade Node.js binding to napi-rs 3.6+ with improved TypeScript definitions and API compatibility with fugle-marketdata-node
@@ -117,7 +121,7 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Build Infrastructure | 3/3 | Complete ✓ | 2026-01-31 |
-| 2. Python Binding | 0/TBD | Ready to plan | - |
+| 2. Python Binding | 0/5 | In progress | - |
 | 3. Node.js Binding | 0/TBD | Not started | - |
 | 4. C# Binding | 0/TBD | Not started | - |
 | 5. Distribution | 0/TBD | Not started | - |
