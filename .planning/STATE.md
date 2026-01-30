@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 
 ## Current Position
 
-Phase: 4 of 6 (C# Binding Replacement) - IN PROGRESS
-Plan: 4 of 5 in current phase - COMPLETE
-Status: Phase 4 In Progress
-Last activity: 2026-01-31 - Completed 04-04-PLAN.md (C# wrapper layer with RestClient)
+Phase: 4 of 6 (C# Binding Replacement) - COMPLETE
+Plan: 5 of 5 in current phase - COMPLETE
+Status: Phase 4 Complete - Ready for Phase 5 (Distribution)
+Last activity: 2026-01-31 - Completed 04-05-PLAN.md (C# WebSocket streaming and testing)
 
-Progress: [████████░░] 64% (~16 of 25 plans complete)
+Progress: [████████░░] 68% (~17 of 25 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 17
 - Average duration: 6 min
-- Total execution time: ~1.7 hours
+- Total execution time: ~1.8 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [████████░░] 64% (~16 of 25 plans complete)
 | 01-build-infrastructure | 3 | 11min | 4min |
 | 02-python-binding | 5 | 38min | 8min |
 | 03-nodejs-binding | 4 | 32min | 8min |
-| 04-csharp-binding | 4 | 15min | 4min |
+| 04-csharp-binding | 5 | 19min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 03-04 (4min), 04-01 (2min), 04-03 (3min), 04-02 (4min), 04-04 (6min)
-- Trend: Phase 4 plans fast due to existing patterns from Python/Node.js
+- Last 5 plans: 04-01 (2min), 04-03 (3min), 04-02 (4min), 04-04 (6min), 04-05 (4min)
+- Trend: Phase 4 consistently fast (4min avg) due to patterns from Python/Node.js
 
 *Updated after each plan completion*
 
@@ -92,6 +92,13 @@ Recent decisions affecting current work:
 - **04-03:** Message polling with MESSAGE_AVAILABLE/NO_MESSAGE status codes for non-blocking C# consumption
 - **04-03:** State codes as c_int constants (DISCONNECTED=0, CONNECTING=1, CONNECTED=2, RECONNECTING=3)
 - **04-03:** Tokio spawn task forwards messages from core MessageReceiver to mpsc::channel for C# polling
+- **04-04:** Record types (not classes) for C# model immutability with JsonPropertyName attributes
+- **04-04:** IsExternalInit polyfill enables records in netstandard2.0 target
+- **04-04:** Dual async/sync method pattern: async primary, sync as GetAwaiter().GetResult() wrapper
+- **04-05:** EventHandler<T> pattern (not callbacks) for .NET-idiomatic streaming
+- **04-05:** 10ms polling interval for low latency message delivery
+- **04-05:** Method-level unsafe (not class-level) for async/await compatibility
+- **04-05:** Assert.Inconclusive for graceful skip when native library unavailable
 
 ### Pending Todos
 
@@ -115,13 +122,15 @@ None yet.
 - PENDING: Memory leak testing for Buffer/TypedArray handling (deferred to Phase 6)
 
 **Phase 4 (C#):**
-- 04-01 COMPLETE: csbindgen FFI foundation with error codes and panic recovery
-- 04-02 COMPLETE: REST client FFI with 8 async callback endpoints (stock/futopt intraday)
-- 04-03 COMPLETE: WebSocket FFI with polling-based message retrieval and generic subscription API
-- 04-04 COMPLETE: C# wrapper layer (RestClient with Task-based async, exception hierarchy, record models)
-- NEXT: 04-05 C# test suite and examples
+- PHASE COMPLETE: All 5 plans executed successfully
+- 04-01: csbindgen FFI foundation with error codes and panic recovery
+- 04-02: REST client FFI with 8 async callback endpoints (stock/futopt intraday)
+- 04-03: WebSocket FFI with polling-based message retrieval and generic subscription API
+- 04-04: C# wrapper layer (RestClient with Task-based async, exception hierarchy, record models)
+- 04-05: WebSocketClient with EventHandler streaming + MSTest suite (56 tests)
 - Send trait issue resolved via usize pointer conversion pattern
 - IsExternalInit polyfill enables records in netstandard2.0
+- Method-level unsafe enables async/await in disposal patterns
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -134,6 +143,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-04-PLAN.md (C# wrapper layer with RestClient)
+Stopped at: Completed 04-05-PLAN.md (C# WebSocket streaming and testing) - Phase 4 COMPLETE
 Resume file: N/A
-Next: Phase 4 - C# Binding (04-05-PLAN.md - C# test suite and examples)
+Next: Phase 5 - Distribution (05-01-PLAN.md - Package release automation)
