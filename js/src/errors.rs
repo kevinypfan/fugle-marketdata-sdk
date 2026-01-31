@@ -35,7 +35,7 @@ mod tests {
         };
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[1001]"));
         assert!(reason.contains("Invalid symbol: TEST"));
     }
@@ -45,7 +45,7 @@ mod tests {
         let err = MarketDataError::ConfigError("missing required field".to_string());
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[1004]"));
         assert!(reason.contains("missing required field"));
     }
@@ -57,7 +57,7 @@ mod tests {
         };
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[2002]"));
         assert!(reason.contains("invalid token"));
     }
@@ -70,7 +70,7 @@ mod tests {
         };
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[2003]"));
         assert!(reason.contains("status 404"));
         assert!(reason.contains("not found"));
@@ -83,7 +83,7 @@ mod tests {
         };
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[2001]"));
         assert!(reason.contains("connection refused"));
     }
@@ -95,7 +95,7 @@ mod tests {
         };
         let napi_err = to_napi_error(err);
 
-        let reason = napi_err.reason;
+        let reason = napi_err.reason.clone();
         assert!(reason.contains("[3001]"));
         assert!(reason.contains("quote request"));
     }
