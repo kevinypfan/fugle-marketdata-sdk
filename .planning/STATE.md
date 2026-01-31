@@ -129,7 +129,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+1. **Fix WebSocket client shutdown blocking** (uniffi) - `uniffi/src/websocket.rs`
+   - `client.Close()` hangs, requires timeout workaround in Go
 
 ### Blockers/Concerns
 
