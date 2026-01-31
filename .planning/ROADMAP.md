@@ -158,14 +158,15 @@ Plans:
   2. Integration tests successfully execute real API calls for all endpoints (REST intraday/historical, WebSocket streaming) across all languages
   3. Unit tests cover all language-specific FFI boundaries including error handling, panic recovery, and memory safety
   4. Performance benchmarks demonstrate competitive speed compared to official SDKs (within 2x for Python, within 1.5x for Node.js)
-**Plans**: 5 plans
+**Plans**: 6 plans
 
 Plans:
 - [ ] 06-01-PLAN.md — Create Python fixture-based response compatibility testing (VCR.py)
 - [ ] 06-02-PLAN.md — Create Node.js fixture-based response compatibility testing (nock)
-- [ ] 06-03-PLAN.md — Create Python and Rust performance benchmarks (pytest-benchmark, criterion)
+- [ ] 06-03-PLAN.md — Create Python and Node.js performance benchmarks with official SDK comparison
 - [ ] 06-04-PLAN.md — Create CI workflows for testing and benchmark regression detection
 - [ ] 06-05-PLAN.md — Create response compatibility tests for C#, Java, and Go bindings
+- [ ] 06-06-PLAN.md — Create FFI boundary unit tests for all language bindings
 
 ## Progress
 
@@ -184,4 +185,4 @@ Note: Phase 4.1 and 4.2 are inserted phases to complete UniFFI bindings before d
 | 4.1 UniFFI Migration | 6/6 | Complete ✓ | 2026-01-31 |
 | 4.2 Java Binding | 3/3 | Complete ✓ | 2026-01-31 |
 | 5. Distribution | 6/6 | Complete ✓ | 2026-01-31 |
-| 6. Testing | 0/5 | Not started | - |
+| 6. Testing | 0/6 | Not started | - |
