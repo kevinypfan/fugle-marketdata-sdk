@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 3 Complete - Ready for Phase 4 (C# Binding)
+**Current focus:** Phase 4 Complete - Ready for Phase 4.1 (UniFFI Migration)
 
 ## Current Position
 
-Phase: 4 of 6 (C# Binding Replacement) - COMPLETE
-Plan: 5 of 5 in current phase - COMPLETE
-Status: Phase 4 Complete - Ready for Phase 5 (Distribution)
-Last activity: 2026-01-31 - Completed 04-05-PLAN.md (C# WebSocket streaming and testing)
+Phase: 4.1 of 7 (UniFFI Migration) - IN PROGRESS
+Plan: 1 of 4 in current phase - COMPLETE
+Status: Plan 04.1-01 complete - Typed UniFFI interface defined
+Last activity: 2026-01-31 - Completed 04.1-01-PLAN.md (typed interface definition)
 
-Progress: [████████░░] 68% (~17 of 25 plans complete)
+Progress: [███████░░░] 67% (~18 of 27 plans complete)
 
 ## Performance Metrics
 
@@ -99,6 +99,16 @@ Recent decisions affecting current work:
 - **04-05:** 10ms polling interval for low latency message delivery
 - **04-05:** Method-level unsafe (not class-level) for async/await compatibility
 - **04-05:** Assert.Inconclusive for graceful skip when native library unavailable
+- **04.1-01:** Proc-macro-only approach (uniffi::setup_scaffolding!) instead of UDL file to avoid duplicate type generation
+- **04.1-01:** Constructors in separate non-exported impl blocks (UniFFI doesn't support associated functions in exports)
+- **04.1-01:** tokio feature required for uniffi dependency when using async_runtime = "tokio"
+
+### Roadmap Evolution
+
+- Phase 4.1 inserted after Phase 4: UniFFI Migration (URGENT)
+  - Rationale: Consolidate language-specific FFI (PyO3, napi-rs, csbindgen) into unified UniFFI architecture
+  - Benefits: Single UDL source, easier Go/Swift support, reduced maintenance burden
+  - Trade-off: Requires rewriting existing bindings, may lose some language-idiomatic optimizations
 
 ### Pending Todos
 
@@ -132,6 +142,12 @@ None yet.
 - IsExternalInit polyfill enables records in netstandard2.0
 - Method-level unsafe enables async/await in disposal patterns
 
+**Phase 4.1 (UniFFI Migration):**
+- IN PROGRESS: Plan 1 of 4 complete
+- 04.1-01: Typed UniFFI interface with proc-macro approach (23 Record structs, flat error enum)
+- Deviation: Switched from UDL to proc-macro-only approach to avoid E0119 duplicate implementation errors
+- PENDING: C# binding generation (04.1-02), Go binding generation (04.1-03), integration testing (04.1-04)
+
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
 - Alpine/musl builds need validation if musllinux wheels required beyond manylinux
@@ -143,6 +159,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-05-PLAN.md (C# WebSocket streaming and testing) - Phase 4 COMPLETE
+Stopped at: Completed 04.1-01-PLAN.md (typed UniFFI interface definition)
 Resume file: N/A
-Next: Phase 5 - Distribution (05-01-PLAN.md - Package release automation)
+Next: Phase 4.1 Plan 02 - C# binding generation with uniffi-bindgen-cs
