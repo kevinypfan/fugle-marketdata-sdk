@@ -1,223 +1,430 @@
-# Domain Pitfalls: Multi-Language SDK Development
+# Domain Pitfalls: SDK API Changes (v0.3.0)
 
-**Domain:** Rust-core multi-language SDK with Python (PyO3), Node.js (napi-rs), and C# (UniFFI) bindings
-**Researched:** 2026-01-30
+**Context:** Breaking changes to constructor signatures and configuration options across 5 language bindings
+**Milestone:** v0.3.0 - Constructor from string → options object, adding reconnection/health check config
+**Researched:** 2026-02-01
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, major runtime failures, or production incidents.
-
-### Pitfall 1: Panic Unwinding Across FFI Boundaries
-**What goes wrong:** Rust panics escape across FFI boundaries causing undefined behavior, process crashes, or corrupted state in the host language runtime.
-
-**Why it happens:**
-- Rust's default `extern "C"` ABI treats unwinding as undefined behavior
-- Many operations (array indexing, unwrap(), arithmetic overflow) can panic
-- PyO3/napi-rs catch panics at their boundaries, but custom FFI code may not
-- Developers assume panics work like exceptions in Python/JavaScript
-
-**Consequences:**
-- Process termination without cleanup (file handles, network connections leak)
-- Corrupted Python/Node.js runtime state leading to segfaults in unrelated code
-- Production incidents that are impossible to debug (no stack trace survives FFI boundary)
-
-**Prevention:**
-```rust
-// ❌ Wrong: panic can escape
-#[no_mangle]
-pub extern "C" fn get_quote(symbol: *const c_char) -> *mut Quote {
-    let symbol = unsafe { CStr::from_ptr(symbol) };
-    data.get(symbol).unwrap()  // Can panic!
-}
-
-// ✅ Right: catch all panics
-#[no_mangle]
-pub extern "C" fn get_quote(symbol: *const c_char) -> *mut Result<Quote> {
-    std::panic::catch_unwind(|| {
-        let symbol = unsafe { CStr::from_ptr(symbol) };
-        data.get(symbol).ok_or(Error::NotFound)
-    }).unwrap_or_else(|_| Err(Error::Panic))
-}
-```
-
-- Use `std::panic::catch_unwind()` at ALL FFI entry points
-- Return Result types and convert panics to error codes
-- Enable `panic = "abort"` in release builds for predictable failure modes
-- PyO3 and napi-rs handle this automatically for `#[pyfunction]` and `#[napi]` macros
-
-**Detection:**
-- Unexplained crashes with no stack trace
-- Intermittent segfaults in Python/Node.js code unrelated to SDK calls
-- Process exits with status 134 (SIGABRT) or 139 (SIGSEGV)
-- Valgrind/AddressSanitizer shows "invalid pointer" after SDK calls
-
-**Phase mapping:** Phase 1 (Python compatibility) - ensure existing PyO3 code has panic handling; Phase 2 (Node.js) - audit napi-rs FFI boundaries; Phase 3 (C#) - critical for UniFFI where automatic panic handling may be limited
-
-**Sources:**
-- [Rust FFI unwinding RFC](https://rust-lang.github.io/rfcs/2797-project-ffi-unwind.html)
-- [FFI Best Practices 2025](https://medium.com/@QuarkAndCode/ffi-best-practices-for-rust-deno-mojo-5b9950dde5ce)
+Mistakes that cause production incidents, user migration failures, or major rewrites.
 
 ---
 
-### Pitfall 2: Async Runtime Deadlocks with GIL and Event Loops
-**What goes wrong:** Python GIL acquisition deadlocks with Tokio runtime, Node.js event loop blocks waiting for Rust async operations, or multiple async runtimes conflict.
+### Pitfall 1: Breaking Existing User Code Without Migration Path
+
+**What goes wrong:** Users upgrade to v0.3.0 and their code immediately breaks with cryptic errors. No clear migration guidance, no deprecation warnings, no backward compatibility shims.
 
 **Why it happens:**
-- PyO3: `Python::with_gil()` blocks the thread, but Tokio may hold locks needed by Python
-- napi-rs: Node.js event loop is single-threaded; blocking it stalls all JavaScript
-- Tokio spawns tasks that try to re-acquire GIL from different threads
-- Async Rust expects `await` points for preemption; FFI synchronous boundaries don't provide this
+- Direct string-to-object constructor change: `new RestClient('api-key')` → `new RestClient({ apiKey: 'api-key' })` breaks immediately
+- No gradual migration period with deprecation warnings
+- Package managers auto-update to minor versions (if using `^0.2.0` in package.json)
+- Users don't read changelogs before updating
+- Error messages don't explain what changed: "TypeError: Cannot read property 'apiKey' of undefined" vs helpful migration hint
 
 **Consequences:**
-- Application hangs indefinitely (hard to debug - no error, just frozen)
-- WebSocket connections timeout because event loop is blocked
-- Python asyncio and Tokio compete for CPU, causing starvation
-- Multi-threaded Tokio tries to acquire GIL from worker thread → deadlock
+- Production applications break during routine dependency updates
+- Support burden: flood of GitHub issues "SDK stopped working after update"
+- Users pin to v0.2.x indefinitely, fragmenting user base
+- Negative sentiment: "SDK is unstable", damages trust
+- Emergency rollback and hotfix cycles
 
 **Prevention:**
 
-**For PyO3:**
+**Strategy 1: Deprecation-first approach (RECOMMENDED)**
 ```rust
-// ❌ Wrong: GIL held while awaiting Rust future
-#[pyfunction]
-fn fetch_quote(py: Python, symbol: String) -> PyResult<Quote> {
-    py.allow_threads(|| {  // STILL WRONG - blocks thread
-        runtime.block_on(async_fetch(symbol))
-    })
+// Phase 1 (v0.2.1): Add new constructor, deprecate old
+impl RestClient {
+    // Old constructor - deprecated but still works
+    #[deprecated(since = "0.2.1", note = "Use RestClient::new(config) with RestClientConfig instead")]
+    pub fn from_api_key(api_key: String) -> Self {
+        Self::new(RestClientConfig {
+            api_key,
+            timeout: None,
+            ..Default::default()
+        })
+    }
+
+    // New constructor
+    pub fn new(config: RestClientConfig) -> Self {
+        // Implementation
+    }
 }
 
-// ✅ Right: Release GIL, return Python future
-#[pyfunction]
-fn fetch_quote(py: Python, symbol: String) -> PyResult<&PyAny> {
-    pyo3_asyncio::tokio::future_into_py(py, async move {
-        let result = async_fetch(symbol).await;
-        Python::with_gil(|py| result.into_py(py))
-    })
-}
+// Phase 2 (v0.3.0): Remove deprecated constructor
+// Users had 1-2 months to migrate
 ```
 
-**For napi-rs:**
-```rust
-// ❌ Wrong: blocking Node.js event loop
-#[napi]
-fn fetch_quote(symbol: String) -> Result<Quote> {
-    RUNTIME.block_on(async_fetch(symbol))  // Blocks Node!
-}
-
-// ✅ Right: return promise to Node.js
-#[napi]
-async fn fetch_quote(symbol: String) -> Result<Quote> {
-    async_fetch(symbol).await  // napi-rs handles conversion
-}
-```
-
-**Key strategies:**
-- Use `pyo3-async-runtimes` for Python - bridges Python asyncio and Tokio
-- Always use `async fn` in napi-rs for async operations
-- NEVER call `block_on()` from FFI code
-- Release GIL before ANY blocking operation with `py.allow_threads()`
-- Use `#[pyo3(get)]` and `#[pyo3(set)]` for sync properties only
-
-**Detection:**
-- `top` shows 100% CPU but no progress
-- `py-spy` or Node.js profiler shows single function consuming all time
-- Python threads show "waiting for GIL" in `py-spy dump`
-- strace shows futex wait operations indefinitely
-- Application becomes unresponsive to signals (except SIGKILL)
-
-**Phase mapping:** Phase 1 (Python) - critical for WebSocket streaming which uses Tokio heavily; Phase 2 (Node.js) - critical, Node.js is single-threaded; Phase 3 (C#) - less critical, .NET has better multi-threading
-
-**Sources:**
-- [PyO3 GIL deadlock discussions](https://github.com/PyO3/pyo3/discussions/3045)
-- [napi-rs async fn documentation](https://napi.rs/docs/concepts/async-fn)
-- [pyo3-async-runtimes](https://github.com/PyO3/pyo3-async-runtimes)
-
----
-
-### Pitfall 3: Breaking API Compatibility in Subtle Ways
-**What goes wrong:** SDK claims API compatibility but breaks it through type mismatches, changed error behaviors, different default values, or inconsistent async/sync signatures.
-
-**Why it happens:**
-- Type mapping across languages loses precision (JavaScript number → Rust i64 → overflow)
-- Error handling differs (Python exceptions vs Rust Results vs JavaScript thrown errors)
-- Defaults not explicitly specified in one language
-- Async/sync mismatches: official SDK is sync, Rust binding exposes async
-- Serialization format differences (JSON field names, null vs undefined, ISO date formats)
-
-**Consequences:**
-- Users' existing code breaks when switching from official SDK
-- Silent data corruption (price 1234567890123 becomes NaN in JavaScript)
-- Error handling code doesn't catch expected exceptions
-- Tests pass but production breaks due to edge cases
-- Loss of trust in "drop-in replacement" promise
-
-**Prevention:**
-
-**Method signature compatibility matrix:**
+**Strategy 2: Constructor overloading (language-specific)**
 ```python
-# Official Python SDK
-def get_quote(symbol: str, oddLot: bool = False) -> Quote
-
-# ❌ Wrong: different parameter name
-def get_quote(symbol: str, odd_lot: bool = False) -> Quote
-
-# ✅ Right: match exactly (PyO3 rename)
-#[pyfunction]
-#[pyo3(signature = (symbol, oddLot=false))]
-fn get_quote(symbol: String, odd_lot: bool) -> PyResult<Quote>
+# Python: Accept both string and dict
+@classmethod
+def __new__(cls, config):
+    if isinstance(config, str):
+        warnings.warn(
+            "Passing api_key as string is deprecated. "
+            "Use RestClient({'api_key': '...'}) instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        config = {'api_key': config}
+    return super().__new__(cls)
 ```
 
-**Type precision handling:**
 ```javascript
-// Official Node SDK returns number for price
-// JavaScript number is f64, can't represent all i64
-
-// ❌ Wrong: precision loss
-class Quote {
-  get price(): number { return this.inner.price; }
-}
-
-// ✅ Right: use string for large integers
-class Quote {
-  get price(): string { return this.inner.price.toString(); }
-  get priceAsNumber(): number { /* document precision loss */ }
+// JavaScript/TypeScript: Union types
+constructor(config: string | RestClientConfig) {
+    if (typeof config === 'string') {
+        console.warn('Passing api_key as string is deprecated...');
+        this.config = { apiKey: config };
+    } else {
+        this.config = config;
+    }
 }
 ```
 
-**Error classification parity:**
+**Strategy 3: Clear error messages with migration guidance**
 ```rust
-// ❌ Wrong: different error types than original SDK
-match status {
-    401 => Err(Error::Auth),
-    429 => Err(Error::Network),  // Original SDK: RateLimitError
-}
-
-// ✅ Right: match original error hierarchy
-match status {
-    401 => Err(Error::Auth(AuthError::InvalidToken)),
-    429 => Err(Error::RateLimit(RateLimitError::TooManyRequests)),
+// If we MUST break immediately, at least make errors helpful
+impl RestClient {
+    pub fn new(config: RestClientConfig) -> Result<Self, ConfigError> {
+        if config.api_key.is_empty() {
+            return Err(ConfigError::MigrationHelp(
+                "RestClient constructor changed in v0.3.0.\n\
+                 Old: RestClient::new('api-key')\n\
+                 New: RestClient::new(RestClientConfig { api_key: 'api-key', ..Default::default() })\n\
+                 See migration guide: https://docs.fugle.tw/sdk/migration-v0.3"
+            ));
+        }
+        // ...
+    }
 }
 ```
-
-**Strategies:**
-- Generate compatibility test suite from official SDK tests
-- Use property-based testing to find edge cases (QuickCheck, Hypothesis)
-- Test with real API responses captured from production
-- Document EVERY deviation from official SDK (even if "better")
-- Version bindings independently - don't break compatibility in patch releases
 
 **Detection:**
-- User reports "code worked with official SDK"
-- Type errors in production that don't appear in tests
-- `JSON.parse` failures or invalid date parsing
-- Tests use mocks that don't match real API behavior
-- Integration tests pass but manual testing breaks
+- User reports: "code broke after update"
+- High volume of identical issues on GitHub
+- Package download stats show users NOT upgrading to v0.3.x
+- Automated dependency scanners (Dependabot) create PRs that break CI
+- Rollback commits with messages like "revert to v0.2.x, v0.3.x broken"
 
-**Phase mapping:** Phase 1 (Python) - compare against fugle-marketdata-python test suite; Phase 2 (Node.js) - compare against fugle-marketdata-node; Phase 3 (C#) - compare against FubonNeo patterns; All phases need compatibility matrix testing
+**Warning signs:**
+- No deprecation warnings in v0.2.x logs
+- Migration guide not written before v0.3.0 release
+- Breaking changes not clearly marked in CHANGELOG with "BREAKING CHANGE:" prefix
+- No automated migration tool or codemod provided
+- Test coverage doesn't include "old API still works" cases in deprecation phase
+
+**Phase mapping:**
+- **Phase 0 (Pre-v0.3.0)**: Add deprecation warnings to v0.2.x, publish migration guide
+- **Phase 1**: Implement dual-constructor support in Rust core
+- **Phase 2-5**: Language bindings implement graceful fallback or clear errors
+- **Phase 6**: Documentation shows both old (deprecated) and new patterns
+- **Phase 7**: Remove deprecated constructors AFTER 2-3 month migration window
 
 **Sources:**
-- [Android SDK compatibility issues research](https://www.revenuecat.com/blog/engineering/binary-compatability/)
-- [API compatibility testing best practices](https://blog.dreamfactory.com/how-to-ensure-api-compatibility-across-platforms)
+- [Managing API Changes: 8 Strategies That Reduce Disruption by 70% (2026 Guide)](https://www.theneo.io/blog/managing-api-changes-strategies)
+- [What Are Breaking Changes and How Do You Avoid Them?](https://nordicapis.com/what-are-breaking-changes-and-how-do-you-avoid-them/)
+- [Handling Breaking Changes in SDKs | Speakeasy](https://www.speakeasy.com/docs/sdks/manage/breaking-changes)
+
+---
+
+### Pitfall 2: Inconsistent Configuration Defaults Across Languages
+
+**What goes wrong:** Python defaults reconnection to enabled, Node.js defaults to disabled, C# requires explicit setting. Users migrating between languages get different behavior, production systems behave unpredictably.
+
+**Why it happens:**
+- Each language binding implemented independently without coordination
+- "Sensible defaults" differ per language ecosystem culture
+- Python: "batteries included" → enable reconnection by default
+- Node.js: "explicit over implicit" → require opt-in
+- C#: "fail fast" → throw if not configured
+- No central configuration schema enforcing consistency
+- Language-specific idioms override cross-language consistency goal
+
+**Consequences:**
+- Polyglot teams get confused: "works in Python, fails in Node.js"
+- Documentation becomes language-specific, can't share examples
+- Users switching languages encounter surprising behavior differences
+- Production incidents when same config works in dev (Python) but not prod (C#)
+- Testing nightmare: need language-specific test matrices
+
+**Prevention:**
+
+**Strategy 1: Single source of truth for defaults**
+```rust
+// core/src/config.rs - SHARED defaults
+pub const DEFAULT_RECONNECT_ENABLED: bool = true;
+pub const DEFAULT_RECONNECT_MAX_ATTEMPTS: u32 = 5;
+pub const DEFAULT_RECONNECT_INITIAL_DELAY_MS: u64 = 1000;
+pub const DEFAULT_RECONNECT_MAX_DELAY_MS: u64 = 30000;
+pub const DEFAULT_HEALTH_CHECK_INTERVAL_MS: u64 = 30000;
+pub const DEFAULT_HEALTH_CHECK_TIMEOUT_MS: u64 = 5000;
+pub const DEFAULT_REST_TIMEOUT_MS: u64 = 30000;
+
+impl Default for WebSocketConfig {
+    fn default() -> Self {
+        Self {
+            reconnect_enabled: DEFAULT_RECONNECT_ENABLED,
+            reconnect_max_attempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+            // ... all languages MUST use these
+        }
+    }
+}
+```
+
+**Strategy 2: Configuration compatibility matrix documentation**
+```markdown
+# Configuration Defaults Across Languages
+
+| Option | Default | Python | Node.js | C# | Java | Go |
+|--------|---------|--------|---------|----|----- |----|
+| reconnect_enabled | `true` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| max_attempts | `5` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| health_check_interval | `30s` | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+ALL languages MUST use identical defaults. Deviations require RFC approval.
+```
+
+**Strategy 3: Cross-language configuration tests**
+```python
+# tests/cross_language_config_test.py
+def test_default_configs_match_across_languages():
+    """Ensure Python defaults match Rust core defaults"""
+    python_config = WebSocketConfig()
+
+    # These MUST match core/src/config.rs constants
+    assert python_config.reconnect_enabled == True  # DEFAULT_RECONNECT_ENABLED
+    assert python_config.max_attempts == 5  # DEFAULT_RECONNECT_MAX_ATTEMPTS
+    assert python_config.health_check_interval == 30.0  # DEFAULT_HEALTH_CHECK_INTERVAL_MS / 1000
+```
+
+```javascript
+// js/tests/config-consistency.test.js
+test('Node.js defaults match Rust core', () => {
+    const config = new WebSocketConfig();
+
+    // Must match core/src/config.rs
+    expect(config.reconnectEnabled).toBe(true);
+    expect(config.maxAttempts).toBe(5);
+});
+```
+
+**Strategy 4: Automated default extraction**
+```bash
+# CI check: extract Rust defaults and generate language-specific constants
+cargo run --bin extract-defaults > defaults.json
+
+# Validate each language reads from same source
+python scripts/validate_defaults.py --language python --expected defaults.json
+node scripts/validate_defaults.js --language nodejs --expected defaults.json
+```
+
+**Detection:**
+- Bug reports: "reconnection works in Python, not in JavaScript"
+- Integration test failures when running same scenario in different languages
+- Documentation contradictions between language sections
+- Code review finds hardcoded defaults instead of importing from constants
+- Config schema validation tests don't exist or don't cover all languages
+
+**Warning signs:**
+- Each language binding has its own `config.rs` / `config.py` / `config.js` with different values
+- No automated test enforcing default consistency
+- Language binding docs don't reference "official defaults" from core
+- Contributors add language-specific "improvements" without cross-language review
+
+**Phase mapping:**
+- **Phase 1 (Rust core)**: Define canonical defaults, export as public constants
+- **Phase 2 (Python)**: Import defaults from Rust via FFI or code generation
+- **Phase 3 (Node.js)**: Same approach as Python
+- **Phase 4 (C#)**: UniFFI should expose defaults automatically
+- **Phase 5 (Java)**: Validate defaults match core in tests
+- **All phases**: Add CI check that fails if defaults diverge
+
+**Sources:**
+- [Azure SDK Design Guidelines](https://learn.microsoft.com/en-us/azure/developer/python/sdk/fundamentals/language-design-guidelines)
+- [Smart configuration defaults - AWS SDKs](https://docs.aws.amazon.com/sdkref/latest/guide/feature-smart-config-defaults.html)
+
+---
+
+### Pitfall 3: Configuration Validation Fails at Wrong Time
+
+**What goes wrong:** Invalid configuration accepted at construction time, fails minutes later during actual connection. User loses context about what was wrong, debugging nightmare.
+
+**Why it happens:**
+- Lazy validation: defer checks until configuration is used
+- Constructor doesn't validate, WebSocket.connect() does
+- Validation happens async in background task, error lost or delayed
+- Complex interdependencies: timeout < interval only detected at runtime
+- Language boundaries: Python validates, Rust re-validates, error messages inconsistent
+
+**Consequences:**
+- User creates client successfully, gets error 30 seconds later when connecting
+- Error message: "invalid timeout" - which timeout? (connect? read? health check?)
+- Production systems deploy successfully, fail at runtime under load
+- Debugging difficulty: error far from source of misconfiguration
+- Logs scattered: config created in one place, error logged elsewhere
+
+**Prevention:**
+
+**Strategy 1: Fail-fast at construction time**
+```rust
+// core/src/config.rs
+impl WebSocketConfig {
+    pub fn new(builder: WebSocketConfigBuilder) -> Result<Self, ConfigError> {
+        let config = builder.build();
+
+        // VALIDATE IMMEDIATELY, not later
+        Self::validate(&config)?;
+        Ok(config)
+    }
+
+    fn validate(config: &WebSocketConfig) -> Result<(), ConfigError> {
+        // Timeout constraints
+        if config.connect_timeout == Duration::ZERO {
+            return Err(ConfigError::InvalidTimeout {
+                field: "connect_timeout",
+                value: "0s",
+                constraint: "must be > 0",
+            });
+        }
+
+        // Logical constraints
+        if config.health_check_timeout >= config.health_check_interval {
+            return Err(ConfigError::ConstraintViolation {
+                fields: vec!["health_check_timeout", "health_check_interval"],
+                constraint: "timeout must be < interval",
+                hint: "Set interval to at least 2x timeout for reliable health checks",
+            });
+        }
+
+        // Reconnection constraints
+        if config.reconnect_enabled && config.max_attempts == 0 {
+            return Err(ConfigError::ConstraintViolation {
+                fields: vec!["reconnect_enabled", "max_attempts"],
+                constraint: "max_attempts must be > 0 when reconnection enabled",
+                hint: "Set max_attempts to at least 1, or disable reconnection",
+            });
+        }
+
+        // Range validation
+        if config.max_attempts > 100 {
+            return Err(ConfigError::OutOfRange {
+                field: "max_attempts",
+                value: config.max_attempts,
+                min: 1,
+                max: 100,
+                hint: "Very high retry counts may cause long delays. Consider max 10-20.",
+            });
+        }
+
+        Ok(())
+    }
+}
+```
+
+**Strategy 2: Helpful error messages with context**
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("Invalid {field}: {value}. Constraint: {constraint}")]
+    InvalidTimeout {
+        field: &'static str,
+        value: String,
+        constraint: &'static str,
+    },
+
+    #[error("Configuration constraint violation: {constraint}\n  Fields: {fields:?}\n  Hint: {hint}")]
+    ConstraintViolation {
+        fields: Vec<&'static str>,
+        constraint: &'static str,
+        hint: &'static str,
+    },
+
+    #[error("{field} = {value} out of range [{min}, {max}]\n  Hint: {hint}")]
+    OutOfRange {
+        field: &'static str,
+        value: u32,
+        min: u32,
+        max: u32,
+        hint: &'static str,
+    },
+}
+```
+
+**Strategy 3: Builder pattern with compile-time guarantees**
+```rust
+// Make invalid states unrepresentable
+pub struct WebSocketConfigBuilder {
+    url: Option<String>,  // Required
+    api_key: Option<String>,  // Required
+    reconnect: ReconnectConfig,  // Has its own validated builder
+    health_check: HealthCheckConfig,  // Has its own validated builder
+}
+
+impl WebSocketConfigBuilder {
+    pub fn build(self) -> Result<WebSocketConfig, ConfigError> {
+        let url = self.url.ok_or(ConfigError::MissingRequired("url"))?;
+        let api_key = self.api_key.ok_or(ConfigError::MissingRequired("api_key"))?;
+
+        // Sub-configs already validated by their builders
+        Ok(WebSocketConfig {
+            url,
+            api_key,
+            reconnect: self.reconnect,
+            health_check: self.health_check,
+        })
+    }
+}
+```
+
+**Strategy 4: Language-specific validation at FFI boundary**
+```python
+# py/src/config.py
+class WebSocketConfig:
+    def __init__(self, **kwargs):
+        # Validate BEFORE passing to Rust
+        self._validate_python_side(kwargs)
+
+        # Create Rust config (which also validates)
+        self._inner = _marketdata.WebSocketConfig(**kwargs)
+
+    def _validate_python_side(self, kwargs):
+        """Python-specific validation for better error messages"""
+        if 'health_check_timeout' in kwargs and 'health_check_interval' in kwargs:
+            timeout = kwargs['health_check_timeout']
+            interval = kwargs['health_check_interval']
+
+            if timeout >= interval:
+                raise ValueError(
+                    f"health_check_timeout ({timeout}s) must be < "
+                    f"health_check_interval ({interval}s)\n"
+                    f"Recommended: timeout = interval / 2"
+                )
+```
+
+**Detection:**
+- Bug reports: "error happens later, not at initialization"
+- Errors with generic messages like "invalid configuration" without specifics
+- Users report difficulty debugging configuration issues
+- Logs show successful construction followed by connection failure
+- Integration tests pass locally, fail in production with different config
+
+**Warning signs:**
+- Constructor doesn't return Result/throws no exceptions
+- Validation code scattered in multiple places (constructor, connect, runtime)
+- Error messages don't mention field names or constraint violations
+- No test cases for invalid configurations
+- Documentation doesn't list valid ranges for numeric options
+
+**Phase mapping:**
+- **Phase 1**: Add validation to Rust core config types with comprehensive error types
+- **Phase 2-5**: Language bindings validate at construction, delegate to Rust for complete validation
+- **Phase 6**: Add validation test suite covering all constraint violations
+- **Phase 7**: Update documentation with valid ranges and constraints
+
+**Sources:**
+- [AWS SDK Configuration Validation](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/timeouts.html)
+- [Parameter validation in AWS JavaScript SDK](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/Config.html)
 
 ---
 
@@ -225,423 +432,614 @@ match status {
 
 Mistakes that cause delays, technical debt, or require significant rework.
 
-### Pitfall 4: Cross-Platform Binary Distribution Failures
-**What goes wrong:** Wheels/packages build on developer machine but fail on user machines due to glibc version mismatches, missing system dependencies, or wrong platform tags.
+---
+
+### Pitfall 4: Timeout Configuration Confusion
+
+**What goes wrong:** Users don't understand which timeout applies where. Set connect_timeout thinking it affects health checks. Production deadlocks or premature disconnections.
 
 **Why it happens:**
-- manylinux compliance: building on Ubuntu 24.04 (glibc 2.39) produces wheels that don't work on CentOS 7 (glibc 2.17)
-- Native dependencies: OpenSSL, native-tls link to system libraries
-- Platform tags: wheel tagged `linux_x86_64` instead of `manylinux2014_x86_64` rejected by PyPI
-- macOS universal2 binaries: arm64 + x86_64 not built correctly
-- Windows: MSVC vs GNU toolchain mismatch
+- Multiple timeout types: connect_timeout, read_timeout, health_check_timeout, rest_timeout
+- Unclear naming: "timeout" could mean connection, operation, or idle
+- No documentation of timeout hierarchy or interaction
+- Users copy-paste config from examples without understanding
+- Different defaults for different operations create inconsistency
 
 **Consequences:**
-- PyPI rejects wheel uploads: "linux platform tag not allowed"
-- Users get "symbol not found" or "GLIBC_2.XX not found" at import time
-- macOS M1 users forced to use Rosetta (slow)
-- Windows users get "DLL load failed" errors
-- CI builds succeed but releases fail
+- Health check timeout > interval → connection never considered unhealthy
+- REST timeout < actual API latency → requests always fail
+- Connect timeout too short → can't connect on slow networks
+- No timeout set → operations hang indefinitely
+- Production incidents: "why did connection drop after exactly 30 seconds?"
 
 **Prevention:**
 
-**For Python (maturin):**
-```bash
-# ❌ Wrong: uses host glibc
-maturin build --release
+**Strategy 1: Self-documenting configuration names**
+```rust
+// ❌ CONFUSING
+pub struct WebSocketConfig {
+    pub timeout: Duration,  // Timeout for what?
+    pub interval: Duration,  // Interval for what?
+}
 
-# ✅ Right: use manylinux container
-docker run --rm -v $(pwd):/io \
-  quay.io/pypa/manylinux2014_x86_64 \
-  /io/build-wheels.sh
+// ✅ CLEAR
+pub struct WebSocketConfig {
+    /// Maximum time to wait for WebSocket connection establishment
+    /// Recommended: 10-30 seconds for production
+    pub connect_timeout: Duration,
 
-# ✅ Better: use cibuildwheel (automates cross-platform)
-pip install cibuildwheel
-cibuildwheel --platform linux
+    /// Maximum time to wait for a message from server before considering connection stale
+    /// Recommended: 2x health_check_interval to avoid false positives
+    pub read_timeout: Duration,
+
+    /// Health check ping interval - how often to send ping to server
+    /// Recommended: 30-60 seconds for market data streams
+    pub health_check_interval: Duration,
+
+    /// Health check pong timeout - max time to wait for pong response
+    /// MUST be < health_check_interval (recommended: interval / 3)
+    pub health_check_timeout: Duration,
+}
+
+pub struct RestClientConfig {
+    /// Maximum time for entire REST request (including connection + read)
+    /// Recommended: 30-60 seconds for production APIs
+    pub request_timeout: Duration,
+}
 ```
 
-**Cargo.toml configuration:**
-```toml
-[package.metadata.maturin]
-# Ensure PyPI compatibility
-compatibility = "manylinux2014"
-# Or be explicit about minimum glibc
-# compatibility = "manylinux_2_17"
+**Strategy 2: Validation of timeout relationships**
+```rust
+impl WebSocketConfig {
+    fn validate_timeouts(&self) -> Result<(), ConfigError> {
+        // Health check timeout must be less than interval
+        if self.health_check_timeout >= self.health_check_interval {
+            return Err(ConfigError::TimeoutConstraint {
+                issue: "health_check_timeout >= health_check_interval",
+                fix: "Set timeout to at most 1/2 of interval",
+                example: format!(
+                    "interval: {}s → timeout: max {}s",
+                    self.health_check_interval.as_secs(),
+                    self.health_check_interval.as_secs() / 2
+                ),
+            });
+        }
 
-[profile.release]
-# Strip symbols to reduce size
-strip = true
+        // Connect timeout should be reasonable (warn if extreme)
+        if self.connect_timeout > Duration::from_secs(60) {
+            eprintln!(
+                "Warning: connect_timeout = {}s is very high. \
+                 Most connections succeed within 10-30s. \
+                 Long timeouts delay error detection.",
+                self.connect_timeout.as_secs()
+            );
+        }
+
+        Ok(())
+    }
+}
 ```
 
-**For Node.js (napi-rs):**
-```bash
-# ❌ Wrong: only builds for host platform
-napi build --release
+**Strategy 3: Timeout configuration guide in documentation**
+```markdown
+# Timeout Configuration Guide
 
-# ✅ Right: cross-compile for all targets
-napi build --release --target x86_64-unknown-linux-gnu
-napi build --release --target aarch64-unknown-linux-gnu
-napi build --release --target x86_64-apple-darwin
-napi build --release --target aarch64-apple-darwin
+## WebSocket Timeouts
+
+| Timeout | Purpose | Recommended Value | Notes |
+|---------|---------|-------------------|-------|
+| `connect_timeout` | Initial connection | 10-30s | Higher for slow networks |
+| `read_timeout` | Message receive | 2x `health_check_interval` | Prevents false disconnects |
+| `health_check_interval` | Ping frequency | 30-60s | Lower = more overhead |
+| `health_check_timeout` | Pong wait | `interval / 3` | Must be < interval |
+
+## REST Timeouts
+
+| Timeout | Purpose | Recommended Value | Notes |
+|---------|---------|-------------------|-------|
+| `request_timeout` | Total request time | 30-60s | Includes connection + read |
+
+## Configuration Examples
+
+### Conservative (Slow Networks)
+```python
+config = WebSocketConfig(
+    connect_timeout=30,  # Allow slow connection
+    health_check_interval=60,  # Reduce ping frequency
+    health_check_timeout=10,  # Wait up to 10s for pong
+)
 ```
 
-**Platform support matrix:**
-| Platform | Python | Node.js | C# |
-|----------|--------|---------|-----|
-| Linux x64 | manylinux2014 | glibc 2.17+ | .NET 6+ |
-| Linux ARM64 | manylinux2014 | glibc 2.17+ | .NET 6+ |
-| macOS x64 | 10.12+ | 10.13+ | .NET 6+ |
-| macOS ARM64 | 11.0+ | 11.0+ | .NET 6+ |
-| Windows x64 | 7+ | 10+ | .NET 6+ |
+### Aggressive (Fast Networks, Quick Failure Detection)
+```python
+config = WebSocketConfig(
+    connect_timeout=10,  # Fail fast if can't connect
+    health_check_interval=30,  # Frequent health checks
+    health_check_timeout=5,  # Expect fast pong
+)
+```
 
-**Strategies:**
-- Use official build containers (manylinux, quay.io/pypa)
-- Test on minimal Docker images (Alpine, debian:slim)
-- Check `auditwheel` / `delocate` output for external dependencies
-- Use `--compatibility pypi` flag for maturin
-- Set up CI matrix for all platforms (GitHub Actions, cross-rs)
-- Document minimum OS versions in README
+### Production Default (Balanced)
+```python
+config = WebSocketConfig(
+    connect_timeout=20,
+    health_check_interval=45,
+    health_check_timeout=10,
+)
+```
+```
+
+**Strategy 4: Runtime timeout diagnostics**
+```rust
+impl WebSocketClient {
+    /// Enable timeout diagnostics logging
+    pub fn enable_timeout_diagnostics(&mut self) {
+        self.diagnostics_enabled = true;
+    }
+
+    // Internal: log timeout events
+    fn log_timeout_event(&self, event: TimeoutEvent) {
+        if !self.diagnostics_enabled {
+            return;
+        }
+
+        match event {
+            TimeoutEvent::ConnectTimeout { elapsed } => {
+                eprintln!(
+                    "TIMEOUT: Connection failed after {:.1}s (limit: {:.1}s)\n  \
+                     Check: network latency, firewall, server availability",
+                    elapsed.as_secs_f64(),
+                    self.config.connect_timeout.as_secs_f64()
+                );
+            }
+            TimeoutEvent::HealthCheckTimeout { elapsed, expected } => {
+                eprintln!(
+                    "TIMEOUT: Health check pong not received after {:.1}s (limit: {:.1}s)\n  \
+                     Possible causes: server overloaded, network congestion, timeout too short\n  \
+                     Recommendation: Increase health_check_timeout or health_check_interval",
+                    elapsed.as_secs_f64(),
+                    expected.as_secs_f64()
+                );
+            }
+        }
+    }
+}
+```
 
 **Detection:**
-- `pip install` works on dev machine, fails on server
-- `ldd` shows missing shared libraries
-- ImportError: dynamic module does not define init function
-- macOS: "is damaged and can't be opened" (code signing)
-- PyPI upload fails with platform tag rejection
+- Bug reports: "connection keeps dropping" (timeout too aggressive)
+- Bug reports: "hangs forever" (timeout too long or missing)
+- Users ask "which timeout should I change?" (unclear documentation)
+- Production incidents correlate with timeout expiration
+- Logs show timeout errors but unclear which timeout triggered
 
-**Phase mapping:** Phase 1 (Python) - critical, set up manylinux builds; Phase 2 (Node.js) - critical, set up cross-compilation; Phase 3 (C#) - moderate, .NET has better cross-platform story but still needs testing
+**Warning signs:**
+- Configuration struct has generic names like `timeout` instead of specific names
+- No validation of timeout relationships (e.g., health check timeout < interval)
+- Documentation doesn't provide recommended values
+- No timeout diagnostic logging in production
+- Users setting all timeouts to same value (cargo-cult configuration)
+
+**Phase mapping:**
+- **Phase 1**: Rename timeout fields to be self-documenting in Rust core
+- **Phase 2-5**: Update language bindings to match Rust naming
+- **Phase 6**: Add timeout relationship validation
+- **Phase 7**: Write comprehensive timeout configuration guide with examples
+- **Phase 8**: Add timeout diagnostic logging
 
 **Sources:**
-- [Maturin distribution guide](https://www.maturin.rs/distribution.html)
-- [cibuildwheel documentation](https://cibuildwheel.pypa.io/)
-- [manylinux PEP 513](https://peps.python.org/pep-0513/)
-- [musllinux PEP 656](https://peps.python.org/pep-0656/)
+- [Kubernetes Health Check Timeouts Best Practices](https://spacelift.io/blog/kubernetes-health-check)
+- [Configure timeouts in AWS SDK](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/timeouts.html)
+- [Cloud Run Health Check Configuration](https://docs.cloud.google.com/run/docs/configuring/healthchecks)
 
 ---
 
-### Pitfall 5: Memory Safety Violations at FFI Boundaries
-**What goes wrong:** Use-after-free, double-free, dangling pointers, or memory leaks when objects cross FFI boundaries.
+### Pitfall 5: Reconnection Configuration Creates Infinite Loops
+
+**What goes wrong:** Reconnection enabled with max_attempts=0 or initial_delay=0 causes tight loop consuming 100% CPU, flooding server with connection attempts.
 
 **Why it happens:**
-- Ownership confusion: who frees the memory? (Rust, Python GC, Node.js V8, or C# GC?)
-- Lifetime mismatches: Rust reference outlives Python object it points to
-- Buffer ownership: passing Vec/String to FFI without proper handoff
-- Circular references between Rust and host language prevent GC
-- Async drop: objects dropped on wrong thread (not thread-safe)
+- max_attempts=0 interpreted as "infinite" instead of "disabled"
+- initial_delay=0 → no backoff → instant reconnection storm
+- Exponential backoff misconfigured: base=1, exponent=0 → always 1ms delay
+- No jitter → all clients reconnect simultaneously (thundering herd)
+- Validation doesn't catch these edge cases
 
 **Consequences:**
-- Segfaults in production (often non-deterministic)
-- Memory leaks that grow unbounded
-- Data races when shared between threads
-- Corrupt data visible to users (wrong prices, wrong symbols)
+- Client CPU pinned at 100%, drains battery on mobile
+- Server flooded with connection requests, triggers DDoS protection
+- IP address gets banned/rate-limited
+- Logs filled with connection attempt messages
+- Application becomes unresponsive
+- Production outage from misconfiguration
 
 **Prevention:**
 
-**For PyO3:**
+**Strategy 1: Validate reconnection configuration**
 ```rust
-// ❌ Wrong: reference escapes PyO3 boundary
-#[pyclass]
-struct Client {
-    config: &'static Config  // Dangerous!
+pub struct ReconnectionConfig {
+    pub enabled: bool,
+    pub max_attempts: u32,
+    pub initial_delay: Duration,
+    pub max_delay: Duration,
+    pub multiplier: f64,
 }
 
-// ✅ Right: own the data or use Arc
-#[pyclass]
-struct Client {
-    config: Arc<Config>  // Shared ownership
-}
+impl ReconnectionConfig {
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if !self.enabled {
+            return Ok(()); // Disabled, no validation needed
+        }
 
-// ❌ Wrong: mutable reference in async
-#[pymethods]
-impl Client {
-    fn __aiter__(&mut self) -> PyResult<MessageIterator> {
-        // &mut self in async is unsound!
+        // If enabled, must have reasonable limits
+        if self.max_attempts == 0 {
+            return Err(ConfigError::InvalidReconnection {
+                issue: "max_attempts = 0 with reconnection enabled",
+                fix: "Set max_attempts to at least 1, or disable reconnection",
+                hint: "max_attempts = 0 is ambiguous (infinite? or disabled?)",
+            });
+        }
+
+        if self.initial_delay < Duration::from_millis(100) {
+            return Err(ConfigError::InvalidReconnection {
+                issue: format!("initial_delay = {}ms is too short", self.initial_delay.as_millis()),
+                fix: "Set initial_delay to at least 100ms",
+                hint: "Very short delays create connection storms",
+            });
+        }
+
+        if self.max_delay < self.initial_delay {
+            return Err(ConfigError::InvalidReconnection {
+                issue: "max_delay < initial_delay",
+                fix: "Set max_delay >= initial_delay",
+                hint: "Exponential backoff needs room to grow",
+            });
+        }
+
+        if self.multiplier < 1.0 {
+            return Err(ConfigError::InvalidReconnection {
+                issue: format!("multiplier = {} would decrease delays", self.multiplier),
+                fix: "Set multiplier >= 1.0 (typically 2.0 for exponential backoff)",
+                hint: "multiplier < 1.0 causes delays to shrink instead of grow",
+            });
+        }
+
+        if self.multiplier > 10.0 {
+            eprintln!(
+                "Warning: multiplier = {} is very aggressive. \
+                 Delays will grow extremely fast. Typical values: 1.5-2.0",
+                self.multiplier
+            );
+        }
+
+        Ok(())
+    }
+}
+```
+
+**Strategy 2: Safe defaults with explicit opt-in for aggressive settings**
+```rust
+impl Default for ReconnectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_attempts: 5,  // NOT 0, NOT infinite
+            initial_delay: Duration::from_secs(1),  // NOT milliseconds
+            max_delay: Duration::from_secs(30),  // Cap exponential growth
+            multiplier: 2.0,  // Standard exponential backoff
+        }
     }
 }
 
-// ✅ Right: use interior mutability
-#[pyclass]
-struct Client {
-    inner: Arc<Mutex<ClientInner>>
-}
-```
+impl ReconnectionConfig {
+    /// Create configuration for aggressive reconnection (use with caution)
+    pub fn aggressive() -> Self {
+        Self {
+            enabled: true,
+            max_attempts: 20,  // Many attempts
+            initial_delay: Duration::from_millis(100),  // Fast start
+            max_delay: Duration::from_secs(60),
+            multiplier: 1.5,  // Slower growth
+        }
+    }
 
-**For napi-rs:**
-```rust
-// ❌ Wrong: lifetime violation
-#[napi]
-struct Buffer {
-    data: &'static [u8]  // Can't guarantee 'static
-}
-
-// ✅ Right: owned types with proper GC integration
-#[napi]
-impl Buffer {
-    #[napi]
-    pub fn from_vec(data: Vec<u8>) -> Self {
-        // napi-rs handles buffer ownership correctly
-        Buffer { inner: data.into() }
+    /// Create configuration for infinite reconnection (DANGEROUS - use only if you have circuit breaker)
+    pub fn infinite() -> Self {
+        eprintln!(
+            "WARNING: Using infinite reconnection. \
+             Ensure you have circuit breaker or manual intervention capability."
+        );
+        Self {
+            enabled: true,
+            max_attempts: u32::MAX,  // Explicit, not 0
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(300),  // 5 minutes max
+            multiplier: 2.0,
+        }
     }
 }
-
-// Buffer/TypedArray are reference-counted
-// Safe to use across async boundaries
 ```
 
-**For UniFFI:**
+**Strategy 3: Add jitter to prevent thundering herd**
 ```rust
-// UniFFI handles ownership automatically but:
-// ❌ Wrong: mutable state in Arc<T>
-pub fn set_config(client: Arc<Client>, config: Config) {
-    client.config = config;  // Can't mutate Arc contents!
-}
+impl ReconnectionConfig {
+    /// Calculate next delay with jitter to prevent thundering herd
+    pub fn next_delay(&self, attempt: u32) -> Duration {
+        let base_delay = self.initial_delay.as_millis() as u64;
+        let exponential = base_delay * (self.multiplier.powi(attempt as i32) as u64);
+        let capped = exponential.min(self.max_delay.as_millis() as u64);
 
-// ✅ Right: use Arc<Mutex<T>> or Arc<RwLock<T>>
-pub fn set_config(client: Arc<Mutex<Client>>, config: Config) {
-    client.lock().unwrap().config = config;
+        // Add random jitter: ±25% of delay
+        let jitter_range = capped / 4;
+        let jitter = rand::thread_rng().gen_range(0..jitter_range * 2);
+        let final_delay = capped.saturating_sub(jitter_range) + jitter;
+
+        Duration::from_millis(final_delay)
+    }
 }
 ```
 
-**Key rules:**
-- NEVER use raw pointers (*const, *mut) unless absolutely necessary
-- Use Arc for shared ownership across FFI boundaries
-- Use Mutex/RwLock for mutable shared state
-- Document ownership transfer with `#[must_use]` or explicit `take_ownership()`
-- Check for circular references (Python object holds Rust, Rust holds Python)
+**Strategy 4: Circuit breaker pattern**
+```rust
+pub struct CircuitBreaker {
+    failures_in_window: AtomicU32,
+    window_start: Mutex<Instant>,
+    state: AtomicU8,  // 0=closed, 1=open, 2=half-open
+}
+
+impl CircuitBreaker {
+    pub fn should_allow_attempt(&self) -> bool {
+        const FAILURE_THRESHOLD: u32 = 10;  // 10 failures in 60s → open circuit
+        const WINDOW_DURATION: Duration = Duration::from_secs(60);
+
+        let failures = self.failures_in_window.load(Ordering::Relaxed);
+
+        if failures >= FAILURE_THRESHOLD {
+            eprintln!(
+                "CIRCUIT BREAKER OPEN: {} connection failures in {}s. \
+                 Temporarily stopping reconnection attempts.",
+                failures,
+                WINDOW_DURATION.as_secs()
+            );
+            return false;
+        }
+
+        true
+    }
+}
+```
 
 **Detection:**
-- Valgrind: "Invalid read/write" or "Use after free"
-- AddressSanitizer (ASan): heap-use-after-free
-- Memory profilers show unbounded growth
-- Segfaults on GC collection cycles
-- Intermittent crashes under load (threading issues)
+- CPU usage at 100% for client process
+- Server logs show rapid connection attempts from same IP
+- Network traffic shows tight loop of connection establishment attempts
+- Logs filled with "reconnection attempt #999..."
+- No exponential backoff visible in timestamps (all within milliseconds)
 
-**Phase mapping:** Phase 1 (Python) - PyO3 handles much of this, audit custom FFI; Phase 2 (Node.js) - critical with napi-rs Buffer/TypedArray usage; Phase 3 (C#) - UniFFI generates safe bindings but check manual FFI code
+**Warning signs:**
+- Reconnection config allows max_attempts=0 without validation
+- No minimum delay validation (accepts 0ms, 1ms)
+- No jitter added to delays
+- No circuit breaker or rate limiting
+- Tests don't cover reconnection edge cases
+
+**Phase mapping:**
+- **Phase 1**: Add reconnection config validation to Rust core
+- **Phase 2-5**: Language bindings validate before passing to Rust
+- **Phase 6**: Add jitter to exponential backoff calculation
+- **Phase 7**: Implement circuit breaker pattern
+- **Phase 8**: Add reconnection diagnostics and rate limiting
 
 **Sources:**
-- [napi-rs lifetime documentation](https://napi.rs/docs/concepts/understanding-lifetime)
-- [PyO3 FAQ on memory management](https://pyo3.rs/main/faq)
+- [MQTT Client Auto-Reconnection Best Practices](https://www.emqx.com/en/blog/mqtt-client-auto-reconnect-best-practices)
+- [Kubernetes Health Check Configuration](https://komodor.com/blog/kubernetes-health-checks-everything-you-need-to-know/)
 
 ---
 
-### Pitfall 6: Type Conversion Edge Cases
-**What goes wrong:** Data loses precision, gets truncated, or converts incorrectly when crossing language boundaries (especially numbers, dates, nulls).
+### Pitfall 6: Options Object Breaks Type Safety in TypeScript
+
+**What goes wrong:** TypeScript users pass invalid options object, gets runtime error instead of compile-time error. IntelliSense doesn't help, autocompletion broken.
 
 **Why it happens:**
-- JavaScript number is always f64 - can't represent i64 precisely
-- Python int is arbitrary precision, Rust integers overflow
-- null vs undefined vs None vs null (4 different "nothing" concepts)
-- Timezone handling: naive vs aware datetimes, UTC vs local
-- String encoding: UTF-8, UTF-16, UCS-2 differences
+- Options object typed as `any` or too permissive
+- Optional fields not clearly marked
+- No discriminated unions for mutually exclusive options
+- Default values not reflected in type definition
+- napi-rs generates weak TypeScript types from Rust
 
 **Consequences:**
-- Price 9007199254740993 becomes 9007199254740992 in JavaScript (precision loss)
-- Large order IDs get corrupted
-- Timestamps off by hours due to timezone assumptions
-- null vs undefined causes type errors
-- Emoji/unicode in symbols get corrupted
+- Users discover errors at runtime, not during development
+- Typos in field names silently ignored: `apikey` vs `apiKey`
+- Invalid combinations accepted: `reconnect_enabled=false, max_attempts=10`
+- IDE autocomplete shows all fields, including internal ones
+- Migration from v0.2.x loses type safety benefits
 
 **Prevention:**
 
-**Integer precision:**
+**Strategy 1: Strict TypeScript type definitions**
 ```typescript
-// JavaScript
-// ❌ Wrong: precision loss for large integers
-interface Quote {
-  orderId: number;  // Can't safely represent > 2^53
+// ❌ WEAK - accepts anything
+export interface RestClientConfig {
+    apiKey?: string;
+    timeout?: number;
+    [key: string]: any;  // BAD - allows typos
 }
 
-// ✅ Right: use string for large integers
-interface Quote {
-  orderId: string;  // Safe for any size
-  orderIdNum: number;  // Convenience getter with warning
-}
-```
+// ✅ STRONG - compile-time validation
+export interface RestClientConfig {
+    /** API key for authentication (required) */
+    readonly apiKey: string;
 
-```rust
-// Rust side
-#[napi(object)]
-pub struct Quote {
-    pub order_id: String,  // Serialize as string
-}
-```
+    /** Request timeout in milliseconds (optional, default: 30000) */
+    readonly requestTimeout?: number;
 
-**Null handling:**
-```python
-# Python
-# ❌ Wrong: None vs null confusion
-def get_quote(symbol: str) -> Optional[Quote]:
-    return None  # Python None
-
-# JavaScript sees: undefined or null?
-# PyO3 converts None to Python None → JavaScript null
-# But JavaScript undefined ≠ null!
-
-# ✅ Right: explicit optional handling
-#[pyfunction]
-fn get_quote(symbol: String) -> PyResult<Option<Quote>> {
-    Ok(Some(quote))  // or Ok(None)
-}
-// PyO3: Some(x) → x, None → None
-// napi-rs: Some(x) → x, None → null (NOT undefined)
-```
-
-**DateTime handling:**
-```rust
-// ❌ Wrong: naive datetime ambiguity
-pub struct Quote {
-    pub timestamp: NaiveDateTime  // What timezone?
+    /** Base URL override (optional, default: https://api.fugle.tw/...) */
+    readonly baseUrl?: string;
 }
 
-// ✅ Right: always UTC with explicit timezone
-pub struct Quote {
-    pub timestamp: DateTime<Utc>
+// Even better: branded types prevent primitive obsession
+export type ApiKey = string & { readonly __brand: 'ApiKey' };
+export type Milliseconds = number & { readonly __brand: 'Milliseconds' };
+
+export interface RestClientConfig {
+    readonly apiKey: ApiKey;
+    readonly requestTimeout?: Milliseconds;
 }
 
-// Python: converts to datetime.datetime with tzinfo=UTC
-// JavaScript: converts to Date (always UTC internally)
-// C#: converts to DateTimeOffset with UTC offset
-```
-
-**Strategies:**
-- Use strings for integers > 2^53 in JavaScript bindings
-- Document timezone assumptions (prefer UTC everywhere)
-- Test with boundary values: i64::MAX, f64::INFINITY, empty strings
-- Use property-based testing for edge cases (Hypothesis, fast-check)
-- Explicit null handling: Option<T> in Rust, Optional in Python, nullable in TypeScript
-
-**Detection:**
-- User reports "wrong order ID" or "price is off"
-- Tests with large numbers (> 10^15) fail
-- Timezone-related bugs (off by N hours)
-- Type errors: "undefined is not a function" in JavaScript
-- JSON serialization round-trip fails
-
-**Phase mapping:** Phase 1 (Python) - less critical (Python handles big ints); Phase 2 (Node.js) - critical (JavaScript number precision); Phase 3 (C#) - moderate (C# has decimal type but still watch for overflow)
-
----
-
-### Pitfall 7: Test Coverage Gaps for Edge Cases
-**What goes wrong:** Unit tests pass but production breaks due to untested edge cases: network errors, rate limiting, reconnection storms, concurrent access, etc.
-
-**Why it happens:**
-- Tests use mocks that don't match real API behavior
-- Network errors hard to simulate in unit tests
-- Concurrent access tests require complex setup
-- Developers test "happy path" only
-- Integration tests expensive/slow, so they're skipped
-
-**Consequences:**
-- Rate limiting causes infinite retry loops
-- Reconnection storms during network flapping
-- Race conditions in concurrent subscription management
-- Panics on malformed API responses
-- Memory leaks under high load
-
-**Prevention:**
-
-**Test categories needed:**
-
-**1. API compatibility tests:**
-```python
-# Generate from official SDK test suite
-def test_compatibility_with_official_sdk():
-    official_result = official_sdk.get_quote("2330")
-    our_result = our_sdk.get_quote("2330")
-
-    # Compare structure, not values (API changes)
-    assert type(official_result) == type(our_result)
-    assert official_result.keys() == our_result.keys()
-    # Test edge cases official SDK handles
-```
-
-**2. Error handling tests:**
-```rust
-#[test]
-fn test_rate_limit_backoff() {
-    let mock_server = mock_api_with_rate_limit();
-    let client = RestClient::new();
-
-    // Should NOT infinite loop
-    let result = client.get_quote("2330");
-    assert!(matches!(result, Err(Error::RateLimit(_))));
-
-    // Should respect retry-after header
-    assert!(mock_server.request_count() <= MAX_RETRIES);
-}
-```
-
-**3. Concurrency tests:**
-```rust
-#[tokio::test]
-async fn test_concurrent_subscriptions() {
-    let client = WebSocketClient::new().await;
-
-    // Multiple threads subscribing simultaneously
-    let handles: Vec<_> = (0..10).map(|i| {
-        let client = client.clone();
-        tokio::spawn(async move {
-            client.subscribe(format!("symbol_{}", i)).await
-        })
-    }).collect();
-
-    // Should not deadlock or lose subscriptions
-    for handle in handles {
-        handle.await.unwrap().unwrap();
+// Helper to create branded types
+export function apiKey(key: string): ApiKey {
+    if (key.length === 0) {
+        throw new TypeError('API key cannot be empty');
     }
+    return key as ApiKey;
+}
+
+export function milliseconds(ms: number): Milliseconds {
+    if (ms < 0) {
+        throw new TypeError('Milliseconds cannot be negative');
+    }
+    return ms as Milliseconds;
 }
 ```
 
-**4. Network instability tests:**
-```rust
-#[test]
-fn test_reconnection_under_flapping() {
-    let mock = mock_server_that_flaps_every_5_seconds();
-    let client = WebSocketClient::connect(&mock.url()).await;
-
-    // Should handle frequent disconnects gracefully
-    sleep(Duration::from_secs(60)).await;
-
-    // Should NOT be in reconnection storm
-    assert!(client.reconnection_count() < 20);
-}
-```
-
-**5. Boundary value tests:**
-```rust
-#[test]
-fn test_large_integers_in_javascript() {
-    let quote = Quote {
-        order_id: i64::MAX,  // 9223372036854775807
-        price: 1234567890123.45
+**Strategy 2: Discriminated unions for mutually exclusive options**
+```typescript
+// Reconnection: either disabled or configured
+export type ReconnectionConfig =
+    | { enabled: false }
+    | {
+        enabled: true;
+        maxAttempts: number;  // Required when enabled
+        initialDelay: Milliseconds;
+        maxDelay: Milliseconds;
+        multiplier: number;
     };
 
-    let js_value = quote.to_js();
-    let round_trip = Quote::from_js(js_value);
+export interface WebSocketConfig {
+    readonly apiKey: ApiKey;
+    readonly reconnection: ReconnectionConfig;
+}
 
-    // JavaScript can't represent i64::MAX
-    // Should use string representation
-    assert_eq!(round_trip.order_id, quote.order_id);
+// TypeScript enforces consistency:
+const config1: WebSocketConfig = {
+    apiKey: apiKey('xxx'),
+    reconnection: { enabled: false }  // ✅ OK
+};
+
+const config2: WebSocketConfig = {
+    apiKey: apiKey('xxx'),
+    reconnection: {
+        enabled: true,
+        // ❌ Compile error: missing maxAttempts, initialDelay, etc.
+    }
+};
+```
+
+**Strategy 3: Builder pattern with type-state**
+```typescript
+// Use builder to guide users through configuration
+export class RestClientConfigBuilder {
+    private config: Partial<RestClientConfig> = {};
+
+    apiKey(key: string): this {
+        this.config.apiKey = apiKey(key);
+        return this;
+    }
+
+    requestTimeout(ms: number): this {
+        this.config.requestTimeout = milliseconds(ms);
+        return this;
+    }
+
+    build(): RestClientConfig {
+        if (!this.config.apiKey) {
+            throw new TypeError('apiKey is required');
+        }
+
+        return {
+            apiKey: this.config.apiKey,
+            requestTimeout: this.config.requestTimeout ?? milliseconds(30000),
+        };
+    }
+}
+
+// Usage: fluent API with IntelliSense
+const config = new RestClientConfigBuilder()
+    .apiKey('my-key')  // IntelliSense shows available methods
+    .requestTimeout(60000)
+    .build();
+```
+
+**Strategy 4: Runtime validation in constructor**
+```typescript
+export class RestClient {
+    constructor(config: RestClientConfig) {
+        // Validate despite TypeScript types (users might use 'as any')
+        this.validateConfig(config);
+        this.config = config;
+    }
+
+    private validateConfig(config: RestClientConfig): void {
+        if (typeof config !== 'object' || config === null) {
+            throw new TypeError('Config must be an object');
+        }
+
+        if (typeof config.apiKey !== 'string' || config.apiKey.length === 0) {
+            throw new TypeError('apiKey must be a non-empty string');
+        }
+
+        if (config.requestTimeout !== undefined) {
+            if (typeof config.requestTimeout !== 'number' || config.requestTimeout < 0) {
+                throw new TypeError('requestTimeout must be a non-negative number');
+            }
+        }
+
+        // Check for common typos
+        const validKeys = new Set(['apiKey', 'requestTimeout', 'baseUrl']);
+        for (const key of Object.keys(config)) {
+            if (!validKeys.has(key)) {
+                throw new TypeError(
+                    `Unknown config option: '${key}'. Did you mean: ${this.suggestCorrection(key, validKeys)}`
+                );
+            }
+        }
+    }
+
+    private suggestCorrection(key: string, validKeys: Set<string>): string {
+        // Simple Levenshtein distance or substring matching
+        const matches = Array.from(validKeys).filter(valid =>
+            valid.toLowerCase().includes(key.toLowerCase()) ||
+            key.toLowerCase().includes(valid.toLowerCase())
+        );
+        return matches.length > 0 ? matches.join(', ') : Array.from(validKeys).join(', ');
+    }
 }
 ```
 
-**Strategies:**
-- Use chaos engineering: inject random failures
-- Capture real API traffic and replay in tests
-- Set up CI/CD matrix: all platforms, all Python/Node versions
-- Use code coverage tools (cargo-tllvm-cov) and aim for >80%
-- Integration test against real API (staging environment)
-
 **Detection:**
-- Production incidents that tests didn't catch
-- Code coverage report shows untested branches
-- User reports "this worked before" (regression)
-- Crash reports from error tracking (Sentry, Rollbar)
+- TypeScript users report runtime errors that should be compile-time
+- GitHub issues: "IntelliSense not working for config options"
+- Users request "better types" or "stricter validation"
+- Code reviews find excessive use of `as any` to bypass type checking
+- Tests for invalid configs don't exist in TypeScript codebase
 
-**Phase mapping:** All phases - set up testing infrastructure early; Phase 1 (Python) - test against official SDK test suite; Phase 2 (Node.js) - add concurrent access tests; Phase 3 (C#) - add .NET-specific threading tests
+**Warning signs:**
+- .d.ts file has `[key: string]: any` in config interfaces
+- Optional fields not marked with `?` or have unclear purpose
+- No JSDoc comments explaining fields
+- No runtime validation in constructor despite having types
+- napi-rs generated types not manually reviewed/improved
+
+**Phase mapping:**
+- **Phase 2 (Node.js binding)**: Generate strict TypeScript definitions from Rust
+- **Phase 2**: Add runtime validation despite TypeScript types
+- **Phase 2**: Implement builder pattern for complex configs
+- **Phase 2**: Add typo detection for config options
+- **Phase 6**: Document TypeScript patterns in migration guide
 
 **Sources:**
-- [Property-based testing best practices](https://hypothesis.readthedocs.io/)
-- [Chaos engineering for APIs](https://principlesofchaos.org/)
+- [TypeScript Best Practices 2026](https://www.xano.com/blog/modern-api-design-best-practices/)
+- [.NET API Change Rules](https://learn.microsoft.com/en-us/dotnet/core/compatibility/library-change-rules)
 
 ---
 
@@ -649,179 +1047,344 @@ fn test_large_integers_in_javascript() {
 
 Mistakes that cause annoyance but are fixable without major rewrites.
 
-### Pitfall 8: Documentation Mismatches Between Languages
-**What goes wrong:** Documentation copy-pasted between languages doesn't reflect language-specific APIs, idioms, or error handling.
+---
+
+### Pitfall 7: Documentation Examples Still Show Old API
+
+**What goes wrong:** README and docs show v0.2.x string constructor after v0.3.0 release. Users copy-paste, get errors, confusion.
 
 **Why it happens:**
-- Doc comments generated from Rust, don't match Python/JavaScript conventions
-- Examples show Rust syntax when users want Python/JavaScript
-- Error types documented for Rust don't match Python exceptions
-- Idioms differ: Python snake_case vs JavaScript camelCase
+- Documentation updated manually, easy to miss instances
+- Example code in multiple places: README, docs/, API reference, blog posts
+- Automated doc generation from code comments not updated
+- Contributors update implementation, forget docs
+- No CI check that examples actually compile/run
 
 **Prevention:**
-- Write language-specific docstrings in binding code
-- Generate API docs per language (pydoc, JSDoc, XML docs for C#)
-- Include examples in each language
-- Document error mapping: Rust `Error::RateLimit` → Python `RateLimitError`
 
-**Detection:**
-- User confusion in issues: "documentation doesn't match API"
-- Examples don't run when copy-pasted
-- Type hints in Python don't match actual types
+**Strategy 1: Testable documentation examples**
+```rust
+// In Rust doc comments - these are tested by cargo test
+/// # Example (v0.3.0+)
+/// ```
+/// use marketdata_core::{RestClient, RestClientConfig};
+///
+/// let config = RestClientConfig {
+///     api_key: "your-api-key".to_string(),
+///     request_timeout: Some(Duration::from_secs(60)),
+///     ..Default::default()
+/// };
+/// let client = RestClient::new(config)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # Migrating from v0.2.x
+/// ```
+/// # use marketdata_core::{RestClient, RestClientConfig};
+/// // Old (v0.2.x) - DEPRECATED
+/// // let client = RestClient::new("your-api-key");
+///
+/// // New (v0.3.0+)
+/// let config = RestClientConfig {
+///     api_key: "your-api-key".to_string(),
+///     ..Default::default()
+/// };
+/// let client = RestClient::new(config)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+```
 
-**Phase mapping:** All phases - write docs as bindings are created
+**Strategy 2: CI checks for runnable examples**
+```bash
+# CI job: extract and test all README examples
+npm run extract-readme-examples
+npm test -- --grep "README examples"
+
+# Python: use doctest
+python -m doctest README.md
+
+# Markdown linter: check for v0.2.x patterns
+rg "new RestClient\('.*'\)" docs/ README.md && exit 1 || exit 0
+```
+
+**Strategy 3: Version-aware documentation**
+```markdown
+# Installation and Quick Start
+
+## Version 0.3.0+ (Current)
+
+```python
+from marketdata_py import RestClient, RestClientConfig
+
+config = RestClientConfig(
+    api_key="your-api-key",
+    request_timeout=60
+)
+client = RestClient(config)
+```
+
+## Version 0.2.x (Legacy)
+
+<details>
+<summary>Click to expand legacy v0.2.x example</summary>
+
+```python
+from marketdata_py import RestClient
+
+# This API is deprecated in v0.3.0
+client = RestClient("your-api-key")
+```
+
+See [Migration Guide](./MIGRATION.md) for upgrading to v0.3.0.
+
+</details>
+```
+
+**Phase mapping:**
+- **Phase 6 (Documentation)**: Update all examples to v0.3.0 API
+- **Phase 6**: Add CI check for outdated patterns
+- **Phase 6**: Write migration guide with before/after examples
+- **Phase 7**: Deprecation warnings in v0.2.x point to migration guide
 
 ---
 
-### Pitfall 9: Version Skew Between Core and Bindings
-**What goes wrong:** Rust core updated but bindings not rebuilt, causing ABI incompatibility or missing features.
+### Pitfall 8: Optional Configuration Fields Create Ambiguity
+
+**What goes wrong:** User doesn't set `reconnect_enabled`, expects default `true`, but different language defaults to `false`. Inconsistent behavior.
 
 **Why it happens:**
-- Bindings built separately from core
-- No version checks at FFI boundary
-- Cached build artifacts from old version
-- CI builds core and bindings in separate jobs
+- Optional fields use language-specific defaults (Python: None, JavaScript: undefined, C#: null)
+- No clear distinction between "not set" vs "explicitly set to false"
+- Default value applied at different layers (Rust, language binding, application)
+- Documentation doesn't clarify when defaults apply
 
 **Prevention:**
-- Use `build.rs` to embed version info and check at runtime
-- Monorepo with workspace dependencies
-- CI builds all bindings together
-- Version pinning: `core = "=1.2.3"` (exact version)
 
+**Strategy 1: Required fields with explicit defaults**
 ```rust
-// core/build.rs
-fn main() {
-    println!("cargo:rustc-env=CORE_VERSION={}", env!("CARGO_PKG_VERSION"));
+// ❌ Ambiguous: is None "disabled" or "use default"?
+pub struct ReconnectionConfig {
+    pub enabled: Option<bool>,  // None, Some(true), Some(false) - 3 states!
 }
 
-// bindings/src/lib.rs
-const EXPECTED_CORE_VERSION: &str = "1.2.3";
-const ACTUAL_CORE_VERSION: &str = env!("CORE_VERSION");
+// ✅ Clear: always explicit
+pub struct ReconnectionConfig {
+    pub enabled: bool,  // Just true or false
+}
 
-#[ctor::ctor]
-fn check_version() {
-    assert_eq!(EXPECTED_CORE_VERSION, ACTUAL_CORE_VERSION,
-        "Core version mismatch!");
+impl Default for ReconnectionConfig {
+    fn default() -> Self {
+        Self { enabled: true }  // Explicit default
+    }
 }
 ```
 
-**Detection:**
-- Crashes with "symbol not found"
-- Features don't work despite being in core
-- CI builds succeed but releases fail
+**Strategy 2: Builder with clear defaults**
+```python
+# Python: use dataclass with explicit defaults
+from dataclasses import dataclass, field
 
-**Phase mapping:** Phase 1 - set up version checking early
+@dataclass
+class ReconnectionConfig:
+    """Reconnection configuration with explicit defaults."""
+
+    enabled: bool = True  # Explicit: default is True
+    max_attempts: int = 5
+    initial_delay: float = 1.0  # seconds
+
+    def __post_init__(self):
+        """Validate after initialization."""
+        if self.enabled and self.max_attempts == 0:
+            raise ValueError("max_attempts must be > 0 when enabled=True")
+```
+
+**Phase mapping:**
+- **Phase 1**: Define explicit defaults in Rust core
+- **Phase 2-5**: Language bindings use same defaults, no "unset" state
+- **Phase 6**: Document all defaults in configuration reference
 
 ---
 
-### Pitfall 10: Build Time Optimization Neglected
-**What goes wrong:** Clean builds take 10+ minutes, slowing development iteration and CI costs.
+### Pitfall 9: Migration Tooling Doesn't Exist
+
+**What goes wrong:** Users must manually update all code from v0.2.x to v0.3.0 API. Error-prone, time-consuming, frustrating.
 
 **Why it happens:**
-- No caching of dependencies (each build from scratch)
-- Release builds in development (unnecessary optimization)
-- No incremental compilation
-- Large dependency trees (tokio, serde, etc.)
+- No automated migration script or codemod provided
+- Breaking changes released without migration tool
+- Assumption that users will manually update (they won't, or will make mistakes)
+- No thought given to user experience during migration
 
 **Prevention:**
-- Use sccache or cargo-chef for dependency caching
-- Dev builds use `--profile dev`, only release for publishing
-- Share target/ directory between workspaces
-- Split into smaller crates to enable parallel compilation
 
-**Detection:**
-- `cargo build` takes >5 minutes on developer machine
-- CI builds timeout or cost too much
-- Developers avoid rebuilding
+**Strategy 1: Provide migration script**
+```python
+# scripts/migrate_to_v0_3.py
+import re
+import sys
 
-**Phase mapping:** Phase 1 - optimize Rust build first; Phase 2/3 - optimize per-language build (maturin, napi-rs)
+def migrate_file(content: str) -> str:
+    """Migrate Python code from v0.2.x to v0.3.0."""
+
+    # Pattern: RestClient('api-key') → RestClient({'api_key': 'api-key'})
+    pattern = r"RestClient\(['\"]([^'\"]+)['\"]\)"
+    replacement = r"RestClient({'api_key': '\1'})"
+    content = re.sub(pattern, replacement, content)
+
+    # Pattern: WebSocketClient('api-key') → WebSocketClient({'api_key': 'api-key'})
+    pattern = r"WebSocketClient\(['\"]([^'\"]+)['\"]\)"
+    replacement = r"WebSocketClient({'api_key': '\1'})"
+    content = re.sub(pattern, replacement, content)
+
+    return content
+
+if __name__ == '__main__':
+    for filepath in sys.argv[1:]:
+        with open(filepath) as f:
+            content = f.read()
+
+        migrated = migrate_file(content)
+
+        if migrated != content:
+            print(f"Migrating {filepath}...")
+            with open(filepath, 'w') as f:
+                f.write(migrated)
+        else:
+            print(f"No changes needed in {filepath}")
+```
+
+**Strategy 2: Use jscodeshift for JavaScript**
+```javascript
+// scripts/migrate-to-v0.3.js - jscodeshift codemod
+module.exports = function(fileInfo, api) {
+    const j = api.jscodeshift;
+    const root = j(fileInfo.source);
+
+    // Find: new RestClient('api-key')
+    // Replace: new RestClient({ apiKey: 'api-key' })
+    root
+        .find(j.NewExpression, {
+            callee: { name: 'RestClient' },
+            arguments: args => args.length === 1 && j.Literal.check(args[0])
+        })
+        .replaceWith(path => {
+            const apiKey = path.node.arguments[0].value;
+            return j.newExpression(
+                j.identifier('RestClient'),
+                [j.objectExpression([
+                    j.property('init', j.identifier('apiKey'), j.literal(apiKey))
+                ])]
+            );
+        });
+
+    return root.toSource();
+};
+
+// Usage: npx jscodeshift -t scripts/migrate-to-v0.3.js src/**/*.js
+```
+
+**Phase mapping:**
+- **Phase 0 (Before v0.3.0)**: Write and test migration scripts
+- **Phase 6**: Document migration scripts in migration guide
+- **Phase 7**: Publish migration scripts to npm/PyPI
+
+---
+
+### Pitfall 10: No Configuration Schema for Validation
+
+**What goes wrong:** Third-party tools (infrastructure-as-code, config management) can't validate SDK config. Users deploy invalid config to production.
+
+**Why it happens:**
+- No JSON Schema or equivalent for configuration
+- Config validation only in SDK runtime, not at deployment time
+- Infrastructure tools can't catch config errors before deployment
+
+**Prevention:**
+
+**Strategy 1: Publish JSON Schema**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Fugle MarketData SDK Configuration",
+  "type": "object",
+  "required": ["apiKey"],
+  "properties": {
+    "apiKey": {
+      "type": "string",
+      "minLength": 1,
+      "description": "API key for authentication"
+    },
+    "requestTimeout": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 300000,
+      "default": 30000,
+      "description": "Request timeout in milliseconds"
+    },
+    "reconnection": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 100, "default": 5 }
+      }
+    }
+  }
+}
+```
+
+**Phase mapping:**
+- **Phase 6**: Generate JSON Schema from Rust types
+- **Phase 6**: Publish schema for third-party tool integration
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Python API compatibility | Method signature differences (snake_case vs camelCase, parameter names) | Generate compatibility matrix from official SDK, test side-by-side |
-| Python async integration | GIL deadlocks with Tokio runtime | Use pyo3-asyncio, never block_on() from Python thread |
-| Python packaging | manylinux compatibility failures on older distributions | Use manylinux2014 containers for builds, test on CentOS 7 / Debian 9 |
-| Node.js API compatibility | Type precision loss (JavaScript number for i64) | Use string for large integers, document precision limits |
-| Node.js async integration | Blocking Node.js event loop with sync Rust calls | Always use `async fn` for any potentially blocking operation |
-| Node.js packaging | Missing prebuilt binaries for obscure platforms (armv7, Alpine Linux) | Set up cross-compilation for common targets, document build from source |
-| C# bindings creation | UniFFI learning curve and C# code generation quirks | Start with simple types, test generated C# code early, iterate |
-| C# async integration | Task vs async/await mismatch with Rust futures | Use UniFFI's async support (if available) or bridge with TaskCompletionSource |
-| Cross-language testing | API behavior divergence not caught until production | Set up integration test suite that runs against all language bindings simultaneously |
-| Distribution | Platform-specific failures (macOS code signing, Windows DLL dependencies) | Test on all platforms in CI, use official build containers |
-
----
-
-## Confidence Assessment
-
-| Pitfall Category | Confidence | Source Quality |
-|------------------|------------|----------------|
-| PyO3 pitfalls | HIGH | Official PyO3 docs, GitHub issues with 2025 updates |
-| napi-rs pitfalls | HIGH | Official napi-rs docs, recent blog posts |
-| UniFFI pitfalls | MEDIUM | Third-party C# bindings docs (uniffi-bindgen-cs), general UniFFI docs |
-| Async runtime conflicts | HIGH | Multiple sources (PyO3 discussions, napi-rs docs), recent 2025 issues |
-| API compatibility testing | MEDIUM | General SDK best practices, not Rust-specific |
-| Cross-platform distribution | HIGH | Official Python PEPs, maturin docs, recent 2025 updates |
-| Memory safety at FFI | HIGH | Rust FFI RFCs, language-specific binding docs |
-| Type conversion edge cases | HIGH | Well-documented in all binding frameworks |
+| Phase | Pitfall Risk | Mitigation |
+|-------|--------------|------------|
+| **Phase 1: Rust Core Config** | Inconsistent defaults, missing validation | Define canonical defaults as public constants, implement comprehensive validation with helpful errors |
+| **Phase 2: Python Binding** | Different defaults than Rust, unclear error messages | Import Rust defaults via FFI, add Python-side validation for better DX |
+| **Phase 3: Node.js Binding** | Weak TypeScript types, runtime errors | Generate strict TypeScript definitions, add runtime validation despite types |
+| **Phase 4: C# Binding** | UniFFI config mapping issues, .NET naming conventions | Test UniFFI-generated config types early, follow .NET casing (PascalCase) |
+| **Phase 5: Java Binding** | Java null handling, builder pattern complexity | Use Optional<T> correctly, provide fluent builder with validation |
+| **Phase 6: Documentation** | Examples show old API, migration guide missing | Update all examples before v0.3.0, provide runnable migration examples |
+| **Phase 7: Migration Support** | Users can't migrate easily, no tooling | Provide migration scripts (Python/JavaScript), deprecation warnings in v0.2.x |
+| **Phase 8: Release** | Breaking changes surprise users, inadequate notice | Publish deprecation warnings 2+ months before v0.3.0, clear CHANGELOG |
 
 ---
 
 ## Sources
 
-**PyO3 / Python Bindings:**
-- [PyO3 FAQ and Troubleshooting](https://pyo3.rs/main/faq)
-- [PyO3 Error Handling](https://pyo3.rs/main/function/error-handling.html)
-- [PyO3 GIL Deadlock Discussion](https://github.com/PyO3/pyo3/discussions/3045)
-- [PyO3 Async GIL Issues](https://github.com/PyO3/pyo3/discussions/1912)
-- [Maturin Distribution Guide](https://www.maturin.rs/distribution.html)
-- [Building Portable Python Extensions](https://blog.savant-ai.io/building-portable-native-python-extensions-with-rust-pyo3-and-maturin-3c1a1634d324)
-- [pyo3-async-runtimes](https://github.com/PyO3/pyo3-async-runtimes)
+**SDK Breaking Changes and Versioning:**
+- [Handling Breaking Changes in SDKs | Speakeasy](https://www.speakeasy.com/docs/sdks/manage/breaking-changes)
+- [Managing API Changes: 8 Strategies That Reduce Disruption by 70% (2026 Guide)](https://www.theneo.io/blog/managing-api-changes-strategies)
+- [What Are Breaking Changes and How Do You Avoid Them? | Nordic APIs](https://nordicapis.com/what-are-breaking-changes-and-how-do-you-avoid-them/)
+- [.NET API changes that affect compatibility | Microsoft Learn](https://learn.microsoft.com/en-us/dotnet/core/compatibility/library-change-rules)
 
-**napi-rs / Node.js Bindings:**
-- [napi-rs Documentation](https://napi.rs/)
-- [napi-rs Async Functions](https://napi.rs/docs/concepts/async-fn)
-- [napi-rs Understanding Lifetime](https://napi.rs/docs/concepts/understanding-lifetime)
-- [napi-rs TypedArray Documentation](https://napi.rs/docs/concepts/typed-array)
-- [Announcing NAPI-RS v2](https://napi.rs/blog/announce-v2)
-- [Node.js Native Addons with N-API](https://medium.com/@2nick2patel2/node-js-native-addons-with-n-api-safely-wrapping-rust-c-for-hot-paths-7015cbbcd7b5)
+**Configuration Best Practices:**
+- [Smart configuration defaults - AWS SDKs and Tools](https://docs.aws.amazon.com/sdkref/latest/guide/feature-smart-config-defaults.html)
+- [AWS SDKs and tools settings reference](https://docs.aws.amazon.com/sdkref/latest/guide/settings-reference.html)
+- [Configure timeouts in AWS SDK for Java 2.x](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/timeouts.html)
 
-**UniFFI / C# Bindings:**
-- [UniFFI GitHub](https://github.com/mozilla/uniffi-rs)
-- [uniffi-bindgen-cs (C# bindings)](https://github.com/NordSecurity/uniffi-bindgen-cs)
-- [UniFFI Design Principles](https://mozilla.github.io/uniffi-rs/latest/internals/design_principles.html)
-- [UniFFI Blog Post](https://blog.mozilla.org/data/2020/10/21/this-week-in-glean-cross-platform-language-binding-generation-with-rust-and-uniffi/)
+**Multi-Language SDK Consistency:**
+- [Azure SDK Language Design Guidelines for Python | Microsoft Learn](https://learn.microsoft.com/en-us/azure/developer/python/sdk/fundamentals/language-design-guidelines)
+- [Top Programming Languages for SDK Development in 2025](https://liblab.com/blog/top-programming-languages-for-sdk-development)
 
-**Rust FFI and Error Handling:**
-- [Rust FFI Unwind RFC](https://rust-lang.github.io/rfcs/2797-project-ffi-unwind.html)
-- [Rust C-unwind ABI RFC](https://rust-lang.github.io/rfcs/2945-c-unwind-abi.html)
-- [FFI Best Practices for Rust 2025](https://medium.com/@QuarkAndCode/ffi-best-practices-for-rust-deno-mojo-5b9950dde5ce)
-- [Rust FFI Documentation](https://doc.rust-lang.org/nomicon/ffi.html)
+**Health Check and Timeout Configuration:**
+- [Kubernetes Health Checks: Types, Configuration & Debugging](https://spacelift.io/blog/kubernetes-health-check)
+- [Configure container health checks for services | Cloud Run](https://docs.cloud.google.com/run/docs/configuring/healthchecks)
+- [Health checks in ASP.NET Core | Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks?view=aspnetcore-9.0)
 
-**Cross-Platform Distribution:**
-- [manylinux GitHub](https://github.com/pypa/manylinux)
-- [manylinux PEP 513](https://peps.python.org/pep-0513/)
-- [manylinux_x_y PEP 600](https://peps.python.org/pep-0600/)
-- [musllinux PEP 656](https://peps.python.org/pep-0656/)
-- [cibuildwheel](https://cibuildwheel.pypa.io/)
-- [Building Cross-Platform SDKs: From FFI to WebAssembly](https://blog.flipt.io/from-ffi-to-wasm)
+**Reconnection Best Practices:**
+- [Ensuring Reliable IoT Device Connectivity: Best Practices for MQTT Client Auto-Reconnection](https://www.emqx.com/en/blog/mqtt-client-auto-reconnect-best-practices)
+- [Understanding Kubernetes Health Checks & How-To with Examples](https://komodor.com/blog/kubernetes-health-checks-everything-you-need-to-know/)
 
-**API Compatibility and Testing:**
-- [Android API Compatibility Issues](https://www.revenuecat.com/blog/engineering/binary-compatability/)
-- [How to Ensure API Compatibility Across Platforms](https://blog.dreamfactory.com/how-to-ensure-api-compatibility-across-platforms)
-- [Semantic Versioning](https://semver.org/)
-- [Beyond API Compatibility: Breaking Changes](https://www.infoq.com/articles/breaking-changes-are-broken-semver/)
-- [Best SDK Generation Tools 2025](https://buildwithfern.com/post/best-sdk-generation-tools-multi-language-api)
-
-**Async Runtime and Concurrency:**
-- [Tokio Documentation](https://tokio.rs/)
-- [The State of Async Rust: Runtimes](https://corrode.dev/blog/async/)
-- [Async Programming in Rust](https://rust-lang.github.io/async-book/)
+**API Design Best Practices:**
+- [8 API Versioning Best Practices for Developers in 2026](https://getlate.dev/blog/api-versioning-best-practices)
+- [Modern API Design Best Practices for 2026](https://www.xano.com/blog/modern-api-design-best-practices/)
 
 ---
 
-*Research completed: 2026-01-30*
-*Confidence: HIGH for Python/Node.js, MEDIUM for C# (less mature ecosystem)*
+**Research completed:** 2026-02-01
+**Confidence:** HIGH - Based on current AWS/Azure SDK patterns, 2026 API design guidelines, and existing project architecture
+**Primary focus:** Constructor signature changes, configuration validation, cross-language consistency

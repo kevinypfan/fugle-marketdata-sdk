@@ -1,1503 +1,890 @@
-# Architecture Patterns: Multi-Language SDK with Rust Core
+# Configuration Integration Architecture
 
-**Domain:** Multi-language SDK (Rust → Python/Node.js/C#)
-**Researched:** 2026-01-30
-**Current State:** Python (PyO3) and Node.js (napi-rs) bindings operational, UniFFI experimental
+**Project:** fugle-marketdata-sdk v0.3.0
+**Researched:** 2026-02-01
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Multi-language SDK architecture with shared Rust core follows a **shared computation, language-specific interface** pattern. The core library (`marketdata-core`) contains business logic, while language-specific binding crates (`py/`, `js/`, `uniffi/`) provide idiomatic interfaces for each ecosystem. This architecture maximizes code reuse (~80-90% shared), ensures consistent behavior across platforms, and allows language-specific optimizations at the FFI boundary.
+This document describes how to wire configuration options (reconnection, health check, REST timeouts) from language bindings through FFI boundaries into the Rust core. The SDK has a well-established pattern: **Core owns config structs, bindings convert from idiomatic types to core types.**
 
-**Key architectural decision:** Three binding strategies coexist:
-1. **PyO3** (Python) - Specialized, ergonomic, direct control over Python types
-2. **napi-rs** (Node.js) - Specialized, async-first, event loop integration
-3. **UniFFI** (C#/Go/etc.) - General-purpose, JSON serialization, broader language support
+**Key Finding:** The architecture already supports configuration constructors (`with_reconnection_config`, `with_full_config`). The implementation task is **not adding new architecture patterns**, but **exposing existing config constructors through each FFI layer**.
 
-Each strategy represents different trade-offs between performance, ergonomics, and language coverage.
+## Current State Assessment
 
----
+### Core Layer (Already Complete)
 
-## Current Architecture Analysis
+**Location:** `core/src/websocket/`
 
-### Component Structure
-
-```
-marketdata-core/          # Rust core library
-├── src/
-│   ├── client/          # REST client (sync API wrapper)
-│   ├── websocket/       # WebSocket client (async streams)
-│   ├── auth/            # Authentication logic
-│   └── error/           # Error types
-└── Cargo.toml           # Core dependencies (tokio, ureq, etc.)
-
-py/                       # Python bindings (PyO3)
-├── src/
-│   ├── lib.rs           # PyO3 module definition
-│   ├── client.rs        # REST client wrapper
-│   ├── websocket.rs     # WebSocket with callbacks
-│   ├── iterator.rs      # Python iterator for messages
-│   └── errors.rs        # Python exception mapping
-└── Cargo.toml           # cdylib, depends on core + pyo3
-
-js/                       # Node.js bindings (napi-rs)
-├── src/
-│   ├── lib.rs           # NAPI module definition
-│   ├── client.rs        # REST client wrapper
-│   ├── websocket.rs     # WebSocket with EventEmitter
-│   └── errors.rs        # JavaScript error mapping
-└── Cargo.toml           # cdylib, depends on core + napi
-
-uniffi/                   # Multi-language bindings (UniFFI)
-├── src/
-│   ├── lib.rs           # UniFFI scaffolding
-│   ├── client.rs        # REST client (JSON returns)
-│   ├── futopt.rs        # FutOpt endpoints
-│   └── marketdata.udl   # Interface definition
-└── Cargo.toml           # lib + cdylib, depends on core + uniffi
-```
-
-**Observations:**
-- **No workspace configuration** - Each crate independently depends on `marketdata-core` via `path = "../core"`
-- **Duplication across bindings** - Each binding recreates similar client/websocket/error patterns
-- **Inconsistent API surfaces** - Python has iterators, Node.js has EventEmitter, UniFFI returns JSON strings
-- **Build independence** - Each binding can build separately (flexibility) but no shared build optimization
-
----
-
-## Recommended Architecture Patterns
-
-### 1. Component Boundaries
-
-**Clear separation of concerns:**
-
-| Component | Responsibility | Exposed To FFI | Language-Specific |
-|-----------|---------------|----------------|-------------------|
-| **Core** | Business logic, API protocol, tokio async operations | No | No |
-| **FFI Bridge** | Type conversion, error mapping, async runtime bridging | Yes (C ABI) | Yes |
-| **Language Layer** | Idiomatic API, language-specific patterns, documentation | Yes (language runtime) | Yes |
-
-**What belongs where:**
+The Rust core already has complete configuration infrastructure:
 
 ```rust
-// CORE LAYER (marketdata-core)
-// ✅ Business logic, pure Rust types
-pub struct RestClient {
-    auth: Auth,
-    http: ureq::Agent,
+// core/src/websocket/reconnection.rs
+pub struct ReconnectionConfig {
+    pub max_attempts: u32,           // Default: 5
+    pub initial_delay: Duration,     // Default: 1s
+    pub max_delay: Duration,         // Default: 60s
 }
 
-impl RestClient {
-    pub async fn get_quote(&self, symbol: &str) -> Result<Quote, MarketDataError> {
-        // HTTP request, parsing, error handling
+impl ReconnectionConfig {
+    pub fn with_max_attempts(mut self, max_attempts: u32) -> Self { ... }
+    pub fn with_initial_delay(mut self, initial_delay: Duration) -> Self { ... }
+    pub fn with_max_delay(mut self, max_delay: Duration) -> Self { ... }
+}
+
+// core/src/websocket/health_check.rs
+pub struct HealthCheckConfig {
+    pub enabled: bool,                // Default: true
+    pub interval: Duration,           // Default: 30s
+    pub max_missed_pongs: u64,        // Default: 2
+}
+
+impl HealthCheckConfig {
+    pub fn with_interval(mut self, interval: Duration) -> Self { ... }
+    pub fn with_max_missed_pongs(mut self, max: u64) -> Self { ... }
+    pub fn with_enabled(mut self, enabled: bool) -> Self { ... }
+}
+
+// core/src/websocket/connection.rs (lines 95-147)
+impl WebSocketClient {
+    pub fn new(config: ConnectionConfig) -> Self {
+        Self::with_reconnection_config(config, ReconnectionConfig::default())
     }
-}
 
-// FFI BRIDGE LAYER (py/js/uniffi)
-// ✅ Type conversion, lifetime management, async bridging
+    pub fn with_reconnection_config(
+        config: ConnectionConfig,
+        reconnection_config: ReconnectionConfig,
+    ) -> Self { ... }
+
+    pub fn with_health_check_config(
+        config: ConnectionConfig,
+        health_check_config: HealthCheckConfig,
+    ) -> Self { ... }
+
+    pub fn with_full_config(
+        config: ConnectionConfig,
+        reconnection_config: ReconnectionConfig,
+        health_check_config: HealthCheckConfig,
+    ) -> Self { ... }
+}
+```
+
+**Status:** Core configuration is production-ready. No changes needed.
+
+### Binding Layers (Need Wiring)
+
+#### Python Binding (PyO3)
+
+**Current State:** Has `ReconnectConfig` struct but not wired to core
+
+**Location:** `py/src/websocket.rs` (lines 37-107)
+
+```rust
 #[pyclass]
-pub struct PyRestClient {
-    inner: Arc<RestClient>,  // Shared ownership for Python GC
-    runtime: tokio::runtime::Handle,  // Async bridge
+#[derive(Clone)]
+pub struct ReconnectConfig {
+    #[pyo3(get, set)]
+    pub enabled: bool,
+    #[pyo3(get, set)]
+    pub max_retries: u32,
+    #[pyo3(get, set)]
+    pub base_delay_ms: u64,
+    #[pyo3(get, set)]
+    pub max_delay_ms: u64,
+}
+```
+
+**Gap:** This `ReconnectConfig` exists in Python binding but is never converted to core's `ReconnectionConfig`. The `StockWebSocketClient::new()` creates core `WebSocketClient` with defaults only (line 324).
+
+**What's Missing:**
+- No health check config exposed
+- `ReconnectConfig` not passed to core
+- Constructor doesn't accept config parameters
+
+#### Node.js Binding (napi-rs)
+
+**Current State:** No config exposed
+
+**Location:** `js/src/websocket.rs`
+
+**Gap:** The binding creates core `WebSocketClient` with default configs (lines 224-225):
+
+```rust
+let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(&api_key));
+let client = CoreClient::new(config);  // Uses defaults
+```
+
+**What's Missing:**
+- No config structs exposed to JavaScript
+- No way to pass reconnection or health check options
+- Hard-coded to defaults
+
+#### UniFFI Binding
+
+**Current State:** No config exposed
+
+**Location:** `uniffi/src/websocket.rs`
+
+**Gap:** Creates core `WebSocketClient` with defaults (lines 162-168):
+
+```rust
+let config = match self.endpoint {
+    WebSocketEndpoint::Stock => ConnectionConfig::fugle_stock(auth),
+    WebSocketEndpoint::FutOpt => ConnectionConfig::fugle_futopt(auth),
+};
+let core_ws = CoreWebSocketClient::new(config);  // Uses defaults
+```
+
+**What's Missing:**
+- No configuration options exposed to C#/Java/Go
+- Constructor doesn't accept config
+- Hard-coded to defaults
+
+## Reference Implementation: Official SDKs
+
+### Python Official SDK Pattern
+
+**Location:** `/Users/zackfan/Project/fugle/fugle-marketdata-python/fugle_marketdata/websocket/client.py`
+
+```python
+class HealthCheckConfig:
+    def __init__(self, enabled: bool = False, ping_interval: int = 30000, max_missed_pongs: int = 2):
+        self.enabled = enabled
+        self.ping_interval = ping_interval
+        self.max_missed_pongs = max_missed_pongs
+
+class WebSocketClient():
+    def __init__(self, **config):
+        self.config = config
+        self.health_check: Optional[HealthCheckConfig] = config.get('health_check')
+```
+
+**Usage:**
+```python
+ws = WebSocketClient(
+    api_key='my-key',
+    health_check=HealthCheckConfig(enabled=True, ping_interval=30000)
+)
+```
+
+### Node.js Official SDK Pattern
+
+**Location:** `/Users/zackfan/Project/fugle/fugle-marketdata-node/src/websocket/client.ts`
+
+```typescript
+export interface HealthCheckConfig {
+  enabled: boolean;
+  pingInterval?: number;      // milliseconds
+  maxMissedPongs?: number;
+}
+
+export interface WebSocketClientOptions {
+  url: string;
+  apiKey?: string;
+  bearerToken?: string;
+  sdkToken?: string;
+  healthCheck?: HealthCheckConfig;
+}
+
+export class WebSocketClient extends events.EventEmitter {
+  constructor(protected readonly options: WebSocketClientOptions) {
+    super();
+  }
+}
+```
+
+**Usage:**
+```typescript
+const ws = new WebSocketClient({
+  url: 'wss://...',
+  apiKey: 'my-key',
+  healthCheck: {
+    enabled: true,
+    pingInterval: 30000,
+    maxMissedPongs: 2
+  }
+});
+```
+
+**Pattern:** Options object with nested config structs.
+
+## Recommended Architecture
+
+### Design Principles
+
+1. **Core owns structs** — Config definitions live in `core/`, bindings convert to them
+2. **Builder pattern in core** — `ReconnectionConfig::default().with_max_attempts(10)`
+3. **Options object in bindings** — Match official SDK patterns for API compatibility
+4. **Duration as milliseconds at FFI** — Avoid complex Duration serialization, use `u64` milliseconds
+5. **Defaults match official SDKs** — Ensure same behavior as reference implementations
+
+### Layer-by-Layer Strategy
+
+#### Layer 1: Core (No Changes)
+
+**Status:** Complete ✓
+
+The core already has:
+- `ReconnectionConfig` with builder methods
+- `HealthCheckConfig` with builder methods
+- `WebSocketClient::with_full_config()` constructor
+- All defaults match requirements
+
+#### Layer 2: Python Binding (PyO3)
+
+**Approach:** Options object constructor pattern
+
+**New Types Needed:**
+
+```rust
+// py/src/websocket.rs
+
+#[pyclass]
+#[derive(Clone)]
+pub struct ReconnectConfig {
+    #[pyo3(get, set)]
+    pub max_attempts: u32,
+    #[pyo3(get, set)]
+    pub initial_delay_ms: u64,
+    #[pyo3(get, set)]
+    pub max_delay_ms: u64,
 }
 
 #[pymethods]
-impl PyRestClient {
-    fn quote(&self, symbol: String) -> PyResult<PyObject> {
-        // Convert Python types → Rust types
-        // Bridge tokio → asyncio
-        // Convert Result → PyResult
-    }
+impl ReconnectConfig {
+    #[new]
+    #[pyo3(signature = (max_attempts=5, initial_delay_ms=1000, max_delay_ms=60000))]
+    pub fn new(max_attempts: u32, initial_delay_ms: u64, max_delay_ms: u64) -> Self { ... }
 }
 
-// LANGUAGE LAYER (Python/JS code)
-// ✅ Pythonic/JavaScript patterns, documentation, convenience
-class RestClient:
-    """REST client for Fugle market data API.
-
-    Examples:
-        >>> client = RestClient("api-key")
-        >>> quote = client.stock.intraday.quote("2330")
-    """
-
-    @property
-    def stock(self) -> StockClient:
-        return StockClient(self._inner)
-```
-
-**Boundary decisions:**
-
-| Concern | Core | FFI Bridge | Language Layer |
-|---------|------|------------|----------------|
-| HTTP requests | ✅ | ❌ | ❌ |
-| JSON parsing | ✅ | ❌ | ❌ |
-| Error types | ✅ (Rust enums) | ✅ (conversion) | ❌ |
-| Async runtime | ✅ (tokio) | ✅ (bridging) | ❌ |
-| API design | ✅ (traits/structs) | ❌ | ✅ (idiomatic) |
-| Documentation | Core docs | FFI docs | User docs |
-
-**Rationale:** This three-layer separation ensures core logic remains pure Rust (testable, maintainable), FFI layer handles impedance mismatch (types, lifetimes, async), and language layer provides natural developer experience.
-
----
-
-### 2. FFI Boundary Design
-
-**What crosses the FFI boundary:**
-
-#### Principle: Minimize Boundary Crossings
-
-FFI calls incur overhead (~100-500ns per call). Design APIs to batch operations and reduce round-trips.
-
-**Good boundary crossings:**
-
-```rust
-// ✅ Simple scalar types (Copy types)
-fn get_price(symbol: String) -> f64
-
-// ✅ Owned strings (allocated on Rust side, freed on Rust side)
-fn get_symbol_name(symbol: &str) -> String
-
-// ✅ Opaque handles (Arc<T> wrapped in newtype)
-struct RestClient(Arc<RestClientInner>);
-
-// ✅ Result types (mapped to language exceptions)
-fn quote(symbol: &str) -> Result<String, MarketDataError>
-
-// ✅ Serialized complex types (JSON for UniFFI)
-fn get_candles(symbol: &str) -> Result<String, MarketDataError>  // Returns JSON
-```
-
-**Problematic boundary crossings:**
-
-```rust
-// ❌ Complex nested structures (serialization overhead)
-fn get_orderbook() -> Result<OrderBook, Error>  // OrderBook has Vec<Vec<f64>>
-
-// ❌ Callbacks crossing back and forth (threading issues)
-fn register_callback(cb: impl Fn(Message))  // Callback might outlive FFI context
-
-// ❌ Mutable references (lifetime/aliasing issues)
-fn update_config(&mut self, config: &Config)  // &mut self unsafe in FFI
-
-// ❌ Borrowed data (lifetime management across FFI)
-fn get_symbols(&self) -> &[String]  // Who owns this slice?
-```
-
-**Recommended patterns:**
-
-| Data Type | FFI Strategy | Example |
-|-----------|-------------|---------|
-| **Primitives** | Pass by value | `i32`, `f64`, `bool` |
-| **Strings** | Owned `String` (Rust allocates/frees) | `symbol: String` |
-| **Complex types** | JSON serialization | `Result<String, Error>` → parse in language layer |
-| **Objects** | Opaque handles (`Arc<T>`) | `#[pyclass] struct Client(Arc<Inner>)` |
-| **Collections** | JSON or owned `Vec<T>` | `Vec<String>` or `serde_json::to_string(&data)` |
-| **Callbacks** | Thread-safe function pointers | `napi::ThreadsafeFunction`, `PyObject::call_method()` |
-| **Errors** | Enum → Exception mapping | `Result<T, E>` → `PyResult<T>`, `napi::Result<T>` |
-
-**Current project analysis:**
-
-```rust
-// Current PyO3 approach: Native Python types
-#[pymethods]
-impl StockIntradayClient {
-    fn quote(&self, py: Python, symbol: String) -> PyResult<PyObject> {
-        let core_result = self.core_client.quote(&symbol)?;
-        pythonize(py, &core_result)  // Converts Rust struct → Python dict
-    }
+#[pyclass]
+#[derive(Clone)]
+pub struct HealthCheckConfig {
+    #[pyo3(get, set)]
+    pub enabled: bool,
+    #[pyo3(get, set)]
+    pub interval_ms: u64,
+    #[pyo3(get, set)]
+    pub max_missed_pongs: u64,
 }
-
-// Current UniFFI approach: JSON strings
-impl StockIntradayClient {
-    fn quote(&self, symbol: String) -> Result<String, MarketDataError> {
-        let core_result = self.core_client.quote(&symbol)?;
-        serde_json::to_string(&core_result)  // Returns JSON string
-            .map_err(|e| MarketDataError::DeserializationError(e.to_string()))
-    }
-}
-```
-
-**Trade-offs:**
-
-| Strategy | Performance | Type Safety | Flexibility | DX |
-|----------|-------------|-------------|-------------|-----|
-| **Native types (PyO3/napi-rs)** | High (5-10x faster) | High (compile-time) | Low (language-specific) | Excellent |
-| **JSON serialization (UniFFI)** | Medium (parsing overhead) | Low (runtime) | High (any language) | Good |
-| **Binary formats (MessagePack)** | Very high | Low | Medium | Poor |
-
-**Recommendation:**
-- **Specialized bindings (PyO3/napi-rs):** Use native types for performance-critical paths (quote, ticker, WebSocket messages)
-- **General bindings (UniFFI):** Use JSON for C#/Go where ergonomics matter more than peak performance
-- **Hybrid approach:** Offer both native and JSON APIs, let users choose based on use case
-
----
-
-### 3. Async Runtime Bridging
-
-**Challenge:** Each language has its own async runtime with different threading models and scheduling behavior.
-
-#### Tokio ↔ Python asyncio
-
-**Architecture:**
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Python Main Thread (asyncio event loop)            │
-│                                                     │
-│  async def main():                                  │
-│      client = RestClient("key")                     │
-│      quote = await client.quote("2330")  ←──────┐  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-                      FFI boundary                 │
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Rust PyO3 Bridge                                 │  │
-│                                                  │  │
-│  #[pymethods]                                    │  │
-│  impl PyRestClient {                             │  │
-│      fn quote<'py>(&self, py: Python<'py>,      │  │
-│                    symbol: String)               │  │
-│          -> PyResult<Bound<'py, PyAny>> {        │  │
-│                                                  │  │
-│          // 1. Release GIL                       │  │
-│          // 2. Spawn tokio task                  │  │
-│          // 3. Block on completion               │  │
-│          // 4. Reacquire GIL                     │  │
-│          // 5. Return Python awaitable           │  │
-│                                                  │  │
-│          pyo3_async_runtimes::tokio::future_into_py(py, async {
-│              self.inner.quote(&symbol).await     │  │
-│          })                                      │  │
-│      }                                           │  │
-│  }                                               │  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Tokio Runtime (background thread pool)          │  │
-│                                                  ▼  │
-│  tokio::spawn(async {                               │
-│      let response = http_client.get(url).await;     │
-│      parse_json(response)                           │
-│  })                                                 │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-**Key patterns:**
-
-1. **GIL management** - Release Python's Global Interpreter Lock during I/O to prevent blocking other Python threads
-2. **Future conversion** - `pyo3-async-runtimes` bridges tokio futures → Python awaitables
-3. **Error propagation** - Rust `Result` → Python exceptions with proper traceback
-
-**Implementation:**
-
-```rust
-use pyo3::prelude::*;
-use pyo3_async_runtimes::tokio::future_into_py;
 
 #[pymethods]
-impl PyRestClient {
-    fn quote<'py>(&self, py: Python<'py>, symbol: String)
-        -> PyResult<Bound<'py, PyAny>>
-    {
-        let client = self.inner.clone();
+impl HealthCheckConfig {
+    #[new]
+    #[pyo3(signature = (enabled=true, interval_ms=30000, max_missed_pongs=2))]
+    pub fn new(enabled: bool, interval_ms: u64, max_missed_pongs: u64) -> Self { ... }
+}
+```
 
-        future_into_py(py, async move {
-            // This runs in tokio runtime
-            client.quote(&symbol)
-                .await
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    format!("Quote failed: {}", e)
-                ))
+**Constructor Modification:**
+
+```rust
+#[pymethods]
+impl StockWebSocketClient {
+    // Existing: new(api_key: String)
+    // Add: new_with_config
+    #[new]
+    #[pyo3(signature = (api_key, reconnect=None, health_check=None))]
+    pub fn new(
+        api_key: String,
+        reconnect: Option<ReconnectConfig>,
+        health_check: Option<HealthCheckConfig>,
+    ) -> Self {
+        // Convert to core types
+        let core_reconnect = reconnect
+            .map(|r| marketdata_core::websocket::ReconnectionConfig {
+                max_attempts: r.max_attempts,
+                initial_delay: Duration::from_millis(r.initial_delay_ms),
+                max_delay: Duration::from_millis(r.max_delay_ms),
+            })
+            .unwrap_or_default();
+
+        let core_health = health_check
+            .map(|h| marketdata_core::websocket::HealthCheckConfig {
+                enabled: h.enabled,
+                interval: Duration::from_millis(h.interval_ms),
+                max_missed_pongs: h.max_missed_pongs,
+            })
+            .unwrap_or_default();
+
+        // Store configs for use in connect()
+        // ...
+    }
+}
+```
+
+**Connect Flow:**
+
+When `connect()` is called, use stored configs to create core `WebSocketClient`:
+
+```rust
+pub fn connect(&self, py: Python<'_>) -> PyResult<()> {
+    let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
+    let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
+
+    // Use with_full_config instead of new()
+    let ws_client = marketdata_core::WebSocketClient::with_full_config(
+        config,
+        self.reconnect_config.clone(),  // stored from constructor
+        self.health_config.clone(),     // stored from constructor
+    );
+
+    // ... rest of connect logic
+}
+```
+
+**Python Usage (API Compatible):**
+
+```python
+from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+
+# Default
+ws = WebSocketClient("my-api-key")
+
+# Custom config
+ws = WebSocketClient(
+    "my-api-key",
+    reconnect=ReconnectConfig(max_attempts=10, initial_delay_ms=2000),
+    health_check=HealthCheckConfig(enabled=True, interval_ms=30000)
+)
+```
+
+#### Layer 3: Node.js Binding (napi-rs)
+
+**Approach:** TypeScript options object
+
+**New Types Needed:**
+
+```rust
+// js/src/websocket.rs
+
+#[napi(object)]
+pub struct ReconnectOptions {
+    pub max_attempts: Option<u32>,
+    pub initial_delay_ms: Option<u32>,
+    pub max_delay_ms: Option<u32>,
+}
+
+#[napi(object)]
+pub struct HealthCheckOptions {
+    pub enabled: Option<bool>,
+    pub interval_ms: Option<u32>,
+    pub max_missed_pongs: Option<u32>,
+}
+
+#[napi(object)]
+pub struct WebSocketOptions {
+    pub reconnect: Option<ReconnectOptions>,
+    pub health_check: Option<HealthCheckOptions>,
+}
+```
+
+**Constructor Modification:**
+
+```rust
+#[napi]
+impl StockWebSocketClient {
+    // Add optional options parameter
+    fn new(api_key: String, options: Option<WebSocketOptions>) -> Self {
+        let opts = options.unwrap_or_default();
+
+        // Convert to core types
+        let reconnect_config = if let Some(r) = opts.reconnect {
+            marketdata_core::websocket::ReconnectionConfig::default()
+                .with_max_attempts(r.max_attempts.unwrap_or(5))
+                .with_initial_delay(Duration::from_millis(r.initial_delay_ms.unwrap_or(1000) as u64))
+                .with_max_delay(Duration::from_millis(r.max_delay_ms.unwrap_or(60000) as u64))
+        } else {
+            marketdata_core::websocket::ReconnectionConfig::default()
+        };
+
+        // Similar for health_check_config
+        // Store for use in connect()
+    }
+}
+```
+
+**TypeScript Usage (API Compatible):**
+
+```typescript
+import { WebSocketClient } from '@fubon/marketdata-js';
+
+// Default
+const ws = new WebSocketClient('my-api-key');
+
+// Custom config
+const ws = new WebSocketClient('my-api-key', {
+  reconnect: {
+    maxAttempts: 10,
+    initialDelayMs: 2000,
+    maxDelayMs: 120000
+  },
+  healthCheck: {
+    enabled: true,
+    intervalMs: 30000,
+    maxMissedPongs: 2
+  }
+});
+
+const client = ws.stock;
+await client.connect();
+```
+
+#### Layer 4: UniFFI Binding (C#/Java/Go)
+
+**Approach:** Record structs with optional constructors
+
+**UniFFI Types:**
+
+```rust
+// uniffi/src/websocket.rs
+
+#[derive(uniffi::Record)]
+pub struct ReconnectConfig {
+    pub max_attempts: u32,
+    pub initial_delay_ms: u64,
+    pub max_delay_ms: u64,
+}
+
+impl Default for ReconnectConfig {
+    fn default() -> Self {
+        Self {
+            max_attempts: 5,
+            initial_delay_ms: 1000,
+            max_delay_ms: 60000,
+        }
+    }
+}
+
+#[derive(uniffi::Record)]
+pub struct HealthCheckConfig {
+    pub enabled: bool,
+    pub interval_ms: u64,
+    pub max_missed_pongs: u64,
+}
+
+impl Default for HealthCheckConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval_ms: 30000,
+            max_missed_pongs: 2,
+        }
+    }
+}
+```
+
+**Constructor with Optional Configs:**
+
+```rust
+#[uniffi::export]
+impl WebSocketClient {
+    #[uniffi::constructor]
+    pub fn new_with_config(
+        api_key: String,
+        listener: Arc<dyn WebSocketListener>,
+        endpoint: WebSocketEndpoint,
+        reconnect: Option<ReconnectConfig>,
+        health_check: Option<HealthCheckConfig>,
+    ) -> Arc<Self> {
+        // Convert to core types
+        let core_reconnect = reconnect
+            .map(|r| marketdata_core::websocket::ReconnectionConfig {
+                max_attempts: r.max_attempts,
+                initial_delay: Duration::from_millis(r.initial_delay_ms),
+                max_delay: Duration::from_millis(r.max_delay_ms),
+            })
+            .unwrap_or_default();
+
+        let core_health = health_check
+            .map(|h| marketdata_core::websocket::HealthCheckConfig {
+                enabled: h.enabled,
+                interval: Duration::from_millis(h.interval_ms),
+                max_missed_pongs: h.max_missed_pongs,
+            })
+            .unwrap_or_default();
+
+        // Store and use in connect()
+        Arc::new(Self {
+            reconnect_config: core_reconnect,
+            health_config: core_health,
+            // ... rest
         })
     }
 }
 ```
 
-**Reference:** [PyO3 async-runtimes](https://github.com/PyO3/pyo3-async-runtimes) provides bridges between Python and Rust async runtimes.
-
-#### Tokio ↔ Node.js Event Loop
-
-**Architecture:**
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Node.js Main Thread (libuv event loop)             │
-│                                                     │
-│  const client = new RestClient("key");              │
-│  const quote = await client.quote("2330");  ←───┐  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-                      FFI boundary                 │
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Rust NAPI-RS Bridge                              │  │
-│                                                  │  │
-│  #[napi]                                         │  │
-│  impl RestClient {                               │  │
-│      #[napi]                                     │  │
-│      pub async fn quote(&self, symbol: String)   │  │
-│          -> napi::Result<JsObject> {             │  │
-│                                                  │  │
-│          // napi-rs automatically:               │  │
-│          // 1. Spawns tokio task                 │  │
-│          // 2. Returns JS Promise                │  │
-│          // 3. Resolves on completion            │  │
-│                                                  │  │
-│          let result = self.inner.quote(&symbol)  │  │
-│              .await                              │  │
-│              .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-│                                                  │  │
-│          // Convert to JS object                 │  │
-│          env.to_js_value(&result)                │  │
-│      }                                           │  │
-│  }                                               │  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Tokio Runtime (shared with napi-rs)             │  │
-│                                                  ▼  │
-│  tokio::spawn(async {                               │
-│      let response = http_client.get(url).await;     │
-│      parse_json(response)                           │
-│  })                                                 │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-**Key patterns:**
-
-1. **Automatic bridging** - napi-rs with `tokio_rt` feature automatically converts `async fn` → JS Promise
-2. **Shared runtime** - Tokio runtime lives for the lifetime of the Node.js process
-3. **ThreadsafeFunction** - For callbacks from Rust → JavaScript across threads
-
-**Implementation:**
-
-```rust
-use napi::bindgen_prelude::*;
-use napi_derive::napi;
-
-#[napi]
-impl RestClient {
-    // napi-rs automatically converts this to a JS Promise
-    #[napi]
-    pub async fn quote(&self, symbol: String) -> Result<JsObject> {
-        // This runs in tokio runtime, returns Promise to JS
-        let data = self.inner
-            .quote(&symbol)
-            .await
-            .map_err(|e| Error::from_reason(e.to_string()))?;
-
-        // Convert to JS object (serde_json feature)
-        Ok(to_js_value(&data)?)
-    }
-}
-```
-
-**Reference:** [NAPI-RS async functions](https://napi.rs/docs/concepts/async-fn) documentation on tokio runtime integration.
-
-#### Tokio ↔ C# Task
-
-**Architecture:**
-
-```
-┌─────────────────────────────────────────────────────┐
-│ C# ThreadPool                                       │
-│                                                     │
-│  var client = new RestClient("key");                │
-│  var quote = await client.QuoteAsync("2330"); ←─┐  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-                      FFI boundary                 │
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Rust UniFFI Bridge                               │  │
-│                                                  │  │
-│  impl StockIntradayClient {                      │  │
-│      pub fn quote(&self, symbol: String)         │  │
-│          -> Result<String, MarketDataError> {    │  │
-│                                                  │  │
-│          // UniFFI is sync only!                 │  │
-│          // Block on tokio future                │  │
-│          let runtime = tokio::runtime::Handle::current();
-│          runtime.block_on(async {                │  │
-│              let result = self.core_client       │  │
-│                  .quote(&symbol)                 │  │
-│                  .await?;                        │  │
-│              serde_json::to_string(&result)      │  │
-│                  .map_err(|e| MarketDataError::DeserializationError(e.to_string()))
-│          })                                      │  │
-│      }                                           │  │
-│  }                                               │  │
-│                                                  │  │
-└──────────────────────────────────────────────────│──┘
-                                                   │
-┌──────────────────────────────────────────────────│──┐
-│ Tokio Runtime (background thread)               │  │
-│                                                  ▼  │
-│  tokio::spawn(async {                               │
-│      let response = http_client.get(url).await;     │
-│      parse_json(response)                           │
-│  })                                                 │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-**Challenge:** UniFFI does not support async functions. Must either:
-1. **Block on tokio** - Use `tokio::runtime::Handle::block_on()` (simple but blocks thread)
-2. **Spawn + polling** - Return handle, poll for completion (complex but non-blocking)
-3. **C# wrapper** - Sync Rust → wrap in `Task.Run()` in C# layer (best for UX)
-
-**Current implementation (blocking):**
-
-```rust
-// uniffi/src/client.rs
-impl StockIntradayClient {
-    pub fn quote(&self, symbol: String) -> Result<String, MarketDataError> {
-        // Block current thread until tokio future completes
-        tokio::runtime::Handle::current()
-            .block_on(async {
-                let result = self.core_client.quote(&symbol).await?;
-                serde_json::to_string(&result)
-                    .map_err(|e| MarketDataError::DeserializationError(e.to_string()))
-            })
-    }
-}
-```
-
-**Recommended C# wrapper:**
+**C# Usage:**
 
 ```csharp
-// C# bindings layer
-public class RestClient {
-    private readonly RestClientFFI _inner;  // Generated by UniFFI
+using Fugle.MarketData;
 
-    public async Task<Quote> QuoteAsync(string symbol) {
-        return await Task.Run(() => {
-            // Call sync FFI on background thread
-            string json = _inner.Quote(symbol);
-            return JsonSerializer.Deserialize<Quote>(json);
-        });
+// Default
+var ws = WebSocketClient.New(apiKey, listener);
+
+// Custom config
+var ws = WebSocketClient.NewWithConfig(
+    apiKey,
+    listener,
+    WebSocketEndpoint.Stock,
+    new ReconnectConfig {
+        MaxAttempts = 10,
+        InitialDelayMs = 2000,
+        MaxDelayMs = 120000
+    },
+    new HealthCheckConfig {
+        Enabled = true,
+        IntervalMs = 30000,
+        MaxMissedPongs = 2
     }
-}
+);
+
+await ws.ConnectAsync();
 ```
 
-**Alternative:** Use [Interoptopus](https://docs.rs/interoptopus/) or [csbindgen](https://github.com/Cysharp/csbindgen) which have better async support for C#.
+**Java Usage:**
 
-**Trade-offs:**
+```java
+import com.fubon.marketdata.*;
 
-| Strategy | Blocking | Threading | Complexity | Performance |
-|----------|----------|-----------|------------|-------------|
-| **block_on** | Yes (FFI thread) | Simple | Low | Medium (thread blocked) |
-| **Spawn + poll** | No | Manual management | High | High (non-blocking) |
-| **C# Task.Run** | Yes (C# threadpool) | C# manages | Low | High (C# scheduler optimized) |
+// Default
+WebSocketClient ws = WebSocketClient.new(apiKey, listener);
 
-**Recommendation:** Use C# `Task.Run()` wrapper for best balance of simplicity and performance.
+// Custom config
+ReconnectConfig reconnect = new ReconnectConfig(10, 2000, 120000);
+HealthCheckConfig health = new HealthCheckConfig(true, 30000, 2);
+WebSocketClient ws = WebSocketClient.newWithConfig(
+    apiKey,
+    listener,
+    WebSocketEndpoint.STOCK,
+    reconnect,
+    health
+);
 
----
-
-### 4. WebSocket Async Callbacks
-
-**Challenge:** WebSocket events are async and continuous (stream of messages), requiring different patterns than request-response.
-
-#### Python: Callback + Iterator Pattern
-
-```python
-# Pattern 1: Callback
-ws = WebSocketClient("key")
-
-def on_message(msg):
-    print(f"Received: {msg}")
-
-ws.stock.on("message", on_message)
-ws.stock.connect()
-ws.stock.subscribe("trades", "2330")
-
-# Pattern 2: Iterator (async generator)
-async for msg in ws.stock.messages():
-    print(msg)
+ws.connect();
 ```
 
-**Implementation:**
+**Go Usage:**
+
+```go
+import "github.com/fubon/marketdata-go"
+
+// Default
+ws := marketdata.NewWebSocketClient(apiKey, listener)
+
+// Custom config
+ws := marketdata.NewWebSocketClientWithConfig(
+    apiKey,
+    listener,
+    marketdata.WebSocketEndpointStock,
+    &marketdata.ReconnectConfig{
+        MaxAttempts:     10,
+        InitialDelayMs:  2000,
+        MaxDelayMs:      120000,
+    },
+    &marketdata.HealthCheckConfig{
+        Enabled:         true,
+        IntervalMs:      30000,
+        MaxMissedPongs:  2,
+    },
+)
+
+ws.Connect()
+```
+
+## FFI Boundary Considerations
+
+### Duration Type Handling
+
+**Challenge:** Rust's `std::time::Duration` is not FFI-safe and doesn't serialize well.
+
+**Solution:** Use `u64` milliseconds at all FFI boundaries.
+
+**Conversion Pattern:**
 
 ```rust
-use pyo3::prelude::*;
-use tokio::sync::mpsc;
+// Binding → Core
+let core_duration = Duration::from_millis(binding_millis);
 
-#[pyclass]
+// Core → Binding (if needed for getters)
+let binding_millis = core_duration.as_millis() as u64;
+```
+
+**Applied to:**
+- `ReconnectionConfig::initial_delay` → `initial_delay_ms: u64`
+- `ReconnectionConfig::max_delay` → `max_delay_ms: u64`
+- `HealthCheckConfig::interval` → `interval_ms: u64`
+
+### Optional Parameters
+
+**PyO3 Pattern:**
+
+```rust
+#[pyo3(signature = (api_key, reconnect=None, health_check=None))]
+pub fn new(
+    api_key: String,
+    reconnect: Option<ReconnectConfig>,
+    health_check: Option<HealthCheckConfig>,
+) -> Self
+```
+
+**napi-rs Pattern:**
+
+```rust
+fn new(api_key: String, options: Option<WebSocketOptions>) -> Self
+```
+
+**UniFFI Pattern:**
+
+```rust
+pub fn new_with_config(
+    api_key: String,
+    reconnect: Option<ReconnectConfig>,
+    health_check: Option<HealthCheckConfig>,
+) -> Arc<Self>
+```
+
+**Common Pattern:** Use `Option<T>` in Rust, convert to language-specific optionals (Python `None`, TypeScript `undefined`, C# `null`, Java `null`, Go `nil`).
+
+### Config Storage in Binding Layer
+
+**Challenge:** Core `WebSocketClient` is created in `connect()`, not constructor.
+
+**Solution:** Store config in binding struct, use when creating core client.
+
+**Pattern:**
+
+```rust
 pub struct StockWebSocketClient {
-    tx: mpsc::UnboundedSender<WsMessage>,
-    callbacks: Arc<Mutex<HashMap<String, PyObject>>>,  // event -> callback
+    api_key: String,
+    reconnect_config: ReconnectionConfig,  // Store here
+    health_config: HealthCheckConfig,      // Store here
+    state: Arc<Mutex<Option<WebSocketState>>>,
+    // ...
 }
 
-#[pymethods]
 impl StockWebSocketClient {
-    // Register callback
-    fn on(&self, event: String, callback: PyObject) -> PyResult<()> {
-        self.callbacks.lock().unwrap().insert(event, callback);
-        Ok(())
+    pub fn new(api_key: String, reconnect: Option<...>, health: Option<...>) -> Self {
+        Self {
+            api_key,
+            reconnect_config: convert_or_default(reconnect),
+            health_config: convert_or_default(health),
+            state: Arc::new(Mutex::new(None)),
+        }
     }
 
-    // Async iterator
-    fn messages<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, MessageIterator>> {
-        let (tx, rx) = mpsc::unbounded_channel();
-        // Spawn tokio task that forwards WebSocket messages to channel
-        Ok(Bound::new(py, MessageIterator { rx })?)
+    pub fn connect(&self) -> Result<()> {
+        let ws_client = marketdata_core::WebSocketClient::with_full_config(
+            config,
+            self.reconnect_config.clone(),
+            self.health_config.clone(),
+        );
+        // ...
     }
 }
+```
 
-#[pyclass]
-pub struct MessageIterator {
-    rx: mpsc::UnboundedReceiver<String>,
+### REST Client Configuration (Future)
+
+**Current State:** REST client uses hardcoded timeouts in core:
+
+```rust
+// core/src/rest/client.rs (lines 37-40)
+let agent = ureq::AgentBuilder::new()
+    .timeout_read(std::time::Duration::from_secs(30))
+    .timeout_write(std::time::Duration::from_secs(30))
+    .build();
+```
+
+**Recommended Addition:**
+
+```rust
+// core/src/rest/client.rs
+pub struct RestClientConfig {
+    pub timeout_read: Duration,
+    pub timeout_write: Duration,
 }
 
-#[pymethods]
-impl MessageIterator {
-    fn __aiter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
-        slf
-    }
-
-    fn __anext__<'py>(&mut self, py: Python<'py>) -> PyResult<Option<String>> {
-        // Poll channel, return None if closed
-        match self.rx.try_recv() {
-            Ok(msg) => Ok(Some(msg)),
-            Err(_) => Ok(None),
+impl Default for RestClientConfig {
+    fn default() -> Self {
+        Self {
+            timeout_read: Duration::from_secs(30),
+            timeout_write: Duration::from_secs(30),
         }
     }
 }
-```
 
-**Reference:** [pyo3-asyncio](https://crates.io/crates/pyo3-asyncio) for bridging tokio futures to Python asyncio.
-
-#### Node.js: EventEmitter Pattern
-
-```javascript
-const ws = new WebSocketClient("key");
-
-ws.stock.on("message", (msg) => {
-    console.log("Received:", msg);
-});
-
-ws.stock.connect();
-ws.stock.subscribe("trades", "2330");
-```
-
-**Implementation:**
-
-```rust
-use napi::bindgen_prelude::*;
-use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
-
-#[napi]
-pub struct StockWebSocketClient {
-    inner: Arc<WebSocketClientInner>,
-    message_callback: Option<ThreadsafeFunction<String>>,
-}
-
-#[napi]
-impl StockWebSocketClient {
-    #[napi]
-    pub fn on(&mut self, env: Env, event: String, callback: JsFunction) -> Result<()> {
-        if event == "message" {
-            // Create thread-safe function that can be called from Rust threads
-            let tsfn: ThreadsafeFunction<String> = callback
-                .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
-
-            self.message_callback = Some(tsfn);
-
-            // Spawn tokio task to forward messages
-            let tsfn_clone = tsfn.clone();
-            let inner = self.inner.clone();
-            tokio::spawn(async move {
-                while let Some(msg) = inner.next_message().await {
-                    // Call JS callback from Rust thread
-                    tsfn_clone.call(msg, ThreadsafeFunctionCallMode::NonBlocking);
-                }
-            });
-        }
-        Ok(())
-    }
-}
-```
-
-**Reference:** [NAPI-RS ThreadsafeFunction](https://napi.rs/docs/concepts/async-fn#threadsafefunction) for cross-thread callbacks.
-
-#### C#: Event Pattern
-
-```csharp
-var ws = new WebSocketClient("key");
-
-ws.Stock.MessageReceived += (sender, msg) => {
-    Console.WriteLine($"Received: {msg}");
-};
-
-await ws.Stock.ConnectAsync();
-await ws.Stock.SubscribeAsync("trades", "2330");
-```
-
-**Implementation (C# wrapper over UniFFI):**
-
-```csharp
-public class StockWebSocketClient {
-    private readonly StockWebSocketClientFFI _inner;
-    private CancellationTokenSource _cts;
-
-    public event EventHandler<string> MessageReceived;
-
-    public async Task ConnectAsync() {
-        _inner.Connect();
-
-        _cts = new CancellationTokenSource();
-
-        // Background task to poll messages
-        _ = Task.Run(async () => {
-            while (!_cts.Token.IsCancellationRequested) {
-                // Poll FFI for next message (blocking call)
-                string msg = await Task.Run(() => _inner.NextMessage());
-                if (msg != null) {
-                    MessageReceived?.Invoke(this, msg);
-                }
-            }
-        }, _cts.Token);
-    }
-}
-```
-
-**Alternative:** Use [System.Threading.Channels](https://learn.microsoft.com/en-us/dotnet/api/system.threading.channels) for better async message passing.
-
----
-
-### 5. Error Handling Across FFI
-
-**Principle:** Map Rust `Result<T, E>` → language-specific error conventions.
-
-#### Error Mapping Strategy
-
-```rust
-// Core library error type
-#[derive(Debug, thiserror::Error)]
-pub enum MarketDataError {
-    #[error("Invalid symbol: {symbol}")]
-    InvalidSymbol { symbol: String },
-
-    #[error("API error (HTTP {status}): {message}")]
-    ApiError { status: u16, message: String },
-
-    #[error("Connection error: {msg}")]
-    ConnectionError { msg: String },
-
-    #[error("Timeout: {operation}")]
-    TimeoutError { operation: String },
-}
-```
-
-**PyO3 mapping:**
-
-```rust
-use pyo3::exceptions::PyException;
-
-impl From<MarketDataError> for PyErr {
-    fn from(err: MarketDataError) -> PyErr {
-        match err {
-            MarketDataError::InvalidSymbol { symbol } => {
-                PyValueError::new_err(format!("Invalid symbol: {}", symbol))
-            }
-            MarketDataError::ApiError { status, message } => {
-                PyRuntimeError::new_err(format!("API error ({}): {}", status, message))
-            }
-            MarketDataError::ConnectionError { msg } => {
-                PyConnectionError::new_err(msg)
-            }
-            _ => PyException::new_err(err.to_string()),
-        }
-    }
-}
-```
-
-**napi-rs mapping:**
-
-```rust
-impl From<MarketDataError> for napi::Error {
-    fn from(err: MarketDataError) -> napi::Error {
-        match err {
-            MarketDataError::InvalidSymbol { symbol } => {
-                napi::Error::new(
-                    napi::Status::InvalidArg,
-                    format!("Invalid symbol: {}", symbol)
-                )
-            }
-            MarketDataError::ApiError { status, message } => {
-                napi::Error::new(
-                    napi::Status::GenericFailure,
-                    format!("API error ({}): {}", status, message)
-                )
-            }
-            _ => napi::Error::from_reason(err.to_string()),
-        }
-    }
-}
-```
-
-**UniFFI mapping:**
-
-```rust
-// UniFFI requires explicit error enum in UDL
-#[derive(Debug, thiserror::Error)]
-pub enum MarketDataError {
-    #[error("Invalid symbol: {0}")]
-    InvalidSymbol(String),
-
-    #[error("API error: {0}")]
-    ApiError(String),
-
-    #[error("{0}")]
-    Other(String),
-}
-
-impl From<CoreError> for MarketDataError {
-    fn from(err: CoreError) -> Self {
-        match err {
-            CoreError::InvalidSymbol { symbol } => {
-                MarketDataError::InvalidSymbol(symbol)
-            }
-            CoreError::ApiError { status, message } => {
-                MarketDataError::ApiError(format!("HTTP {}: {}", status, message))
-            }
-            _ => MarketDataError::Other(err.to_string()),
-        }
-    }
-}
-```
-
-**Trade-offs:**
-
-| Strategy | Type Safety | Stack Traces | Localization | DX |
-|----------|-------------|--------------|--------------|-----|
-| **Native exceptions** | High | Excellent | Easy | Excellent |
-| **Error codes** | Low | None | Hard | Poor |
-| **JSON error objects** | Medium | Manual | Medium | Good |
-
-**Recommendation:** Use native exception types (PyErr, napi::Error, C# Exception) for best developer experience. Preserve error details and stack traces.
-
----
-
-## Build System Organization
-
-### Current State: Independent Builds
-
-```bash
-# Build each binding separately
-cd core && cargo build --release
-cd py && maturin build --release
-cd js && npm run build
-cd uniffi && cargo build --release && cargo run --bin uniffi-bindgen
-```
-
-**Issues:**
-- No dependency ordering enforcement
-- Core changes require manual rebuild of all bindings
-- No shared artifact caching
-- Inconsistent versioning across bindings
-
-### Recommended: Cargo Workspace
-
-```toml
-# Root Cargo.toml
-[workspace]
-members = [
-    "core",
-    "py",
-    "js",
-    "uniffi",
-]
-
-[workspace.package]
-version = "0.2.0"
-edition = "2021"
-authors = ["Fugle <team@fugle.tw>"]
-license = "MIT"
-
-[workspace.dependencies]
-# Shared dependencies across all crates
-tokio = { version = "1.49", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
-thiserror = "2.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-
-# FFI crates
-pyo3 = { version = "0.22", features = ["extension-module"] }
-napi = { version = "2.16", features = ["napi8", "async", "serde-json", "tokio_rt"] }
-napi-derive = "2.16"
-uniffi = { version = "0.28", features = ["cli"] }
-```
-
-```toml
-# core/Cargo.toml
-[package]
-name = "marketdata-core"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-
-[dependencies]
-tokio.workspace = true
-thiserror.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-# ... other deps
-```
-
-```toml
-# py/Cargo.toml
-[package]
-name = "marketdata-py"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-marketdata-core = { path = "../core" }
-pyo3.workspace = true
-serde_json.workspace = true
-tokio.workspace = true
-```
-
-**Benefits:**
-- **Single Cargo.lock** - Ensures version consistency across all crates
-- **Shared target directory** - Faster builds, reuse compiled artifacts
-- **Workspace dependencies** - Define once, use everywhere
-- **Build ordering** - Cargo understands dependency graph
-- **Version synchronization** - Workspace version applies to all crates
-
-**Reference:** [Cargo Workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) documentation.
-
-### Build Targets and Release Packaging
-
-**Multi-target matrix:**
-
-| Language | Platforms | Architectures | Package Format |
-|----------|-----------|---------------|----------------|
-| Python | Linux, macOS, Windows | x86_64, aarch64 | Wheel (`.whl`) |
-| Node.js | Linux, macOS, Windows | x86_64, aarch64, arm | npm package (`.tgz`) |
-| C# | Windows, Linux, macOS | x86_64, aarch64 | NuGet (`.nupkg`) |
-
-**Recommended build tool:** [cross](https://github.com/cross-rs/cross) for Rust cross-compilation.
-
-**CI/CD strategy:**
-
-```yaml
-# .github/workflows/build.yml
-name: Build Multi-Language Bindings
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  build-python:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
-    steps:
-      - uses: actions/checkout@v4
-      - uses: PyO3/maturin-action@v1
-        with:
-          working-directory: py
-          target: ${{ matrix.target }}
-          manylinux: auto
-          args: --release --out dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ matrix.os }}-${{ matrix.python }}
-          path: py/dist
-
-  build-nodejs:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: cd js && npm install && npm run build
-      - run: cd js && npm pack
-      - uses: actions/upload-artifact@v4
-        with:
-          name: npm-package-${{ matrix.os }}
-          path: js/*.tgz
-
-  build-csharp:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0'
-      - run: cd uniffi && cargo build --release
-      - run: cd uniffi && cargo run --bin uniffi-bindgen generate src/marketdata.udl --language csharp
-      # Package as NuGet (requires .csproj setup)
-```
-
-**Release checklist:**
-
-1. **Version bump** - Update `workspace.package.version` in root `Cargo.toml`
-2. **Build all targets** - Python wheels, npm packages, NuGet packages
-3. **Test on all platforms** - Smoke tests for each binding
-4. **Publish**:
-   - Python: `maturin publish` or `twine upload dist/*`
-   - Node.js: `npm publish` from `js/`
-   - C#: `dotnet nuget push *.nupkg`
-5. **Tag release** - `git tag v0.2.0 && git push origin v0.2.0`
-6. **GitHub release** - Attach built artifacts
-
-**Reference:**
-- [Temporal's Rust at the Core](https://www.infoq.com/news/2025/11/temporal-rust-polygot-sdk/) - Real-world example of multi-language SDK development with Rust core
-- [Spikard](https://github.com/Goldziher/spikard) - Multi-language web toolkit with PyO3, napi-rs, magnus, ext-php-rs
-
----
-
-## Data Flow Architecture
-
-### Request-Response Flow (REST API)
-
-```
-User Code                FFI Boundary          Core Library
-─────────                ────────────          ────────────
-
-Python:
-client.quote("2330")
-    │
-    ├─→ PyObject → String conversion
-    │
-    └─→ Release GIL
-            │
-            ├─→ PyRestClient.quote()
-            │       │
-            │       ├─→ spawn tokio task
-            │       │
-            │       └─→ RestClientInner.quote("2330")
-            │               │
-            │               ├─→ HTTP GET /stock/intraday/quote?symbol=2330
-            │               │
-            │               ├─→ JSON parse → Quote struct
-            │               │
-            │               └─→ return Result<Quote, Error>
-            │
-            ├─→ Convert Quote → PyDict
-            │
-            └─→ Reacquire GIL
-    │
-    ├─→ Return PyDict to Python
-    │
-    ▼
-print(quote)
-```
-
-**Key points:**
-- **Single crossing** - Data crosses FFI boundary twice (in: String, out: PyDict/JsObject)
-- **Serialization** - Complex types serialized at boundary (Rust struct → language object)
-- **Error propagation** - Rust Result → language exception
-
-### Streaming Flow (WebSocket)
-
-```
-User Code                FFI Boundary          Core Library
-─────────                ────────────          ────────────
-
-Python:
-async for msg in ws.messages():
-    │
-    ├─→ MessageIterator.__anext__()
-    │       │
-    │       ├─→ rx.try_recv()  (tokio channel)
-    │       │       │
-    │       │       ◄─┤ WebSocket task (spawned once)
-    │       │         │
-    │       │         ├─→ ws.next().await
-    │       │         │       │
-    │       │         │       ◄─┤ TCP socket
-    │       │         │         │
-    │       │         │         └─→ Raw bytes
-    │       │         │
-    │       │         ├─→ Deserialize JSON → Message
-    │       │         │
-    │       │         └─→ tx.send(Message)
-    │       │
-    │       └─→ Convert Message → PyDict
-    │
-    └─→ Return PyDict
-    │
-    ▼
-process(msg)
-```
-
-**Key points:**
-- **Persistent connection** - WebSocket task runs in background
-- **Channel-based** - tokio mpsc channel decouples WebSocket from iterator
-- **Continuous crossing** - Each message crosses FFI boundary (Rust Message → Python dict)
-- **Backpressure** - Channel bounded to prevent memory issues
-
-### Callback Flow (Node.js EventEmitter)
-
-```
-JavaScript                FFI Boundary          Core Library
-──────────                ────────────          ────────────
-
-ws.on("message", callback)
-    │
-    ├─→ JsFunction → ThreadsafeFunction
-    │       │
-    │       └─→ Store in StockWebSocketClient
-    │
-ws.connect()
-    │
-    ├─→ StockWebSocketClient.connect()
-    │       │
-    │       └─→ spawn tokio task
-    │               │
-    │               ├─→ WebSocket connect
-    │               │
-    │               └─→ loop {
-    │                       │
-    │                       ├─→ ws.next().await
-    │                       │       │
-    │                       │       └─→ Message
-    │                       │
-    │                       ├─→ Serialize Message → String
-    │                       │
-    │                       └─→ tsfn.call(msg)  ◄─┐
-    │                                             │
-    ◄───────────────────────────────────────────────┘
-    │
-    ├─→ JS callback invoked on event loop
-    │       │
-    │       └─→ callback(msg)
-    │
-    ▼
-process(msg)
-```
-
-**Key points:**
-- **Callback registration** - JsFunction converted to ThreadsafeFunction (can be called from any thread)
-- **Cross-thread invocation** - Rust task calls into JS from tokio thread
-- **Event loop integration** - ThreadsafeFunction schedules callback on JS event loop
-- **Minimal blocking** - Only callback execution blocks event loop, not I/O
-
----
-
-## Suggested Build Order
-
-**Phase dependency graph:**
-
-```
-Phase 1: Core Library Stabilization
-    │
-    ├─→ API finalization
-    ├─→ Error handling consistency
-    ├─→ Performance benchmarks
-    └─→ Documentation
-
-Phase 2: Workspace Migration
-    │
-    ├─→ Create root Cargo.toml with [workspace]
-    ├─→ Extract shared dependencies
-    ├─→ Update child Cargo.toml with workspace = true
-    └─→ Verify builds (cargo build --workspace)
-
-Phase 3: Python Binding Enhancement (Parallel)
-    │
-    ├─→ Async runtime bridging (pyo3-async-runtimes)
-    ├─→ WebSocket iterator pattern
-    ├─→ Type stubs generation (.pyi files)
-    └─→ Testing (pytest)
-
-Phase 3: Node.js Binding Enhancement (Parallel)
-    │
-    ├─→ TypeScript definitions refinement
-    ├─→ EventEmitter pattern for WebSocket
-    ├─→ Memory leak testing
-    └─→ Testing (Jest)
-
-Phase 4: C# Binding Development (Sequential, depends on UniFFI stability)
-    │
-    ├─→ Evaluate UniFFI vs csbindgen vs Interoptopus
-    ├─→ Async wrapper (Task.Run pattern)
-    ├─→ Event pattern for WebSocket
-    ├─→ NuGet packaging
-    └─→ Testing (xUnit)
-
-Phase 5: Cross-Platform CI/CD
-    │
-    ├─→ GitHub Actions matrix builds
-    ├─→ Cross-compilation setup
-    ├─→ Release automation
-    └─→ Documentation generation
-
-Phase 6: Performance Optimization (Cross-cutting)
-    │
-    ├─→ FFI call reduction (batching)
-    ├─→ Serialization optimization
-    ├─→ Memory profiling
-    └─→ Async runtime tuning
-```
-
-**Critical path:**
-1. Workspace migration (1 week) - Blocks all parallel work
-2. Core stabilization (2 weeks) - Blocks binding improvements
-3. C# binding (3 weeks) - Sequential, requires UniFFI decisions
-4. CI/CD (1 week) - Can start once first binding is complete
-
-**Parallelization opportunities:**
-- Python and Node.js enhancements can happen concurrently
-- Documentation can be written alongside implementation
-- Performance testing can run in parallel across languages
-
----
-
-## Architecture Anti-Patterns to Avoid
-
-### 1. Leaking Rust Types Across FFI
-
-**❌ Bad:**
-
-```rust
-#[napi]
-pub struct Quote {
-    pub price: f64,
-    pub volume: i64,
-    // ... 20 more fields
-}
-```
-
-**Problem:** Changes to Rust struct require changes to all language bindings.
-
-**✅ Good:**
-
-```rust
-// Core library
-pub struct Quote { /* ... */ }
-
-// FFI layer
-impl Quote {
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-}
-
-// Language binding
-#[napi]
-pub fn get_quote(symbol: String) -> Result<String> {
-    let quote = core_client.quote(&symbol)?;
-    Ok(quote.to_json())
-}
-```
-
-### 2. Synchronous FFI Calls in Async Context
-
-**❌ Bad:**
-
-```python
-# This blocks the entire event loop!
-async def get_quote(symbol):
-    return client.quote_sync(symbol)  # Blocks 100-500ms
-```
-
-**Problem:** Synchronous FFI calls block the async runtime, preventing other tasks from running.
-
-**✅ Good:**
-
-```python
-# Run FFI call on thread pool
-async def get_quote(symbol):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, client.quote_sync, symbol)
-```
-
-Or use async FFI bridge (pyo3-asyncio, napi-rs async).
-
-### 3. Unbounded WebSocket Message Buffers
-
-**❌ Bad:**
-
-```rust
-let (tx, rx) = mpsc::unbounded_channel();  // No backpressure!
-
-tokio::spawn(async move {
-    while let Some(msg) = ws.next().await {
-        tx.send(msg).unwrap();  // Accumulates infinitely if consumer is slow
-    }
-});
-```
-
-**Problem:** Fast WebSocket + slow consumer = memory exhaustion.
-
-**✅ Good:**
-
-```rust
-let (tx, rx) = mpsc::channel(100);  // Bounded channel with capacity
-
-tokio::spawn(async move {
-    while let Some(msg) = ws.next().await {
-        if tx.send(msg).await.is_err() {
-            break;  // Consumer dropped, exit task
-        }
-    }
-});
-```
-
-### 4. Mixing Async Runtimes
-
-**❌ Bad:**
-
-```rust
-// Core uses tokio
 impl RestClient {
-    pub async fn quote(&self) -> Result<Quote> { /* tokio */ }
-}
-
-// Binding uses async-std
-#[napi]
-impl RestClient {
-    pub async fn quote(&self) -> Result<String> {
-        async_std::task::block_on(self.inner.quote())  // Runtime conflict!
+    pub fn with_config(auth: Auth, config: RestClientConfig) -> Self {
+        let agent = ureq::AgentBuilder::new()
+            .timeout_read(config.timeout_read)
+            .timeout_write(config.timeout_write)
+            .build();
+        // ...
     }
 }
 ```
 
-**Problem:** Nested runtimes cause deadlocks and panics.
+**Bindings follow same pattern:** Options object with `timeout_read_ms` and `timeout_write_ms`.
 
-**✅ Good:**
+## Implementation Order
 
-```rust
-// Use the same runtime everywhere (tokio)
-// napi-rs with tokio_rt feature shares tokio runtime
-#[napi]
-impl RestClient {
-    pub async fn quote(&self) -> Result<String> {
-        self.inner.quote().await  // Same tokio runtime
-    }
-}
-```
+### Phase 1: Core Extensions (if REST config needed)
 
-### 5. Not Handling Language-Specific Lifecycle
+1. Add `RestClientConfig` to `core/src/rest/client.rs`
+2. Add `RestClient::with_config()` constructor
+3. Add tests for custom timeouts
 
-**❌ Bad:**
+**Effort:** 1-2 hours (optional for v0.3.0)
 
-```rust
-#[pyclass]
-pub struct WebSocketClient {
-    ws: WebSocket,  // Dropped when Python object GC'd
-}
+### Phase 2: Python Binding
 
-// No __del__ method, WebSocket connection leaks!
-```
+1. Update `ReconnectConfig` to match core field names
+2. Add `HealthCheckConfig` PyClass
+3. Modify `StockWebSocketClient::new()` to accept optional configs
+4. Store configs in struct
+5. Use `with_full_config()` in `connect()`
+6. Add tests with custom configs
 
-**Problem:** Language GC != Rust Drop. WebSocket may not close properly.
+**Files to modify:**
+- `py/src/websocket.rs` (config structs + constructor)
+- `py/tests/test_websocket.py` (test custom configs)
 
-**✅ Good:**
+**Effort:** 4-6 hours
 
-```rust
-#[pyclass]
-pub struct WebSocketClient {
-    ws: Arc<Mutex<Option<WebSocket>>>,
-}
+### Phase 3: Node.js Binding
 
-#[pymethods]
-impl WebSocketClient {
-    fn close(&mut self) -> PyResult<()> {
-        if let Some(ws) = self.ws.lock().unwrap().take() {
-            ws.close().await;
-        }
-        Ok(())
-    }
+1. Add `ReconnectOptions`, `HealthCheckOptions`, `WebSocketOptions` napi objects
+2. Modify `StockWebSocketClient::new()` to accept options
+3. Convert options to core types and store
+4. Use `with_full_config()` in `connect()`
+5. Update TypeScript types in `js/index.d.ts`
+6. Add tests with custom configs
 
-    fn __del__(&mut self) {
-        // Ensure cleanup on GC
-        let _ = self.close();
-    }
-}
-```
+**Files to modify:**
+- `js/src/websocket.rs` (config objects + constructor)
+- `js/index.d.ts` (TypeScript types)
+- `js/tests/websocket.test.js` (test custom configs)
 
----
+**Effort:** 4-6 hours
 
-## Performance Considerations
+### Phase 4: UniFFI Binding
 
-### FFI Call Overhead
+1. Add `ReconnectConfig` and `HealthCheckConfig` Records
+2. Add `new_with_config()` constructor
+3. Modify `connect()` to use stored configs with `with_full_config()`
+4. Test in C# wrapper
+5. Test in Java wrapper
+6. Test in Go wrapper
 
-**Measurements:**
+**Files to modify:**
+- `uniffi/src/websocket.rs` (config records + constructor)
+- `dotnet/` (C# wrapper with config)
+- `java/` (Java wrapper with config)
+- `go/` (Go wrapper with config)
 
-| Operation | Overhead | Frequency | Total Impact |
-|-----------|----------|-----------|--------------|
-| FFI call (no-op) | ~100-500ns | Per API call | Low (1-2% for 200ms API) |
-| String copy (10KB) | ~5µs | Per API call | Low (2-3%) |
-| JSON serialize (1KB) | ~10-50µs | Per message | Medium (5-10%) |
-| GIL acquire/release | ~1-10µs | Per async call | Low (Python-specific) |
-| ThreadsafeFunction call | ~10-50µs | Per callback | Medium (high-freq streams) |
+**Effort:** 6-8 hours (testing across 3 languages)
 
-**Optimization strategies:**
+### Phase 5: Documentation
 
-1. **Batch operations** - Reduce FFI crossings
-   ```rust
-   // ❌ Bad: N FFI calls
-   for symbol in symbols:
-       client.quote(symbol)
+1. Update README with config examples for each language
+2. Add config reference documentation
+3. Document default values
+4. Add migration guide (defaults → custom)
 
-   // ✅ Good: 1 FFI call
-   client.quote_batch(symbols)
-   ```
+**Files to modify:**
+- `README.md` (usage examples)
+- `.planning/docs/CONFIGURATION.md` (reference)
+- API docs for each binding
 
-2. **Zero-copy serialization** - Use binary formats (MessagePack) instead of JSON for large payloads
-   ```rust
-   // JSON: ~50µs for 1KB
-   serde_json::to_string(&data)
+**Effort:** 2-3 hours
 
-   // MessagePack: ~10µs for 1KB
-   rmp_serde::to_vec(&data)
-   ```
+**Total Estimated Effort:** 17-25 hours
 
-3. **Async batching** - Buffer messages before crossing FFI
-   ```rust
-   let mut buffer = Vec::with_capacity(100);
+## Validation Approach
 
-   while let Some(msg) = ws.next().await {
-       buffer.push(msg);
+### Unit Tests
 
-       if buffer.len() >= 100 || elapsed > Duration::from_millis(100) {
-           // Cross FFI once for 100 messages
-           callback(serde_json::to_string(&buffer));
-           buffer.clear();
-       }
-   }
-   ```
+Each binding layer should test:
+1. Default config (matches current behavior)
+2. Custom reconnect config (verify core receives correct values)
+3. Custom health check config (verify core receives correct values)
+4. Full custom config (both reconnect + health check)
+5. Invalid configs (negative delays, zero attempts)
 
-**Reference:** [Effective Rust Item 34: Control what crosses FFI boundaries](https://www.effective-rust.com/ffi.html)
+### Integration Tests
 
----
+Test actual behavior:
+1. Reconnection triggers with custom max_attempts
+2. Health check pings at custom intervals
+3. Missed pongs trigger disconnect at custom threshold
 
-## Summary
+### Compatibility Tests
 
-### Component Boundaries (What Talks to What)
+Verify API compatibility:
+1. Python usage matches reference SDK patterns
+2. Node.js usage matches reference SDK patterns
+3. C#/Java/Go usage follows platform conventions
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ User Application Layer (Python/JS/C#)                  │
-│ - Idiomatic API                                         │
-│ - Documentation                                         │
-│ - Convenience wrappers                                  │
-└─────────────────────────────────────────────────────────┘
-                         ▲
-                         │ Language-specific API
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│ FFI Binding Layer (py/js/uniffi crates)                │
-│ - Type conversion (Rust ↔ Python/JS/C#)                │
-│ - Async runtime bridging                                │
-│ - Error mapping                                         │
-│ - Lifetime management                                   │
-└─────────────────────────────────────────────────────────┘
-                         ▲
-                         │ C ABI (FFI boundary)
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│ Core Library (marketdata-core)                         │
-│ - Business logic                                        │
-│ - API protocol                                          │
-│ - tokio async operations                                │
-│ - Pure Rust types                                       │
-└─────────────────────────────────────────────────────────┘
-                         ▲
-                         │ HTTP/WebSocket
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│ Fugle API (external)                                    │
-└─────────────────────────────────────────────────────────┘
-```
+## Risk Assessment
 
-### Data Flow Direction
+### Low Risk
 
-1. **Request flow:** User → Language layer → FFI bridge (type conversion) → Core (business logic) → API
-2. **Response flow:** API → Core (parse JSON) → FFI bridge (serialize to language type) → Language layer → User
-3. **Stream flow:** API → Core (WebSocket task) → tokio channel → FFI bridge (callback/iterator) → Language layer → User
+- **Core changes:** None required, only using existing constructors
+- **Breaking changes:** None, all changes are additive (optional parameters)
+- **FFI complexity:** Standard Duration → milliseconds conversion
 
-### Build Order Dependencies
+### Medium Risk
 
-```
-1. Core stabilization (blocks all)
-    ↓
-2. Workspace migration (blocks parallel work)
-    ↓
-3a. Python enhancement ────┐
-3b. Node.js enhancement ───┤ (parallel)
-3c. C# development ────────┤ (sequential after 3a/3b if using UniFFI)
-    ↓
-4. CI/CD setup (requires 3a-3c)
-    ↓
-5. Performance tuning (continuous)
-```
+- **Type mismatches:** Must carefully convert binding types to core types
+- **Default behavior:** Must preserve existing defaults exactly
+- **Testing burden:** Need to test across 5 language bindings
 
----
+### Mitigation
 
-## Confidence Assessment
+- **Preserve defaults:** Use `Option<T>` everywhere, unwrap to current defaults
+- **Comprehensive tests:** Unit + integration + compatibility tests
+- **Incremental rollout:** Python → Node.js → UniFFI
+- **Documentation:** Clear examples for each language
 
-| Area | Confidence | Source | Notes |
-|------|------------|--------|-------|
-| **PyO3 patterns** | HIGH | Official docs, pyo3-async-runtimes | Well-established, production-ready |
-| **napi-rs patterns** | HIGH | Official docs, napi.rs | Mature ecosystem, active development |
-| **UniFFI for C#** | MEDIUM | Mozilla docs, community reports | Experimental, limited C# examples |
-| **Async bridging** | HIGH | pyo3-async-runtimes, NAPI-RS tokio_rt | Documented approaches |
-| **Build systems** | HIGH | Cargo workspaces docs, real projects | Standard Rust practice |
-| **Performance numbers** | MEDIUM | Various benchmarks | Context-dependent, need validation |
-| **C# alternatives** | LOW | Web search only | Need deeper evaluation (csbindgen vs Interoptopus vs UniFFI) |
+## Open Questions
 
----
+1. **REST client config priority:** Should v0.3.0 include REST timeout config or defer to v0.3.1?
+   - **Recommendation:** Include in v0.3.0 for completeness, minimal effort
+
+2. **Reconnection disable:** Should `max_attempts: 0` disable reconnection entirely?
+   - **Recommendation:** Yes, document as disable mechanism
+
+3. **Health check defaults:** Official Python SDK has `enabled: False` by default, but our core has `enabled: true`. Which to follow?
+   - **Recommendation:** Match official SDKs (`enabled: false` default) for API compatibility, update core default
+
+4. **Config validation:** Should bindings validate configs (e.g., `interval > 0`) or let core handle it?
+   - **Recommendation:** Bindings validate for better error messages, core validates as defense
+
+## Conclusion
+
+Configuration integration is straightforward: the core already supports it, we just need to expose it through each binding layer. The architecture follows a clear pattern:
+
+1. **Core owns config structs** (already complete)
+2. **Bindings convert to core types** (Duration → milliseconds)
+3. **Constructors accept optional configs** (preserve backward compatibility)
+4. **Connect uses stored configs** (call `with_full_config()`)
+
+**No new architecture patterns needed.** Implementation is wiring, not design.
 
 ## Sources
 
-**FFI and Multi-Language Bindings:**
-- [Mozilla UniFFI](https://github.com/mozilla/uniffi-rs) - Multi-language bindings generator
-- [PyO3](https://github.com/PyO3/pyo3) - Rust bindings for Python
-- [NAPI-RS](https://napi.rs/) - Node.js bindings framework
-- [Effective Rust Item 34: Control what crosses FFI boundaries](https://www.effective-rust.com/ffi.html)
-- [Maturin User Guide](https://www.maturin.rs/bindings.html) - PyO3/UniFFI binding comparison
+- [PyO3 Rust-Python FFI Documentation](https://pyo3.rs/)
+- [PyO3 - Rust](https://docs.rs/pyo3/latest/pyo3/)
+- [GitHub - PyO3/pyo3: Rust bindings for the Python interpreter](https://github.com/PyO3/pyo3)
+- [NAPI-RS Documentation](https://napi.rs/)
+- [Types Overwrite – NAPI-RS](https://napi.rs/docs/concepts/types-overwrite)
+- [GitHub - napi-rs/napi-rs: A framework for building compiled Node.js add-ons in Rust via Node-API](https://github.com/napi-rs/napi-rs)
+- [GitHub - mozilla/uniffi-rs: a multi-language bindings generator for rust](https://github.com/mozilla/uniffi-rs)
+- [UniFFI — Rust utility // Lib.rs](https://lib.rs/crates/uniffi)
+- [The UniFFI user guide - FFI converter traits](https://mozilla.github.io/uniffi-rs/latest/internals/ffi_converter_traits.html)
 
-**Async Runtime Bridging:**
-- [PyO3 async-runtimes](https://github.com/PyO3/pyo3-async-runtimes) - Bridges between Python and Rust async runtimes
-- [NAPI-RS async functions](https://napi.rs/docs/concepts/async-fn) - Tokio runtime integration
-- [Tokio bridging guide](https://tokio.rs/tokio/topics/bridging) - Bridging sync and async code
-- [pyo3-asyncio crate](https://crates.io/crates/pyo3-asyncio) - Python/Rust async interop
+---
 
-**C# Bindings:**
-- [csbindgen](https://github.com/Cysharp/csbindgen) - Generate C# FFI from Rust
-- [Calling Rust from C#](https://www.strathweb.com/2023/06/calling-rust-code-from-csharp/) - Strathweb article
-- [Rust at Datalust](https://blog.datalust.co/rust-at-datalust-how-we-integrate-rust-with-csharp/) - C# integration case study
-- [Interoptopus C# backend](https://docs.rs/interoptopus_backend_csharp/)
-
-**Architecture and Build Systems:**
-- [Cargo Workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) - Official Rust book
-- [Cargo Workspaces reference](https://doc.rust-lang.org/cargo/reference/workspaces.html)
-- [Temporal Rust Core SDK](https://www.infoq.com/news/2025/11/temporal-rust-polygot-sdk/) - Multi-language SDK architecture
-- [Spikard](https://github.com/Goldziher/spikard) - Multi-language web toolkit example
-- [Monorepo build systems](https://monorepo.tools/) - Comparison of build tools
-
-**Performance and Serialization:**
-- [Data Serialization Comparison](https://www.sitepoint.com/data-serialization-comparison-json-yaml-bson-messagepack/)
-- [JSON vs Protobuf vs FlatBuffers benchmarks](https://medium.com/@harshiljani2002/benchmarking-data-serialization-json-vs-protobuf-vs-flatbuffers-3218eecdba77)
-- [ORJSON vs JSON performance](https://onchana01.medium.com/orjson-vs-json-choosing-the-right-serializer-for-high-performance-api-development-f7e4db123d18)
-
-**Project Examples:**
-- [BridgeRust](https://dev.to/josias1997/bridgerust-one-rust-core-every-ecosystem-5bi1) - Unified multi-language framework
-- [Multi-language SDK management](https://medium.com/@parserdigital/how-to-manage-multi-language-open-source-sdks-on-githug-best-practices-tools-1a401b22544e)
+*Architecture research: 2026-02-01*
+*Confidence: HIGH - Based on existing codebase patterns and official SDK analysis*
