@@ -27,6 +27,7 @@
 mod client;
 mod errors;
 mod models;
+mod websocket;
 
 use std::sync::Arc;
 use marketdata_core::Auth;
@@ -39,6 +40,9 @@ pub use errors::MarketDataError;
 
 // Re-export client types (FutOpt now consolidated in client module)
 pub use client::{RestClient, StockClient, StockIntradayClient, FutOptClient, FutOptIntradayClient};
+
+// Re-export WebSocket types
+pub use websocket::{WebSocketClient, WebSocketListener, WebSocketEndpoint};
 
 // Setup UniFFI scaffolding using proc macros
 // This replaces include_scaffolding!() and allows using derive macros for types

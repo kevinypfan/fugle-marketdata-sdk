@@ -727,3 +727,36 @@ pub struct StreamMessage {
     pub error_code: Option<i32>,
     pub error_message: Option<String>,
 }
+
+impl From<core::WebSocketMessage> for StreamMessage {
+    fn from(msg: core::WebSocketMessage) -> Self {
+        // Extract error info from data if event is "error"
+        let (error_code, error_message) = if msg.event == "error" {
+            let code = msg
+                .data
+                .as_ref()
+                .and_then(|d| d.get("code"))
+                .and_then(|v| v.as_i64())
+                .map(|c| c as i32);
+            let message = msg
+                .data
+                .as_ref()
+                .and_then(|d| d.get("message"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            (code, message)
+        } else {
+            (None, None)
+        };
+
+        Self {
+            event: msg.event,
+            channel: msg.channel,
+            symbol: msg.symbol,
+            id: msg.id,
+            data_json: msg.data.map(|d| d.to_string()),
+            error_code,
+            error_message,
+        }
+    }
+}
