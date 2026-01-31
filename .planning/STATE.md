@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 4.1 of 7 (UniFFI Migration) - IN PROGRESS
-Plan: 2 of 6 in current phase - COMPLETE
-Status: Plan 04.1-02 complete - Typed REST client with async support
-Last activity: 2026-01-31 - Completed 04.1-02-PLAN.md (typed REST client implementation)
+Plan: 3 of 6 in current phase - COMPLETE
+Status: Plan 04.1-03 complete - WebSocket client with foreign trait callbacks
+Last activity: 2026-01-31 - Completed 04.1-03-PLAN.md (WebSocket streaming implementation)
 
-Progress: [███████░░░] 70% (~19 of 27 plans complete)
+Progress: [████████░░] 74% (~20 of 27 plans complete)
 
 ## Performance Metrics
 
@@ -105,6 +105,9 @@ Recent decisions affecting current work:
 - **04.1-02:** spawn_blocking wraps all core REST calls (core uses blocking ureq)
 - **04.1-02:** Dual async/sync methods: get_quote() async, quote_sync() blocking for simple use cases
 - **04.1-02:** tokio feature required in build-dependencies for async_compat module in proc-macro generation
+- **04.1-03:** Proc-macro with_foreign pattern (not deprecated callback interface) for WebSocketListener trait
+- **04.1-03:** receive_timeout with 100ms interval enables graceful shutdown via AtomicBool signal
+- **04.1-03:** Arc<AtomicBool> for connected/shutdown state (AtomicBool not Clone, Arc enables sharing)
 
 ### Roadmap Evolution
 
@@ -146,11 +149,13 @@ None yet.
 - Method-level unsafe enables async/await in disposal patterns
 
 **Phase 4.1 (UniFFI Migration):**
-- IN PROGRESS: Plan 2 of 6 complete
+- IN PROGRESS: Plan 3 of 6 complete
 - 04.1-01: Typed UniFFI interface with proc-macro approach (23 Record structs, flat error enum)
 - 04.1-02: Typed REST client with async/sync methods (spawn_blocking for core calls)
+- 04.1-03: WebSocket client with WebSocketListener foreign trait and StreamMessage delivery
 - Deviation: Split impl blocks required (UniFFI doesn't support associated functions in exports)
-- PENDING: Historical data (04.1-03), WebSocket (04.1-04), C# generation (04.1-05), testing (04.1-06)
+- Deviation: Plan referenced UDL file; used proc-macro with_foreign instead
+- PENDING: C# generation (04.1-04), Go generation (04.1-05), testing (04.1-06)
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -163,6 +168,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.1-02-PLAN.md (typed REST client with async support)
+Stopped at: Completed 04.1-03-PLAN.md (WebSocket client with foreign trait callbacks)
 Resume file: N/A
-Next: Phase 4.1 Plan 03 - Historical data methods
+Next: Phase 4.1 Plan 04 - C# binding generation
