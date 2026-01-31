@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn test_health_check_default_config() {
         let config = HealthCheckConfig::default();
-        assert!(config.enabled);
+        assert!(!config.enabled); // CHANGED: was true, now false (aligned with official SDKs)
         assert_eq!(config.interval, Duration::from_secs(30));
         assert_eq!(config.max_missed_pongs, 2);
     }
@@ -303,12 +303,93 @@ mod tests {
     fn test_health_check_config_builder() {
         let config = HealthCheckConfig::default()
             .with_interval(Duration::from_secs(60))
+            .unwrap()
             .with_max_missed_pongs(5)
-            .with_enabled(false);
+            .unwrap()
+            .with_enabled(false); // Note: with_enabled doesn't need unwrap
 
         assert!(!config.enabled);
         assert_eq!(config.interval, Duration::from_secs(60));
         assert_eq!(config.max_missed_pongs, 5);
+    }
+
+    #[test]
+    fn test_health_check_default_uses_constants() {
+        let config = HealthCheckConfig::default();
+        assert_eq!(config.enabled, DEFAULT_HEALTH_CHECK_ENABLED);
+        assert_eq!(
+            config.interval,
+            Duration::from_millis(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
+        );
+        assert_eq!(config.max_missed_pongs, DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS);
+    }
+
+    #[test]
+    fn test_health_check_default_enabled_is_false() {
+        // Explicit test for CON-01: alignment with official SDKs
+        let config = HealthCheckConfig::default();
+        assert!(
+            !config.enabled,
+            "Default enabled should be false to match official SDKs"
+        );
+    }
+
+    #[test]
+    fn test_new_rejects_too_small_interval() {
+        let result = HealthCheckConfig::new(true, Duration::from_secs(2), 3);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("interval"),
+            "Error should mention field name: {}",
+            err
+        );
+        assert!(
+            err.contains("5000ms") || err.contains("2000ms"),
+            "Error should show values: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_new_rejects_zero_max_missed_pongs() {
+        let result = HealthCheckConfig::new(true, Duration::from_secs(30), 0);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("max_missed_pongs"),
+            "Error should mention field name: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_new_accepts_valid_config() {
+        let result = HealthCheckConfig::new(true, Duration::from_secs(10), 5);
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        assert!(config.enabled);
+        assert_eq!(config.interval, Duration::from_secs(10));
+        assert_eq!(config.max_missed_pongs, 5);
+    }
+
+    #[test]
+    fn test_builder_rejects_too_small_interval() {
+        let result = HealthCheckConfig::default().with_interval(Duration::from_secs(1));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_rejects_zero_max_missed_pongs() {
+        let result = HealthCheckConfig::default().with_max_missed_pongs(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_accepts_minimum_interval() {
+        // Exactly 5000ms should be valid
+        let result = HealthCheckConfig::new(true, Duration::from_millis(5000), 1);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -343,7 +424,7 @@ mod tests {
 
     #[test]
     fn test_is_healthy_returns_correct_status() {
-        let config = HealthCheckConfig::default().with_max_missed_pongs(3);
+        let config = HealthCheckConfig::default().with_max_missed_pongs(3).unwrap();
         let health_check = HealthCheck::new(config);
 
         // Initially healthy
