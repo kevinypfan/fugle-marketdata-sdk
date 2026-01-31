@@ -71,3 +71,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.uniffi == 'true' }}
     uses: ./.github/workflows/uniffi.yml
+
+  version:
+    name: Version Check
+    uses: ./.github/workflows/version-check.yml
