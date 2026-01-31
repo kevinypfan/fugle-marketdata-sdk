@@ -23,18 +23,24 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Node.js Binding
 
-- [ ] **JS-01**: Upgrade napi-rs from 2.16 to 3.6+
-- [ ] **JS-02**: Native event loop integration for async operations
-- [ ] **JS-03**: API compatibility with fugle-marketdata-node (method signatures, response types)
-- [ ] **JS-04**: Complete TypeScript type definitions (.d.ts)
+- [x] **JS-01**: Upgrade napi-rs from 2.16 to 3.6+ ✓
+- [x] **JS-02**: Native event loop integration for async operations ✓
+- [x] **JS-03**: API compatibility with fugle-marketdata-node (method signatures, response types) ✓
+- [x] **JS-04**: Complete TypeScript type definitions (.d.ts) ✓
 - [ ] **JS-05**: Publish native addon to npm registry
 
 ### C# Binding
 
-- [ ] **CS-01**: Replace UniFFI with csbindgen for .NET binding generation
-- [ ] **CS-02**: Task-based async/await support for all async operations
-- [ ] **CS-03**: API compatibility with FubonNeo patterns (naming conventions, structure)
+- [x] **CS-01**: Replace UniFFI with csbindgen for .NET binding generation ✓
+- [x] **CS-02**: Task-based async/await support for all async operations ✓
+- [x] **CS-03**: API compatibility with FubonNeo patterns (naming conventions, structure) ✓
 - [ ] **CS-04**: Publish to NuGet registry
+
+### Java Binding (INSERTED)
+
+- [x] **JAVA-01**: Generate Java bindings via uniffi-bindgen-java with CompletableFuture ✓
+- [x] **JAVA-02**: Idiomatic Java wrapper with builder pattern and exception hierarchy ✓
+- [x] **JAVA-03**: Tests validate structural correctness and CI workflow ✓
 
 ### Testing
 
@@ -92,24 +98,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PY-03 | Phase 2 | Complete |
 | PY-04 | Phase 2 | Complete |
 | PY-05 | Phase 5 | Pending |
-| JS-01 | Phase 3 | Pending |
-| JS-02 | Phase 3 | Pending |
-| JS-03 | Phase 3 | Pending |
-| JS-04 | Phase 3 | Pending |
+| JS-01 | Phase 3 | Complete |
+| JS-02 | Phase 3 | Complete |
+| JS-03 | Phase 3 | Complete |
+| JS-04 | Phase 3 | Complete |
 | JS-05 | Phase 5 | Pending |
-| CS-01 | Phase 4 | Pending |
-| CS-02 | Phase 4 | Pending |
-| CS-03 | Phase 4 | Pending |
+| CS-01 | Phase 4/4.1 | Complete |
+| CS-02 | Phase 4/4.1 | Complete |
+| CS-03 | Phase 4/4.1 | Complete |
 | CS-04 | Phase 5 | Pending |
+| JAVA-01 | Phase 4.2 | Complete |
+| JAVA-02 | Phase 4.2 | Complete |
+| JAVA-03 | Phase 4.2 | Complete |
 | TEST-01 | Phase 6 | Pending |
 | TEST-02 | Phase 6 | Pending |
 | TEST-03 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 20
+- v1 requirements: 23 total (20 original + 3 Java)
+- Mapped to phases: 23
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2025-01-30*
-*Last updated: 2026-01-31 after Phase 1 completion*
+*Last updated: 2026-01-31 after Phase 4.2 completion*
