@@ -47,6 +47,15 @@ pub use websocket::{
     ReconnectionConfig, WebSocketClient,
 };
 
+// Re-export WebSocket config constants for binding layers (CON-01)
+pub use websocket::health_check::{
+    DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEALTH_CHECK_INTERVAL_MS,
+    DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS, MIN_HEALTH_CHECK_INTERVAL_MS,
+};
+pub use websocket::reconnection::{
+    DEFAULT_INITIAL_DELAY_MS, DEFAULT_MAX_ATTEMPTS, DEFAULT_MAX_DELAY_MS, MIN_INITIAL_DELAY_MS,
+};
+
 // Re-export model types for convenience
 pub use models::{
     // Common types
