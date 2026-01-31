@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Python Binding Enhancement** - Upgrade to PyO3 0.27+ with full async support ✓
 - [x] **Phase 3: Node.js Binding Enhancement** - Upgrade to napi-rs 3.6+ with TypeScript improvements ✓
 - [x] **Phase 4: C# Binding Replacement** - Migrate from UniFFI to csbindgen with Task async ✓
-- [ ] **Phase 4.1: UniFFI Migration** - Unified FFI architecture for multi-language maintenance (INSERTED)
+- [x] **Phase 4.1: UniFFI Migration** - Unified FFI architecture for multi-language maintenance (INSERTED) ✓
 - [ ] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet
 - [ ] **Phase 6: Testing & Production Readiness** - Comprehensive API compatibility and integration testing
 
@@ -104,12 +104,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 04.1-01-PLAN.md — Define typed UDL with model dictionaries and error enum
-- [ ] 04.1-02-PLAN.md — Implement REST client with typed async returns
-- [ ] 04.1-03-PLAN.md — Implement WebSocket with foreign trait callbacks
-- [ ] 04.1-04-PLAN.md — Generate C# bindings and create thin wrapper
-- [ ] 04.1-05-PLAN.md — Generate Go bindings with channel wrapper
-- [ ] 04.1-06-PLAN.md — Cleanup old cs/ crate and add tests/CI
+- [x] 04.1-01-PLAN.md — Define typed UniFFI interface with proc-macro approach ✓
+- [x] 04.1-02-PLAN.md — Implement REST client with typed async returns ✓
+- [x] 04.1-03-PLAN.md — Implement WebSocket with foreign trait callbacks ✓
+- [x] 04.1-04-PLAN.md — Generate C# bindings and create thin wrapper ✓
+- [x] 04.1-05-PLAN.md — Generate Go bindings with channel wrapper ✓
+- [x] 04.1-06-PLAN.md — Cleanup old cs/ crate and add tests/CI ✓
 
 ### Phase 5: Cross-Platform Distribution
 **Goal**: Automate package publishing with platform-specific builds for PyPI, npm, and NuGet registries
@@ -153,6 +153,6 @@ Note: Phase 4.1 is an inserted phase to migrate to UniFFI before distribution.
 | 2. Python Binding | 5/5 | Complete ✓ | 2026-01-31 |
 | 3. Node.js Binding | 4/4 | Complete ✓ | 2026-01-31 |
 | 4. C# Binding | 5/5 | Complete ✓ | 2026-01-31 |
-| 4.1 UniFFI Migration | 0/6 | Ready for execution | - |
+| 4.1 UniFFI Migration | 6/6 | Complete ✓ | 2026-01-31 |
 | 5. Distribution | 0/TBD | Not started | - |
 | 6. Testing | 0/TBD | Not started | - |
