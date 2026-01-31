@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 4.2 of 7 (Java Binding)
-Plan: 1 of 3 in current phase - COMPLETE
-Status: Java binding infrastructure established
-Last activity: 2026-01-31 - Completed 04.2-01-PLAN.md (Java Binding Infrastructure)
+Plan: 2 of 3 in current phase - COMPLETE
+Status: Java wrapper with builder pattern complete
+Last activity: 2026-01-31 - Completed 04.2-02-PLAN.md (Idiomatic Java Wrapper)
 
-Progress: [████████░░] 84% (~24 of 28+ plans complete)
+Progress: [████████░░] 85% (~25 of 28+ plans complete)
 
 ## Performance Metrics
 
@@ -32,11 +32,11 @@ Progress: [████████░░] 84% (~24 of 28+ plans complete)
 | 03-nodejs-binding | 4 | 32min | 8min |
 | 04-csharp-binding | 5 | 19min | 4min |
 | 04.1-uniffi-migration | 6 | 36min | 6min |
-| 04.2-java-binding | 1 | 8min | 8min |
+| 04.2-java-binding | 2 | 13min | 7min |
 
 **Recent Trend:**
-- Last 5 plans: 04.1-03 (7min), 04.1-04 (6min), 04.1-05 (10min), 04.1-06 (8min), 04.2-01 (8min)
-- Trend: Consistent 6-8min range for UniFFI binding generation phases
+- Last 5 plans: 04.1-04 (6min), 04.1-05 (10min), 04.1-06 (8min), 04.2-01 (8min), 04.2-02 (5min)
+- Trend: Consistent 5-8min range for UniFFI binding phases
 
 *Updated after each plan completion*
 
@@ -123,6 +123,9 @@ Recent decisions affecting current work:
 - **04.2-01:** uniffi.toml configures Java package name (tw.com.fugle.marketdata.generated)
 - **04.2-01:** Java 21 required for pattern matching in switch expressions (UniFFI-generated code)
 - **04.2-01:** Gradle wrapper 8.5 with JNA 5.14.0 for native library access
+- **04.2-02:** Unchecked exceptions (RuntimeException) for modern Java API, matching C# pattern
+- **04.2-02:** Builder pattern with apiKey()/bearerToken()/sdkToken() for flexible authentication
+- **04.2-02:** Dual sync/async methods: getQuote() blocks, getQuoteAsync() returns CompletableFuture
 
 ### Roadmap Evolution
 
@@ -172,9 +175,10 @@ Recent decisions affecting current work:
 - 04.1-06: Testing and cleanup (15 C# tests, 14 Go tests, CI workflow)
 
 **Phase 4.2 (Java Binding):**
-- IN PROGRESS: 1 of 3 plans complete
+- IN PROGRESS: 2 of 3 plans complete
 - 04.2-01: Java binding infrastructure (uniffi-bindgen-java, Gradle 8.5, JNA 5.14.0, 152 generated files)
-- READY FOR: 04.2-02 (Idiomatic Java wrapper with CompletableFuture)
+- 04.2-02: Idiomatic Java wrapper (builder pattern, FugleException hierarchy, dual sync/async)
+- READY FOR: 04.2-03 (Testing)
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -187,6 +191,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.2-01-PLAN.md (Java Binding Infrastructure)
+Stopped at: Completed 04.2-02-PLAN.md (Idiomatic Java Wrapper)
 Resume file: N/A
-Next: Phase 4.2 Plan 02 - Idiomatic Java Wrapper
+Next: Phase 4.2 Plan 03 - Testing
