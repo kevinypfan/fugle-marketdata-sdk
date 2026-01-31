@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 5 of 7 (Cross-Platform Distribution)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-31 - Completed 05-02-PLAN.md (Node.js Build Workflow)
+Last activity: 2026-01-31 - Completed 05-03-PLAN.md (UniFFI Build Workflow)
 
-Progress: [████████░░] 90% (~28 of 31 plans complete)
+Progress: [█████████░] 94% (~29 of 31 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28
+- Total plans completed: 29
 - Average duration: 6 min
 - Total execution time: ~2.6 hours
 
@@ -33,10 +33,10 @@ Progress: [████████░░] 90% (~28 of 31 plans complete)
 | 04-csharp-binding | 5 | 19min | 4min |
 | 04.1-uniffi-migration | 6 | 36min | 6min |
 | 04.2-java-binding | 3 | 18min | 6min |
-| 05-distribution | 2 | 6min | 3min |
+| 05-distribution | 3 | 8min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 04.2-02 (5min), 04.2-03 (5min), 05-01 (4min), 05-02 (2min)
+- Last 5 plans: 04.2-03 (5min), 05-01 (4min), 05-02 (2min), 05-03 (2min)
 - Trend: Fast execution for GitHub Actions workflow plans
 
 *Updated after each plan completion*
@@ -137,6 +137,9 @@ Recent decisions affecting current work:
 - **05-02:** Cross-compilation for Linux ARM64 on ubuntu-latest with gcc-aarch64-linux-gnu
 - **05-02:** Artifact naming: bindings-{target} pattern for napi-rs targets
 - **05-02:** napi prepublish generates optionalDependencies packages
+- **05-03:** Separate macOS ARM64 and x64 builds (no universal2 for cdylib)
+- **05-03:** RID naming convention (linux-x64, osx-arm64, osx-x64, win-x64) matches NuGet runtimes
+- **05-03:** Consolidation job creates unified uniffi-all artifact for downstream packaging
 
 ### Roadmap Evolution
 
@@ -202,6 +205,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-02-PLAN.md (Node.js Build Workflow)
+Stopped at: Completed 05-03-PLAN.md (UniFFI Build Workflow)
 Resume file: N/A
-Next: 05-03-PLAN.md (UniFFI Build Workflow)
+Next: 05-04-PLAN.md (C# NuGet Package)
