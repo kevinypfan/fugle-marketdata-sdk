@@ -1,0 +1,180 @@
+// Public wrapper providing FubonNeo-compatible WebSocket API over UniFFI-generated bindings
+using System;
+using System.Threading.Tasks;
+
+namespace FugleMarketData
+{
+    /// <summary>
+    /// WebSocket endpoint types for market data streaming.
+    /// </summary>
+    public enum WebSocketEndpoint
+    {
+        /// <summary>
+        /// Stock market data stream
+        /// </summary>
+        Stock,
+
+        /// <summary>
+        /// Futures and options market data stream
+        /// </summary>
+        FutOpt
+    }
+
+    /// <summary>
+    /// Interface for receiving WebSocket events.
+    /// Implement this interface to handle streaming market data.
+    /// </summary>
+    public interface IWebSocketListener
+    {
+        /// <summary>
+        /// Called when WebSocket connection is established.
+        /// </summary>
+        void OnConnected();
+
+        /// <summary>
+        /// Called when WebSocket connection is closed.
+        /// </summary>
+        void OnDisconnected();
+
+        /// <summary>
+        /// Called when a market data message is received.
+        /// </summary>
+        /// <param name="message">Streaming message with event, channel, symbol, and data</param>
+        void OnMessage(uniffi.marketdata_uniffi.StreamMessage message);
+
+        /// <summary>
+        /// Called when an error occurs.
+        /// </summary>
+        /// <param name="errorMessage">Error description</param>
+        void OnError(string errorMessage);
+    }
+
+    /// <summary>
+    /// Internal adapter to convert IWebSocketListener to UniFFI WebSocketListener interface.
+    /// </summary>
+    internal class WebSocketListenerAdapter : uniffi.marketdata_uniffi.WebSocketListener
+    {
+        private readonly IWebSocketListener _listener;
+
+        public WebSocketListenerAdapter(IWebSocketListener listener)
+        {
+            _listener = listener ?? throw new ArgumentNullException(nameof(listener));
+        }
+
+        public void OnConnected() => _listener.OnConnected();
+        public void OnDisconnected() => _listener.OnDisconnected();
+        public void OnMessage(uniffi.marketdata_uniffi.StreamMessage message) => _listener.OnMessage(message);
+        public void OnError(string errorMessage) => _listener.OnError(errorMessage);
+    }
+
+    /// <summary>
+    /// WebSocket client for streaming market data.
+    /// Provides real-time data via callback-based interface.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// class MyListener : IWebSocketListener
+    /// {
+    ///     public void OnConnected() => Console.WriteLine("Connected!");
+    ///     public void OnDisconnected() => Console.WriteLine("Disconnected");
+    ///     public void OnMessage(StreamMessage msg) => Console.WriteLine($"{msg.Channel}: {msg.Symbol}");
+    ///     public void OnError(string error) => Console.WriteLine($"Error: {error}");
+    /// }
+    ///
+    /// var listener = new MyListener();
+    /// using var client = new WebSocketClient("your-api-key", listener);
+    /// await client.ConnectAsync();
+    /// await client.SubscribeAsync("trades", "2330");
+    /// // Messages will arrive via OnMessage callback
+    /// </code>
+    /// </example>
+    public sealed class WebSocketClient : IDisposable
+    {
+        private readonly uniffi.marketdata_uniffi.WebSocketClient _inner;
+        private bool _disposed;
+
+        /// <summary>
+        /// Create a WebSocket client for stock market data streaming.
+        /// </summary>
+        /// <param name="apiKey">Fugle API key</param>
+        /// <param name="listener">Listener to receive WebSocket events</param>
+        /// <exception cref="ArgumentNullException">If apiKey or listener is null</exception>
+        public WebSocketClient(string apiKey, IWebSocketListener listener)
+        {
+            if (string.IsNullOrEmpty(apiKey))
+                throw new ArgumentNullException(nameof(apiKey));
+            if (listener == null)
+                throw new ArgumentNullException(nameof(listener));
+
+            var adapter = new WebSocketListenerAdapter(listener);
+            _inner = new uniffi.marketdata_uniffi.WebSocketClient(apiKey, adapter);
+        }
+
+        /// <summary>
+        /// Create a WebSocket client for a specific endpoint (stock or futopt).
+        /// </summary>
+        /// <param name="apiKey">Fugle API key</param>
+        /// <param name="listener">Listener to receive WebSocket events</param>
+        /// <param name="endpoint">Endpoint type: Stock or FutOpt</param>
+        /// <exception cref="ArgumentNullException">If apiKey or listener is null</exception>
+        public WebSocketClient(string apiKey, IWebSocketListener listener, WebSocketEndpoint endpoint)
+        {
+            if (string.IsNullOrEmpty(apiKey))
+                throw new ArgumentNullException(nameof(apiKey));
+            if (listener == null)
+                throw new ArgumentNullException(nameof(listener));
+
+            var adapter = new WebSocketListenerAdapter(listener);
+            var uniffiEndpoint = endpoint switch
+            {
+                WebSocketEndpoint.Stock => uniffi.marketdata_uniffi.WebSocketEndpoint.Stock,
+                WebSocketEndpoint.FutOpt => uniffi.marketdata_uniffi.WebSocketEndpoint.FutOpt,
+                _ => throw new ArgumentOutOfRangeException(nameof(endpoint))
+            };
+
+            _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithEndpoint(apiKey, adapter, uniffiEndpoint);
+        }
+
+        /// <summary>
+        /// Connect to the WebSocket server.
+        /// </summary>
+        /// <returns>Task that completes when connection is established</returns>
+        public Task ConnectAsync() => _inner.Connect();
+
+        /// <summary>
+        /// Disconnect from the WebSocket server.
+        /// </summary>
+        /// <returns>Task that completes when disconnected</returns>
+        public Task DisconnectAsync() => _inner.Disconnect();
+
+        /// <summary>
+        /// Subscribe to a market data channel for a symbol.
+        /// </summary>
+        /// <param name="channel">Channel name: "trades", "candles", "books", "meta"</param>
+        /// <param name="symbol">Symbol to subscribe (e.g., "2330" for TSMC)</param>
+        /// <returns>Task that completes when subscription is confirmed</returns>
+        public Task SubscribeAsync(string channel, string symbol) => _inner.Subscribe(channel, symbol);
+
+        /// <summary>
+        /// Unsubscribe from a market data channel for a symbol.
+        /// </summary>
+        /// <param name="channel">Channel name</param>
+        /// <param name="symbol">Symbol to unsubscribe</param>
+        /// <returns>Task that completes when unsubscription is confirmed</returns>
+        public Task UnsubscribeAsync(string channel, string symbol) => _inner.Unsubscribe(channel, symbol);
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(WebSocketClient));
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _inner?.Dispose();
+            _disposed = true;
+        }
+    }
+}

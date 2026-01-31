@@ -31,9 +31,17 @@ csharp-release:
 	cargo build -p marketdata-uniffi --release
 
 # Generate C# bindings from UniFFI (library mode - proc-macro approach)
+# Post-processes generated file to make types public for consumer access
 gen-csharp:
 	cargo build -p marketdata-uniffi --release
 	uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.dylib -o bindings/csharp/MarketdataUniffi/
+	@echo "Post-processing: making generated types public..."
+	sed -i '' 's/^internal record /public record /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i '' 's/^internal interface /public interface /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i '' 's/^internal class /public class /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i '' 's/^internal enum /public enum /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i '' 's/^internal static class MarketdataUniffiMethods/public static class MarketdataUniffiMethods/g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	@echo "C# bindings generated successfully"
 
 # ============================================================
 # Go Bindings (via UniFFI)
