@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4.2: Java Binding via UniFFI** - Generate Java bindings using uniffi-bindgen-java with CompletableFuture async (INSERTED) ✓
 - [x] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet ✓
 - [x] **Phase 6: Testing & Production Readiness** - Comprehensive API compatibility and integration testing ✓
-- [ ] **Phase 7: Complete REST API Coverage** - Implement all missing REST endpoints (Historical, Snapshot, Technical, Corporate Actions)
+- [x] **Phase 7: Complete REST API Coverage** - Implement all missing REST endpoints (Historical, Snapshot, Technical, Corporate Actions) ✓
 
 ## Phase Details
 
@@ -185,15 +185,15 @@ Plans:
 **Plans**: 9 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Stock Historical endpoints (candles, stats) in Rust core
-- [ ] 07-02-PLAN.md — Stock Snapshot endpoints (quotes, movers, actives) in Rust core
-- [ ] 07-03-PLAN.md — Stock Technical indicators (SMA, RSI, KDJ, MACD, BB) in Rust core
-- [ ] 07-04-PLAN.md — Stock Corporate Actions (capital-changes, dividends, listing-applicants) in Rust core
-- [ ] 07-05-PLAN.md — FutOpt Historical endpoints (candles, daily) in Rust core
-- [ ] 07-06-PLAN.md — UniFFI bindings for C#, Java, Go (all new endpoints)
-- [ ] 07-07-PLAN.md — Python bindings via PyO3 (all new endpoints)
-- [ ] 07-08-PLAN.md — Node.js bindings via napi-rs (all new endpoints)
-- [ ] 07-09-PLAN.md — Comprehensive compatibility and integration tests
+- [x] 07-01-PLAN.md — Stock Historical endpoints (candles, stats) in Rust core ✓
+- [x] 07-02-PLAN.md — Stock Snapshot endpoints (quotes, movers, actives) in Rust core ✓
+- [x] 07-03-PLAN.md — Stock Technical indicators (SMA, RSI, KDJ, MACD, BB) in Rust core ✓
+- [x] 07-04-PLAN.md — Stock Corporate Actions (capital-changes, dividends, listing-applicants) in Rust core ✓
+- [x] 07-05-PLAN.md — FutOpt Historical endpoints (candles, daily) in Rust core ✓
+- [x] 07-06-PLAN.md — UniFFI bindings for C#, Java, Go (all new endpoints) ✓
+- [x] 07-07-PLAN.md — Python bindings via PyO3 (all new endpoints) ✓
+- [x] 07-08-PLAN.md — Node.js bindings via napi-rs (all new endpoints) ✓
+- [x] 07-09-PLAN.md — Comprehensive compatibility and integration tests ✓
 
 ## Progress
 
@@ -213,4 +213,4 @@ Note: Phase 4.1 and 4.2 are inserted phases to complete UniFFI bindings before d
 | 4.2 Java Binding | 3/3 | Complete ✓ | 2026-01-31 |
 | 5. Distribution | 6/6 | Complete ✓ | 2026-01-31 |
 | 6. Testing | 9/9 | Complete ✓ | 2026-01-31 |
-| 7. REST API Coverage | 0/9 | Not Started | - |
+| 7. REST API Coverage | 9/9 | Complete ✓ | 2026-01-31 |
