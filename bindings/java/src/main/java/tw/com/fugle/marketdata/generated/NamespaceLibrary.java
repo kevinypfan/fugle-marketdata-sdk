@@ -19,7 +19,7 @@ final class NamespaceLibrary {
 
   static void uniffiCheckContractApiVersion(UniffiLib lib) {
     // Get the bindings contract version from our ComponentInterface
-    int bindingsContractVersion = 29;
+    int bindingsContractVersion = 26;
     // Get the scaffolding contract version by calling the into the dylib
     int scaffoldingContractVersion = lib.ffi_marketdata_uniffi_uniffi_contract_version();
     if (bindingsContractVersion != scaffoldingContractVersion) {

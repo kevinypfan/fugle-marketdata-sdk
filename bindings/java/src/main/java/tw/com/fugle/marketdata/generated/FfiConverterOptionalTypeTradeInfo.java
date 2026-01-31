@@ -2,8 +2,6 @@ package tw.com.fugle.marketdata.generated;
 
 
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Map;
 
 // public class TestForOptionals {}
 public enum FfiConverterOptionalTypeTradeInfo implements FfiConverterRustBuffer<TradeInfo> {
