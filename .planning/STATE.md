@@ -171,6 +171,9 @@ Recent decisions affecting current work:
 - **07-08:** Intermediate let bindings for Rust lifetime management when chaining napi-rs client calls
 - **07-08:** Pass after_hours as Option<bool> instead of flag method (core API requires boolean argument)
 - **07-08:** TypeScript dev dependency added for npx tsc --noEmit validation of type definitions
+- **07-06:** Helper functions with intermediate bindings to extend lifetimes for builder pattern in UniFFI
+- **07-06:** C# records made public via post-processing (uniffi-bindgen-cs generates internal by default)
+- **07-06:** Java bindings require JDK 21 (uniffi-bindgen-java uses pattern matching in switch expressions)
 
 ### Roadmap Evolution
 
@@ -257,7 +260,7 @@ Recent decisions affecting current work:
 - 07-03: Stock Technical Indicators (SMA, RSI, KDJ, MACD, BB) - COMPLETE
 - 07-04: Stock Corporate Actions (capital-changes, dividends, listing-applicants) - COMPLETE
 - 07-05: FutOpt Historical endpoints (candles, daily) - COMPLETE
-- 07-06: UniFFI bindings for new REST endpoints - COMPLETE
+- 07-06: UniFFI bindings for new REST endpoints - COMPLETE (5 client types, 50+ models, C#/Go/Java regenerated)
 - 07-07: Python bindings for new REST endpoints - COMPLETE (5 client classes, 17 methods, 516 lines type stubs)
 - 07-08: Node.js bindings for new REST endpoints - COMPLETE
 - 07-09: Remaining plans TBD
@@ -265,6 +268,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 07-07-PLAN.md (Python Bindings)
+Stopped at: Completed 07-06-PLAN.md (UniFFI Bindings)
 Resume file: N/A
-Next: Continue Wave 2 execution
+Next: Continue Wave 2 execution (07-09 remaining)
