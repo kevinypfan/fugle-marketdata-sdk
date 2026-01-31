@@ -1,6 +1,6 @@
 # Milestone v0.3.0: API Compatibility & Configuration
 
-**Status:** Planning
+**Status:** In Progress
 **Target:** Align constructor APIs with official Fugle SDKs, expose WebSocket configuration options
 **Phases:** 5
 
@@ -14,7 +14,7 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 **Goal**: Establish canonical defaults, add comprehensive validation, align with official SDKs
 **Depends on**: Nothing (first phase)
-**Estimated effort**: 4-6 hours
+**Plans:** 2 plans
 
 **Delivers:**
 - Comprehensive validation for `ReconnectionConfig` (max_attempts >= 1, delays > 0)
@@ -25,11 +25,15 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 **Requirements addressed:** VAL-01, VAL-02, VAL-03, VAL-04, CON-01
 
+Plans:
+- [ ] 01-01-PLAN.md — ReconnectionConfig validation & default constants
+- [ ] 01-02-PLAN.md — HealthCheckConfig validation, default alignment & exports
+
 ### Phase 2: Python Binding Enhancement
 
 **Goal**: Add options-based constructor and config exposure to Python binding
 **Depends on**: Phase 1
-**Estimated effort**: 6-8 hours
+**Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
 - `HealthCheckConfig` PyClass with constructor
@@ -45,7 +49,7 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 **Goal**: Add options-based constructor and config exposure to Node.js binding
 **Depends on**: Phase 1
-**Estimated effort**: 6-8 hours
+**Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
 - `WebSocketOptions` napi object with nested config types
@@ -62,7 +66,7 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 **Goal**: Add config exposure to C#, Java, and Go bindings via UniFFI
 **Depends on**: Phase 1
-**Estimated effort**: 8-10 hours
+**Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
 - `ReconnectConfig` and `HealthCheckConfig` UniFFI Records
@@ -79,7 +83,7 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 **Goal**: Update all documentation and provide migration tooling
 **Depends on**: Phases 2, 3, 4
-**Estimated effort**: 4-6 hours
+**Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
 - Updated README examples with options object pattern
