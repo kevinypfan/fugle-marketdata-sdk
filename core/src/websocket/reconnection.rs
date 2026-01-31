@@ -2,6 +2,20 @@
 
 use std::time::Duration;
 
+use crate::MarketDataError;
+
+/// Default maximum reconnection attempts (VAL-02)
+pub const DEFAULT_MAX_ATTEMPTS: u32 = 5;
+
+/// Default initial reconnection delay in milliseconds (VAL-02)
+pub const DEFAULT_INITIAL_DELAY_MS: u64 = 1000;
+
+/// Default maximum reconnection delay in milliseconds (VAL-02)
+pub const DEFAULT_MAX_DELAY_MS: u64 = 60000;
+
+/// Minimum allowed initial delay to prevent connection storms
+pub const MIN_INITIAL_DELAY_MS: u64 = 100;
+
 /// Reconnection configuration
 ///
 /// Controls automatic reconnection behavior after connection drops.
@@ -19,9 +33,9 @@ pub struct ReconnectionConfig {
 impl Default for ReconnectionConfig {
     fn default() -> Self {
         Self {
-            max_attempts: 5,
-            initial_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60),
+            max_attempts: DEFAULT_MAX_ATTEMPTS,
+            initial_delay: Duration::from_millis(DEFAULT_INITIAL_DELAY_MS),
+            max_delay: Duration::from_millis(DEFAULT_MAX_DELAY_MS),
         }
     }
 }
