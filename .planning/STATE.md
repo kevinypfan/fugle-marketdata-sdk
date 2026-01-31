@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 1 of 5 — Core Config Validation & Defaults
-Plan: 1 of 2 in Phase 1
-Status: In progress - Plan 01-01 complete
-Last activity: 2026-02-01 - Completed 01-01-PLAN.md (ReconnectionConfig validation)
+Plan: 2 of 2 in Phase 1 (Phase 1 complete)
+Status: Phase 1 complete
+Last activity: 2026-02-01 - Completed 01-02-PLAN.md (HealthCheckConfig validation)
 
-Progress: [███░░░░░░░] 25% (Phase 1 plan 1/2 complete)
+Progress: [████░░░░░░] 40% (Phase 1 complete, 2/5 phases done)
 
 ## Milestone History
 
@@ -39,12 +39,19 @@ From 01-01 execution:
 - max_delay must be >= initial_delay (logical constraint)
 - Config validation returns Result<Self, MarketDataError::ConfigError>
 
+From 01-02 execution:
+- DEFAULT_HEALTH_CHECK_ENABLED = false (aligned with official SDKs per CON-01)
+- MIN_HEALTH_CHECK_INTERVAL_MS = 5000ms (prevent excessive overhead)
+- with_enabled() returns Self not Result (any bool is valid)
+- All 8 config constants re-exported from lib.rs for binding layers
+
 ### Patterns Established
 
-From 01-01 execution:
+From 01-01 and 01-02 execution:
 - Config validation pattern: new() returns Result with ConfigError on invalid input
 - Default constants pattern: pub const DEFAULT_* for binding layer reference
 - Error message pattern: include field name, constraint, and actual value
+- Builder method pattern: methods that validate return Result, methods that don't return Self
 
 ### Roadmap Evolution
 
@@ -59,11 +66,11 @@ From 01-01 execution:
 
 ### Blockers/Concerns
 
-None — ready to continue Phase 1.
+None — Phase 1 complete, ready to plan Phase 2.
 
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 01-01-PLAN.md (ReconnectionConfig validation)
+Stopped at: Completed 01-02-PLAN.md (HealthCheckConfig validation) - Phase 1 complete
 Resume file: N/A
-Next: Execute 01-02-PLAN.md (HealthCheckConfig constants and validation)
+Next: Plan Phase 2 (Binding Deprecation)
