@@ -141,6 +141,234 @@ public class ResponseCompatibilityTest {
         }
     }
 
+    // ========== Historical Response Structure (Phase 7) ==========
+
+    @Test
+    @Tag("structural")
+    @DisplayName("HistoricalCandlesResponse class exists")
+    void historicalCandlesResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.HistoricalCandlesResponse");
+            assertNotNull(responseClass, "HistoricalCandlesResponse should exist");
+            assertNotNull(responseClass.getMethod("symbol"), "HistoricalCandlesResponse should have symbol()");
+            assertNotNull(responseClass.getMethod("data"), "HistoricalCandlesResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("HistoricalCandlesResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("HistoricalCandlesResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("StatsResponse class exists")
+    void statsResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.StatsResponse");
+            assertNotNull(responseClass, "StatsResponse should exist");
+            assertNotNull(responseClass.getMethod("symbol"), "StatsResponse should have symbol()");
+            assertNotNull(responseClass.getMethod("date"), "StatsResponse should have date()");
+            assertNotNull(responseClass.getMethod("name"), "StatsResponse should have name()");
+        } catch (ClassNotFoundException e) {
+            fail("StatsResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("StatsResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    // ========== Snapshot Response Structure (Phase 7) ==========
+
+    @Test
+    @Tag("structural")
+    @DisplayName("SnapshotQuotesResponse class exists")
+    void snapshotQuotesResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.SnapshotQuotesResponse");
+            assertNotNull(responseClass, "SnapshotQuotesResponse should exist");
+            assertNotNull(responseClass.getMethod("date"), "SnapshotQuotesResponse should have date()");
+            assertNotNull(responseClass.getMethod("time"), "SnapshotQuotesResponse should have time()");
+            assertNotNull(responseClass.getMethod("market"), "SnapshotQuotesResponse should have market()");
+            assertNotNull(responseClass.getMethod("data"), "SnapshotQuotesResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("SnapshotQuotesResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("SnapshotQuotesResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("MoversResponse class exists")
+    void moversResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.MoversResponse");
+            assertNotNull(responseClass, "MoversResponse should exist");
+            assertNotNull(responseClass.getMethod("date"), "MoversResponse should have date()");
+            assertNotNull(responseClass.getMethod("data"), "MoversResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("MoversResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("MoversResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("ActivesResponse class exists")
+    void activesResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.ActivesResponse");
+            assertNotNull(responseClass, "ActivesResponse should exist");
+            assertNotNull(responseClass.getMethod("data"), "ActivesResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("ActivesResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("ActivesResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    // ========== Technical Indicator Response Structure (Phase 7) ==========
+
+    @Test
+    @Tag("structural")
+    @DisplayName("SmaResponse class exists")
+    void smaResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.SmaResponse");
+            assertNotNull(responseClass, "SmaResponse should exist");
+            assertNotNull(responseClass.getMethod("symbol"), "SmaResponse should have symbol()");
+            assertNotNull(responseClass.getMethod("data"), "SmaResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("SmaResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("SmaResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("RsiResponse class exists")
+    void rsiResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.RsiResponse");
+            assertNotNull(responseClass, "RsiResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("RsiResponse class not found");
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("KdjResponse class exists")
+    void kdjResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.KdjResponse");
+            assertNotNull(responseClass, "KdjResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("KdjResponse class not found");
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("MacdResponse class exists")
+    void macdResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.MacdResponse");
+            assertNotNull(responseClass, "MacdResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("MacdResponse class not found");
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("BbResponse class exists")
+    void bbResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.BbResponse");
+            assertNotNull(responseClass, "BbResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("BbResponse class not found");
+        }
+    }
+
+    // ========== Corporate Actions Response Structure (Phase 7) ==========
+
+    @Test
+    @Tag("structural")
+    @DisplayName("CapitalChangesResponse class exists")
+    void capitalChangesResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.CapitalChangesResponse");
+            assertNotNull(responseClass, "CapitalChangesResponse should exist");
+            assertNotNull(responseClass.getMethod("data"), "CapitalChangesResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("CapitalChangesResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("CapitalChangesResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("DividendsResponse class exists")
+    void dividendsResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.DividendsResponse");
+            assertNotNull(responseClass, "DividendsResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("DividendsResponse class not found");
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("ListingApplicantsResponse class exists")
+    void listingApplicantsResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.ListingApplicantsResponse");
+            assertNotNull(responseClass, "ListingApplicantsResponse should exist");
+        } catch (ClassNotFoundException e) {
+            fail("ListingApplicantsResponse class not found");
+        }
+    }
+
+    // ========== FutOpt Historical Response Structure (Phase 7) ==========
+
+    @Test
+    @Tag("structural")
+    @DisplayName("FutOptHistoricalCandlesResponse class exists")
+    void futOptHistoricalCandlesResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.FutOptHistoricalCandlesResponse");
+            assertNotNull(responseClass, "FutOptHistoricalCandlesResponse should exist");
+            assertNotNull(responseClass.getMethod("symbol"), "FutOptHistoricalCandlesResponse should have symbol()");
+            // FutOptHistoricalCandlesResponse uses candles() not data()
+            assertNotNull(responseClass.getMethod("candles"), "FutOptHistoricalCandlesResponse should have candles()");
+        } catch (ClassNotFoundException e) {
+            fail("FutOptHistoricalCandlesResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("FutOptHistoricalCandlesResponse missing expected method: " + e.getMessage());
+        }
+    }
+
+    @Test
+    @Tag("structural")
+    @DisplayName("FutOptDailyResponse class exists")
+    void futOptDailyResponseExists() {
+        try {
+            Class<?> responseClass = Class.forName("uniffi.marketdata_uniffi.FutOptDailyResponse");
+            assertNotNull(responseClass, "FutOptDailyResponse should exist");
+            assertNotNull(responseClass.getMethod("symbol"), "FutOptDailyResponse should have symbol()");
+            assertNotNull(responseClass.getMethod("data"), "FutOptDailyResponse should have data()");
+        } catch (ClassNotFoundException e) {
+            fail("FutOptDailyResponse class not found");
+        } catch (NoSuchMethodException e) {
+            fail("FutOptDailyResponse missing expected method: " + e.getMessage());
+        }
+    }
+
     // ========== Integration Response Tests ==========
 
     @Test

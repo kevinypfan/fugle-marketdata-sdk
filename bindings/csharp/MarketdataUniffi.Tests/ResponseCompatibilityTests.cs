@@ -167,6 +167,239 @@ public class ResponseCompatibilityTests
         }
     }
 
+    // ========== Historical Response Structure (Phase 7) ==========
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void HistoricalCandlesResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.HistoricalCandlesResponse");
+
+        Assert.IsNotNull(responseType, "HistoricalCandlesResponse type should exist");
+
+        var requiredFields = new[] { "symbol", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"HistoricalCandlesResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void StatsResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.StatsResponse");
+
+        Assert.IsNotNull(responseType, "StatsResponse type should exist");
+
+        var requiredFields = new[] { "symbol", "date", "name" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"StatsResponse should have {fieldName} property");
+        }
+    }
+
+    // ========== Snapshot Response Structure (Phase 7) ==========
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void SnapshotQuotesResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.SnapshotQuotesResponse");
+
+        Assert.IsNotNull(responseType, "SnapshotQuotesResponse type should exist");
+
+        var requiredFields = new[] { "date", "time", "market", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"SnapshotQuotesResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void MoversResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.MoversResponse");
+
+        Assert.IsNotNull(responseType, "MoversResponse type should exist");
+
+        var requiredFields = new[] { "date", "time", "market", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"MoversResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void ActivesResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.ActivesResponse");
+
+        Assert.IsNotNull(responseType, "ActivesResponse type should exist");
+
+        var requiredFields = new[] { "date", "time", "market", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"ActivesResponse should have {fieldName} property");
+        }
+    }
+
+    // ========== Technical Indicator Response Structure (Phase 7) ==========
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void SmaResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.SmaResponse");
+
+        Assert.IsNotNull(responseType, "SmaResponse type should exist");
+
+        var requiredFields = new[] { "symbol", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"SmaResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void RsiResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.RsiResponse");
+
+        Assert.IsNotNull(responseType, "RsiResponse type should exist");
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void KdjResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.KdjResponse");
+
+        Assert.IsNotNull(responseType, "KdjResponse type should exist");
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void MacdResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.MacdResponse");
+
+        Assert.IsNotNull(responseType, "MacdResponse type should exist");
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void BbResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.BbResponse");
+
+        Assert.IsNotNull(responseType, "BbResponse type should exist");
+    }
+
+    // ========== Corporate Actions Response Structure (Phase 7) ==========
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void CapitalChangesResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.CapitalChangesResponse");
+
+        Assert.IsNotNull(responseType, "CapitalChangesResponse type should exist");
+
+        var requiredFields = new[] { "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"CapitalChangesResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void DividendsResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.DividendsResponse");
+
+        Assert.IsNotNull(responseType, "DividendsResponse type should exist");
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void ListingApplicantsResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.ListingApplicantsResponse");
+
+        Assert.IsNotNull(responseType, "ListingApplicantsResponse type should exist");
+    }
+
+    // ========== FutOpt Historical Response Structure (Phase 7) ==========
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void FutOptHistoricalCandlesResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.FutOptHistoricalCandlesResponse");
+
+        Assert.IsNotNull(responseType, "FutOptHistoricalCandlesResponse type should exist");
+
+        // FutOptHistoricalCandlesResponse has 'candles' field instead of 'data'
+        var requiredFields = new[] { "symbol", "candles" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"FutOptHistoricalCandlesResponse should have {fieldName} property");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Structural")]
+    public void FutOptDailyResponse_HasExpectedFields()
+    {
+        var assembly = typeof(FugleMarketData.RestClient).Assembly;
+        var responseType = assembly.GetType("uniffi.marketdata_uniffi.FutOptDailyResponse");
+
+        Assert.IsNotNull(responseType, "FutOptDailyResponse type should exist");
+
+        var requiredFields = new[] { "symbol", "data" };
+        foreach (var fieldName in requiredFields)
+        {
+            var prop = responseType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
+                    ?? responseType.GetProperty(char.ToUpper(fieldName[0]) + fieldName.Substring(1), BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(prop, $"FutOptDailyResponse should have {fieldName} property");
+        }
+    }
+
     // ========== Integration Response Tests ==========
 
     [TestMethod]
