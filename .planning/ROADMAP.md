@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Node.js Binding Enhancement** - Upgrade to napi-rs 3.6+ with TypeScript improvements ✓
 - [x] **Phase 4: C# Binding Replacement** - Migrate from UniFFI to csbindgen with Task async ✓
 - [x] **Phase 4.1: UniFFI Migration** - Unified FFI architecture for multi-language maintenance (INSERTED) ✓
+- [ ] **Phase 4.2: Java Binding via UniFFI** - Generate Java bindings using uniffi-bindgen-java with CompletableFuture async (INSERTED)
 - [ ] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet
 - [ ] **Phase 6: Testing & Production Readiness** - Comprehensive API compatibility and integration testing
 
@@ -111,6 +112,23 @@ Plans:
 - [x] 04.1-05-PLAN.md — Generate Go bindings with channel wrapper ✓
 - [x] 04.1-06-PLAN.md — Cleanup old cs/ crate and add tests/CI ✓
 
+### Phase 4.2: Java Binding via UniFFI (INSERTED)
+**Goal**: Generate Java bindings using uniffi-bindgen-java with idiomatic Java async patterns (CompletableFuture)
+**Depends on**: Phase 4.1 (UniFFI infrastructure already established)
+**Requirements**: JAVA-01, JAVA-02, JAVA-03
+**Success Criteria** (what must be TRUE):
+  1. Java binding generated via uniffi-bindgen-java from existing UniFFI proc-macro interface
+  2. REST client methods return CompletableFuture<T> for async operations (not Kotlin coroutines)
+  3. WebSocket streaming uses Java callback interface implementing WebSocketListener trait
+  4. Java wrapper provides idiomatic API with proper exception handling (FugleException hierarchy)
+  5. Tests validate structural correctness and integration with native library
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04.2-01-PLAN.md — Install uniffi-bindgen-java and create Gradle project
+- [ ] 04.2-02-PLAN.md — Create wrapper with builder pattern and exception hierarchy
+- [ ] 04.2-03-PLAN.md — Add WebSocket wrapper, tests, and CI workflow
+
 ### Phase 5: Cross-Platform Distribution
 **Goal**: Automate package publishing with platform-specific builds for PyPI, npm, and NuGet registries
 **Depends on**: Phase 4.1 (UniFFI bindings must be complete before distribution)
@@ -142,10 +160,10 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 4.2 → 5 → 6
 
 Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
-Note: Phase 4.1 is an inserted phase to migrate to UniFFI before distribution.
+Note: Phase 4.1 and 4.2 are inserted phases to complete UniFFI bindings before distribution.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -154,5 +172,6 @@ Note: Phase 4.1 is an inserted phase to migrate to UniFFI before distribution.
 | 3. Node.js Binding | 4/4 | Complete ✓ | 2026-01-31 |
 | 4. C# Binding | 5/5 | Complete ✓ | 2026-01-31 |
 | 4.1 UniFFI Migration | 6/6 | Complete ✓ | 2026-01-31 |
+| 4.2 Java Binding | 0/3 | Not started | - |
 | 5. Distribution | 0/TBD | Not started | - |
 | 6. Testing | 0/TBD | Not started | - |

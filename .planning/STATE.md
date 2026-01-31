@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 4.1 Complete - Ready for Phase 5 (Distribution)
+**Current focus:** Phase 4.1 Complete - Ready for Phase 4.2 (Java Binding)
 
 ## Current Position
 
@@ -14,7 +14,7 @@ Plan: 6 of 6 in current phase - COMPLETE
 Status: Phase 4.1 complete - All UniFFI bindings validated with tests and CI
 Last activity: 2026-01-31 - Completed 04.1-06-PLAN.md (Testing and Cleanup)
 
-Progress: [████████░░] 85% (~23 of 27 plans complete)
+Progress: [████████░░] 82% (~23 of 28+ plans complete)
 
 ## Performance Metrics
 
@@ -126,6 +126,11 @@ Recent decisions affecting current work:
   - Result: Successfully consolidated binding generation for C# and Go
   - PyO3 and napi-rs preserved for Python and Node.js (more mature, language-idiomatic)
   - csbindgen removed (replaced by UniFFI for C#)
+- Phase 4.2 inserted after Phase 4.1: Java Binding via UniFFI (INSERTED)
+  - uniffi-bindgen-java (IronCore Labs) provides Java binding generation
+  - Uses CompletableFuture instead of Kotlin coroutines for async
+  - Follows same pattern as C# and Go bindings
+  - Inserted before Distribution to complete all UniFFI bindings together
 
 ### Pending Todos
 
@@ -175,4 +180,4 @@ Recent decisions affecting current work:
 Last session: 2026-01-31
 Stopped at: Completed 04.1-06-PLAN.md (Testing and Cleanup)
 Resume file: N/A
-Next: Phase 5 - Distribution
+Next: Phase 4.2 - Java Binding via UniFFI
