@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Python Binding Enhancement** - Upgrade to PyO3 0.27+ with full async support ✓
 - [x] **Phase 3: Node.js Binding Enhancement** - Upgrade to napi-rs 3.6+ with TypeScript improvements ✓
 - [x] **Phase 4: C# Binding Replacement** - Migrate from UniFFI to csbindgen with Task async ✓
+- [ ] **Phase 4.1: UniFFI Migration** - Unified FFI architecture for multi-language maintenance (INSERTED)
 - [ ] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet
 - [ ] **Phase 6: Testing & Production Readiness** - Comprehensive API compatibility and integration testing
 
@@ -90,9 +91,29 @@ Plans:
 - [x] 04-04-PLAN.md — Create C# project with models, exceptions, and RestClient ✓
 - [x] 04-05-PLAN.md — Create WebSocketClient wrapper and test suite ✓
 
+### Phase 4.1: UniFFI Migration (INSERTED)
+**Goal**: Migrate C# binding from csbindgen to UniFFI and add Go binding for unified multi-language FFI maintenance
+**Depends on**: Phase 4 (existing bindings provide reference implementation)
+**Requirements**: UNIFFI-01, UNIFFI-02, UNIFFI-03
+**Success Criteria** (what must be TRUE):
+  1. Single UDL file defines all SDK APIs (REST client, WebSocket client, models, errors)
+  2. C# binding generated via uniffi-bindgen-cs maintains API compatibility with Phase 4 implementation
+  3. Go binding generated via uniffi-bindgen-go provides new language support with consistent API
+  4. Async operations work correctly across generated bindings (C# Task, Go goroutines)
+  5. Python (PyO3) and Node.js (napi-rs) bindings remain unchanged
+**Plans**: 6 plans
+
+Plans:
+- [ ] 04.1-01-PLAN.md — Define typed UDL with model dictionaries and error enum
+- [ ] 04.1-02-PLAN.md — Implement REST client with typed async returns
+- [ ] 04.1-03-PLAN.md — Implement WebSocket with foreign trait callbacks
+- [ ] 04.1-04-PLAN.md — Generate C# bindings and create thin wrapper
+- [ ] 04.1-05-PLAN.md — Generate Go bindings with channel wrapper
+- [ ] 04.1-06-PLAN.md — Cleanup old cs/ crate and add tests/CI
+
 ### Phase 5: Cross-Platform Distribution
 **Goal**: Automate package publishing with platform-specific builds for PyPI, npm, and NuGet registries
-**Depends on**: Phase 2, Phase 3, Phase 4 (all bindings must be complete before distribution)
+**Depends on**: Phase 4.1 (UniFFI bindings must be complete before distribution)
 **Requirements**: PY-05, JS-05, CS-04, BUILD-02 (cross-platform builds)
 **Success Criteria** (what must be TRUE):
   1. Python users can `pip install fugle-marketdata` on Linux (x86_64, aarch64), macOS (universal2), and Windows without requiring Rust toolchain
@@ -121,9 +142,10 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6
 
 Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
+Note: Phase 4.1 is an inserted phase to migrate to UniFFI before distribution.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -131,5 +153,6 @@ Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 | 2. Python Binding | 5/5 | Complete ✓ | 2026-01-31 |
 | 3. Node.js Binding | 4/4 | Complete ✓ | 2026-01-31 |
 | 4. C# Binding | 5/5 | Complete ✓ | 2026-01-31 |
+| 4.1 UniFFI Migration | 0/6 | Ready for execution | - |
 | 5. Distribution | 0/TBD | Not started | - |
 | 6. Testing | 0/TBD | Not started | - |
