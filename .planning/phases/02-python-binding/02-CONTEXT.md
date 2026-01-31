@@ -1,52 +1,51 @@
 # Phase 2: Python Binding Enhancement - Context
 
-**Gathered:** 2026-01-31
+**Gathered:** 2026-02-01
 **Status:** Ready for planning
 
 <domain>
 ## Phase Boundary
 
-Modernize Python binding to PyO3 0.27+ with native asyncio support and full API compatibility with fugle-marketdata-python. Python users can use async/await syntax, see full IDE autocomplete, and replace `import fugle_marketdata` without changing method calls.
+Modify Python binding constructors to accept kwargs (matching official Fugle SDK), expose WebSocket configuration options as flat kwargs, and add authentication validation. This phase does NOT add new API endpoints or change WebSocket subscribe() signatures.
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### Async API design
-- Async-only API (no sync wrappers) — market data is inherently real-time, matches official SDK patterns
-- Rate limiting: Configurable auto-retry with exponential backoff (default enabled, can be disabled for manual handling)
+### Constructor Style
+- **Kwargs only** — `RestClient(api_key='...')` or `RestClient(bearer_token='...')`
+- **No positional arguments** — matches official Fugle Python SDK pattern
+- **Remove static methods** — `with_bearer_token()` and `with_sdk_token()` are removed entirely (not deprecated)
+- **Pure kwargs, no Options object** — no `ClientOptions` dataclass; just individual kwargs
 
-### Module & import structure
-- Match official SDK import paths exactly: `from fugle_marketdata import RestClient, WebSocketClient`
-- Drop-in replacement goal: existing code should work by changing only the pip package name
+### Error Messages
+- **Detailed with examples** — Include valid usage example in error message
+  - e.g., `"Must provide exactly one of: api_key, bearer_token, or sdk_token. Example: RestClient(api_key='...')"`
+- **ValueError for auth errors** — Standard Python exception for invalid arguments
+- **English only** — No i18n; consistent with most Python libraries
+- **Fail at construction time** — Invalid config raises immediately, not at connect()
 
-### WebSocket streaming pattern
-- Support BOTH async iterator (`async for msg in ws.subscribe(...)`) AND callback patterns (`ws.on_message(handler)`)
-- Configurable auto-reconnect with exponential backoff (default enabled)
-- Queue subscription changes during disconnection, replay after reconnect
-- Parse errors: Skip malformed messages and continue streaming (resilient), but also emit error events for users who want visibility
-
-### Error handling & types
-- Full exception hierarchy: `FugleError` → `ApiError`, `AuthError`, `RateLimitError`, `ConnectionError`, `TimeoutError`, etc.
-- Response model fields use `Optional[T] = None` for explicit nullability where API can return null
+### Config Exposure Style
+- **Flat kwargs** — `WebSocketClient(api_key='...', reconnect_max_attempts=5, health_check_enabled=True)`
+- **Prefixed snake_case** — `reconnect_max_attempts`, `reconnect_initial_delay_ms`, `health_check_enabled`, `health_check_interval_ms`
+- **Milliseconds for time values** — `_ms` suffix, consistent with Rust core
+- **Read-only properties exposed** — Users can inspect config after construction via `ws_client.reconnect_max_attempts` etc.
 
 ### Claude's Discretion
-- Connection lifecycle management (context manager vs explicit connect/close — likely both)
-- Timeout behavior (client-level default + per-call override — likely both)
-- Types submodule organization and `__all__` exports (match official SDK structure)
-- py.typed marker and .pyi stub generation (follow PyO3 best practices)
-- API error response structure (structured object with code/message + raw response for debugging)
-- Response model mutability (frozen dataclasses preferred for safety)
+- Exact property names (as long as prefixed snake_case with `_ms` for time)
+- Type hints approach (runtime checking vs static only)
+- Whether to provide a `__repr__` showing config values
+- Test organization and fixtures
 
 </decisions>
 
 <specifics>
 ## Specific Ideas
 
-- "Match official SDK exactly" — import paths and method signatures should allow drop-in replacement
-- Both iterator and callback patterns for WebSocket to support different use cases
-- Resilient streaming that doesn't crash on malformed messages but still exposes errors
+- Official Fugle Python SDK already uses `RestClient(api_key='YOUR_API_KEY')` kwargs pattern — our change aligns with this
+- Static methods (`with_bearer_token`, `with_sdk_token`) are being removed, not deprecated — clean break
+- Config inspection via properties is useful for debugging connection issues
 
 </specifics>
 
@@ -60,4 +59,4 @@ None — discussion stayed within phase scope
 ---
 
 *Phase: 02-python-binding*
-*Context gathered: 2026-01-31*
+*Context gathered: 2026-02-01*
