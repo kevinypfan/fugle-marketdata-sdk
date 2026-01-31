@@ -38,7 +38,13 @@ A unified multi-language SDK for Fugle Market Data API, built on a Rust core wit
 
 ### Active
 
-(None — fresh requirements defined in next milestone)
+**Milestone v0.3.0: API Compatibility & Configuration**
+
+- [ ] Constructor accepts options object matching official SDK patterns (all languages)
+- [ ] Expose WebSocket reconnection config (max_attempts, initial_delay, max_delay)
+- [ ] Expose WebSocket health check config (enabled, interval, max_missed_pongs)
+- [ ] Expose REST client config (timeouts, retry behavior)
+- [ ] Documentation for all configuration options
 
 ### Out of Scope
 
@@ -93,4 +99,4 @@ A unified multi-language SDK for Fugle Market Data API, built on a Rust core wit
 | GitHub Packages for Java | Avoids Maven Central GPG signing complexity | ✓ Good |
 
 ---
-*Last updated: 2026-01-31 after v0.2.0 milestone*
+*Last updated: 2026-02-01 after v0.3.0 milestone start*

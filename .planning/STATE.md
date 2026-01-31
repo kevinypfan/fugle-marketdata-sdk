@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-31)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** v0.2.0 shipped — planning next milestone
+**Current focus:** v0.3.0 API Compatibility & Configuration
 
 ## Current Position
 
-Phase: N/A (milestone complete)
+Phase: N/A (defining requirements)
 Plan: N/A
-Status: Ready to plan next milestone
-Last activity: 2026-01-31 — Completed quick task 002 (add language usage docs)
+Status: Defining requirements
+Last activity: 2026-02-01 — Milestone v0.3.0 started
 
-Progress: v0.2.0 SHIPPED + quick task 002 complete
+Progress: Defining requirements for v0.3.0
 
 ## Milestone History
 
