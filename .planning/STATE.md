@@ -12,9 +12,9 @@ See: .planning/PROJECT.md (updated 2026-01-31)
 Phase: N/A (milestone complete)
 Plan: N/A
 Status: Ready to plan next milestone
-Last activity: 2026-01-31 — v0.2.0 milestone complete
+Last activity: 2026-01-31 — Completed quick task 002 (add language usage docs)
 
-Progress: v0.2.0 SHIPPED
+Progress: v0.2.0 SHIPPED + quick task 002 complete
 
 ## Milestone History
 
@@ -45,7 +45,7 @@ None — ready for next milestone.
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: v0.2.0 milestone complete
+Last session: 2026-01-31T16:22:15Z
+Stopped at: Completed quick task 002 (add language usage docs)
 Resume file: N/A
 Next: `/gsd:new-milestone` to start next milestone cycle
