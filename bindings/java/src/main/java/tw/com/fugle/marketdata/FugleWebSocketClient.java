@@ -91,7 +91,7 @@ public class FugleWebSocketClient implements AutoCloseable {
      */
     public CompletableFuture<Void> connect() {
         return webSocketClient.connect()
-                .exceptionally(FugleException::unwrap);
+                .exceptionally(e -> { throw FugleException.unwrap(e); });
     }
 
     /**
@@ -110,7 +110,7 @@ public class FugleWebSocketClient implements AutoCloseable {
         try {
             return webSocketClient.isConnected();
         } catch (Exception e) {
-            throw FugleException.from(e);
+            throw FugleException.unwrap(e);
         }
     }
 
@@ -124,7 +124,7 @@ public class FugleWebSocketClient implements AutoCloseable {
      */
     public CompletableFuture<Void> subscribe(String channel, String symbol) {
         return webSocketClient.subscribe(channel, symbol)
-                .exceptionally(FugleException::unwrap);
+                .exceptionally(e -> { throw FugleException.unwrap(e); });
     }
 
     /**
@@ -136,7 +136,7 @@ public class FugleWebSocketClient implements AutoCloseable {
      */
     public CompletableFuture<Void> unsubscribe(String channel, String symbol) {
         return webSocketClient.unsubscribe(channel, symbol)
-                .exceptionally(FugleException::unwrap);
+                .exceptionally(e -> { throw FugleException.unwrap(e); });
     }
 
     /**

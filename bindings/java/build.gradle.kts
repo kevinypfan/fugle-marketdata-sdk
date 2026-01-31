@@ -30,7 +30,7 @@ tasks.test {
 sourceSets {
     main {
         java {
-            srcDirs("src/main/java")
+            srcDirs("src/main/java", "examples")
         }
     }
 }
