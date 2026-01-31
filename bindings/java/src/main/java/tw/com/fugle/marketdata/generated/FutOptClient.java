@@ -108,6 +108,39 @@ public class FutOptClient implements AutoCloseable, FutOptClientInterface {
 
   
     /**
+     * Access historical data endpoints
+     */
+    @Override
+    public FutOptHistoricalClient historical()  {
+            try {
+                return FfiConverterTypeFutOptHistoricalClient.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_futoptclient_historical(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Access intraday (real-time) endpoints
      */
     @Override

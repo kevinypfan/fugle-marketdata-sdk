@@ -12,6 +12,11 @@ import com.sun.jna.ptr.*;
 public interface FutOptClientInterface {
     
     /**
+     * Access historical data endpoints
+     */
+    public FutOptHistoricalClient historical();
+    
+    /**
      * Access intraday (real-time) endpoints
      */
     public FutOptIntradayClient intraday();

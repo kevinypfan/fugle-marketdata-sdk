@@ -12,9 +12,29 @@ import com.sun.jna.ptr.*;
 public interface StockClientInterface {
     
     /**
+     * Access corporate actions endpoints
+     */
+    public StockCorporateActionsClient corporateActions();
+    
+    /**
+     * Access historical data endpoints
+     */
+    public StockHistoricalClient historical();
+    
+    /**
      * Access intraday (real-time) endpoints
      */
     public StockIntradayClient intraday();
+    
+    /**
+     * Access snapshot (market-wide) endpoints
+     */
+    public StockSnapshotClient snapshot();
+    
+    /**
+     * Access technical indicator endpoints
+     */
+    public StockTechnicalClient technical();
     
 }
 

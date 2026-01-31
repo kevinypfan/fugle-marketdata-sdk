@@ -108,6 +108,72 @@ public class StockClient implements AutoCloseable, StockClientInterface {
 
   
     /**
+     * Access corporate actions endpoints
+     */
+    @Override
+    public StockCorporateActionsClient corporateActions()  {
+            try {
+                return FfiConverterTypeStockCorporateActionsClient.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockclient_corporate_actions(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Access historical data endpoints
+     */
+    @Override
+    public StockHistoricalClient historical()  {
+            try {
+                return FfiConverterTypeStockHistoricalClient.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockclient_historical(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Access intraday (real-time) endpoints
      */
     @Override
@@ -120,6 +186,72 @@ public class StockClient implements AutoCloseable, StockClientInterface {
             return
     UniffiHelpers.uniffiRustCall( _status -> {
         return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockclient_intraday(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Access snapshot (market-wide) endpoints
+     */
+    @Override
+    public StockSnapshotClient snapshot()  {
+            try {
+                return FfiConverterTypeStockSnapshotClient.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockclient_snapshot(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Access technical indicator endpoints
+     */
+    @Override
+    public StockTechnicalClient technical()  {
+            try {
+                return FfiConverterTypeStockTechnicalClient.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockclient_technical(
             it, _status);
     });
     

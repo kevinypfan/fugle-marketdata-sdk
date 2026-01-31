@@ -43,7 +43,22 @@ final class NamespaceLibrary {
     if (lib.uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_endpoint() != ((short) 15148)) {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_futoptclient_historical() != ((short) 18194)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
     if (lib.uniffi_marketdata_uniffi_checksum_method_futoptclient_intraday() != ((short) 43120)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_futopthistoricalclient_candles_sync() != ((short) 56503)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_futopthistoricalclient_daily_sync() != ((short) 10493)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_futopthistoricalclient_get_candles() != ((short) 14488)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_futopthistoricalclient_get_daily() != ((short) 41351)) {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (lib.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_products() != ((short) 61510)) {
@@ -70,7 +85,49 @@ final class NamespaceLibrary {
     if (lib.uniffi_marketdata_uniffi_checksum_method_restclient_stock() != ((short) 18733)) {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockclient_corporate_actions() != ((short) 38783)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockclient_historical() != ((short) 45578)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
     if (lib.uniffi_marketdata_uniffi_checksum_method_stockclient_intraday() != ((short) 53228)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockclient_snapshot() != ((short) 49856)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockclient_technical() != ((short) 10974)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_capital_changes_sync() != ((short) 38225)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_dividends_sync() != ((short) 26469)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_get_capital_changes() != ((short) 34953)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_get_dividends() != ((short) 30186)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_get_listing_applicants() != ((short) 41091)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockcorporateactionsclient_listing_applicants_sync() != ((short) 19487)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockhistoricalclient_candles_sync() != ((short) 58660)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockhistoricalclient_get_candles() != ((short) 18842)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockhistoricalclient_get_stats() != ((short) 19930)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stockhistoricalclient_stats_sync() != ((short) 25283)) {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (lib.uniffi_marketdata_uniffi_checksum_method_stockintradayclient_candles_sync() != ((short) 10535)) {
@@ -101,6 +158,54 @@ final class NamespaceLibrary {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (lib.uniffi_marketdata_uniffi_checksum_method_stockintradayclient_volumes_sync() != ((short) 8850)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_actives_sync() != ((short) 45448)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_get_actives() != ((short) 31681)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_get_movers() != ((short) 54795)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_get_quotes() != ((short) 5150)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_movers_sync() != ((short) 38625)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocksnapshotclient_quotes_sync() != ((short) 7562)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_bb_sync() != ((short) 50012)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_get_bb() != ((short) 28523)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_get_kdj() != ((short) 47666)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_get_macd() != ((short) 17293)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_get_rsi() != ((short) 23780)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_get_sma() != ((short) 37856)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_kdj_sync() != ((short) 58302)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_macd_sync() != ((short) 32247)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_rsi_sync() != ((short) 6527)) {
+        throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (lib.uniffi_marketdata_uniffi_checksum_method_stocktechnicalclient_sma_sync() != ((short) 18246)) {
         throw new RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (lib.uniffi_marketdata_uniffi_checksum_method_websocketclient_connect() != ((short) 52173)) {
