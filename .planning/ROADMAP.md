@@ -47,11 +47,12 @@ Plans:
 
 **Requirements addressed:** API-01, API-02, API-03, API-04, API-05, WS-01 to WS-06, TEST-01, TEST-02
 
-### Phase 3: Node.js Binding Enhancement
+### Phase 3: Node.js Binding Enhancement ✓
 
 **Goal**: Add options-based constructor and config exposure to Node.js binding
+**Status**: Complete (2026-01-31)
 **Depends on**: Phase 1
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 4 plans
 
 **Delivers:**
 - `WebSocketOptions` napi object with nested config types
