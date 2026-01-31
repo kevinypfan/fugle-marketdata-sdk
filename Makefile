@@ -1,4 +1,4 @@
-.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-bindings gen-csharp gen-go build-csharp build-go test test-python test-nodejs test-csharp test-go
+.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-bindings gen-csharp gen-go gen-java build-csharp build-go build-java test test-python test-nodejs test-csharp test-go test-java
 
 # Default: Build all bindings in order (Python -> Node.js -> C#)
 all: python-release nodejs-release csharp-release
@@ -30,8 +30,8 @@ csharp-dev:
 csharp-release:
 	cargo build -p marketdata-uniffi --release
 
-# Generate all bindings (C# and Go)
-gen-bindings: gen-csharp gen-go
+# Generate all bindings (C#, Go, and Java)
+gen-bindings: gen-csharp gen-go gen-java
 
 # Generate C# bindings from UniFFI (library mode - proc-macro approach)
 # Post-processes generated file to make types public for consumer access
@@ -58,6 +58,19 @@ gen-go:
 	mv bindings/go/tmp/marketdata_uniffi/* bindings/go/marketdata/
 	rmdir bindings/go/tmp/marketdata_uniffi bindings/go/tmp
 
+# ============================================================
+# Java Bindings (via UniFFI)
+# ============================================================
+
+# Generate Java bindings from UniFFI (library mode - proc-macro approach)
+gen-java:
+	cargo build -p marketdata-uniffi --release
+	mkdir -p bindings/java/src/main/java
+	uniffi-bindgen-java generate --library target/release/libmarketdata_uniffi.dylib \
+		--out-dir bindings/java/src/main/java \
+		--crate marketdata_uniffi \
+		--config uniffi/uniffi.toml
+
 # Build C# project after generating bindings
 build-csharp: gen-csharp
 	dotnet build bindings/csharp/FugleMarketData.sln
@@ -65,6 +78,10 @@ build-csharp: gen-csharp
 # Build Go module after generating bindings
 build-go: gen-go
 	cd bindings/go/marketdata && CGO_ENABLED=1 go build .
+
+# Build Java project after generating bindings
+build-java: gen-java
+	cd bindings/java && ./gradlew compileJava
 
 # ============================================================
 # Testing
@@ -83,6 +100,9 @@ test-csharp:
 
 test-go:
 	cd bindings/go/marketdata && CGO_ENABLED=1 go test -v -short .
+
+test-java:
+	cd bindings/java && ./gradlew test
 
 # ============================================================
 # Workspace Operations
@@ -123,11 +143,13 @@ help:
 	@echo "  make nodejs-release   - Build Node.js binding (release)"
 	@echo "  make csharp-dev       - Build C# binding (dev)"
 	@echo "  make csharp-release   - Build C# binding (release)"
-	@echo "  make gen-bindings     - Generate all UniFFI bindings (C# + Go)"
+	@echo "  make gen-bindings     - Generate all UniFFI bindings (C# + Go + Java)"
 	@echo "  make gen-csharp       - Generate C# bindings from UniFFI"
 	@echo "  make gen-go           - Generate Go bindings from UniFFI"
+	@echo "  make gen-java         - Generate Java bindings from UniFFI"
 	@echo "  make build-csharp     - Build C# project"
 	@echo "  make build-go         - Build Go module"
+	@echo "  make build-java       - Build Java project"
 	@echo ""
 	@echo "Test targets:"
 	@echo "  make test             - Run all tests"
@@ -135,6 +157,7 @@ help:
 	@echo "  make test-nodejs      - Run Node.js tests"
 	@echo "  make test-csharp      - Run C# tests"
 	@echo "  make test-go          - Run Go tests"
+	@echo "  make test-java        - Run Java tests"
 	@echo ""
 	@echo "Workspace targets:"
 	@echo "  make check            - Check workspace (fast)"
