@@ -1277,7 +1277,9 @@ mod tests {
             ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
         let reconnection_config = ReconnectionConfig::default()
             .with_max_attempts(10)
-            .with_initial_delay(Duration::from_secs(2));
+            .unwrap()
+            .with_initial_delay(Duration::from_secs(2))
+            .unwrap();
 
         let client = WebSocketClient::with_reconnection_config(config, reconnection_config);
 

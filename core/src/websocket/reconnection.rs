@@ -231,8 +231,11 @@ mod tests {
     fn test_reconnection_config_builder() {
         let config = ReconnectionConfig::default()
             .with_max_attempts(10)
+            .unwrap()
             .with_initial_delay(Duration::from_secs(2))
-            .with_max_delay(Duration::from_secs(120));
+            .unwrap()
+            .with_max_delay(Duration::from_secs(120))
+            .unwrap();
 
         assert_eq!(config.max_attempts, 10);
         assert_eq!(config.initial_delay, Duration::from_secs(2));
@@ -344,7 +347,7 @@ mod tests {
 
     #[test]
     fn test_max_attempts_reached() {
-        let config = ReconnectionConfig::default().with_max_attempts(3);
+        let config = ReconnectionConfig::default().with_max_attempts(3).unwrap();
         let mut manager = ReconnectionManager::new(config);
 
         // Get 3 delays
@@ -359,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_attempts_remaining() {
-        let config = ReconnectionConfig::default().with_max_attempts(5);
+        let config = ReconnectionConfig::default().with_max_attempts(5).unwrap();
         let mut manager = ReconnectionManager::new(config);
 
         assert_eq!(manager.attempts_remaining(), 5);
@@ -369,5 +372,103 @@ mod tests {
 
         let _ = manager.next_delay();
         assert_eq!(manager.attempts_remaining(), 3);
+    }
+
+    #[test]
+    fn test_reconnection_config_default_uses_constants() {
+        let config = ReconnectionConfig::default();
+        assert_eq!(config.max_attempts, DEFAULT_MAX_ATTEMPTS);
+        assert_eq!(
+            config.initial_delay,
+            Duration::from_millis(DEFAULT_INITIAL_DELAY_MS)
+        );
+        assert_eq!(
+            config.max_delay,
+            Duration::from_millis(DEFAULT_MAX_DELAY_MS)
+        );
+    }
+
+    #[test]
+    fn test_new_rejects_zero_max_attempts() {
+        let result = ReconnectionConfig::new(0, Duration::from_secs(1), Duration::from_secs(60));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("max_attempts"),
+            "Error should mention field name: {}",
+            err
+        );
+        assert!(
+            err.contains(">= 1") || err.contains("must be"),
+            "Error should mention constraint: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_new_rejects_too_small_initial_delay() {
+        let result = ReconnectionConfig::new(5, Duration::from_millis(50), Duration::from_secs(60));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("initial_delay"),
+            "Error should mention field name: {}",
+            err
+        );
+        assert!(
+            err.contains("100ms") || err.contains("50ms"),
+            "Error should show values: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_new_rejects_max_delay_less_than_initial() {
+        let result = ReconnectionConfig::new(5, Duration::from_secs(10), Duration::from_secs(5));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("max_delay"),
+            "Error should mention field name: {}",
+            err
+        );
+        assert!(
+            err.contains("initial_delay"),
+            "Error should mention constraint relationship: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_new_accepts_valid_config() {
+        let result =
+            ReconnectionConfig::new(3, Duration::from_millis(500), Duration::from_secs(30));
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        assert_eq!(config.max_attempts, 3);
+        assert_eq!(config.initial_delay, Duration::from_millis(500));
+        assert_eq!(config.max_delay, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_builder_rejects_zero_max_attempts() {
+        let result = ReconnectionConfig::default().with_max_attempts(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_rejects_too_small_initial_delay() {
+        let result = ReconnectionConfig::default().with_initial_delay(Duration::from_millis(50));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_rejects_max_delay_less_than_initial() {
+        // First set a larger initial_delay, then try to set smaller max_delay
+        let config = ReconnectionConfig::default()
+            .with_initial_delay(Duration::from_secs(30))
+            .unwrap();
+        let result = config.with_max_delay(Duration::from_secs(10));
+        assert!(result.is_err());
     }
 }
