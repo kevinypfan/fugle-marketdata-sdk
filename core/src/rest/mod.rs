@@ -21,3 +21,4 @@ pub mod futopt;
 pub use auth::Auth;
 pub use client::{IntradayClient, RestClient, StockClient};
 pub use futopt::{FutOptClient, FutOptIntradayClient};
+pub use stock::snapshot::SnapshotClient;
