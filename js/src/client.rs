@@ -75,6 +75,38 @@ impl StockClient {
             inner: self.inner.clone(),
         }
     }
+
+    /// Get historical client for historical stock data
+    #[napi(getter)]
+    pub fn historical(&self) -> StockHistoricalClient {
+        StockHistoricalClient {
+            inner: self.inner.clone(),
+        }
+    }
+
+    /// Get snapshot client for market-wide data
+    #[napi(getter)]
+    pub fn snapshot(&self) -> StockSnapshotClient {
+        StockSnapshotClient {
+            inner: self.inner.clone(),
+        }
+    }
+
+    /// Get technical indicators client
+    #[napi(getter)]
+    pub fn technical(&self) -> StockTechnicalClient {
+        StockTechnicalClient {
+            inner: self.inner.clone(),
+        }
+    }
+
+    /// Get corporate actions client
+    #[napi(getter)]
+    pub fn corporate_actions(&self) -> StockCorporateActionsClient {
+        StockCorporateActionsClient {
+            inner: self.inner.clone(),
+        }
+    }
 }
 
 /// Stock intraday data client
@@ -208,6 +240,581 @@ impl StockIntradayClient {
     }
 }
 
+/// Stock historical data client
+#[napi]
+pub struct StockHistoricalClient {
+    inner: marketdata_core::RestClient,
+}
+
+#[napi]
+impl StockHistoricalClient {
+    /// Get historical candles for a stock symbol
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M", "1", "5", etc.)
+    /// @returns Promise resolving to historical candles data
+    #[napi(ts_return_type = "Promise<HistoricalCandlesResponse>")]
+    pub async fn candles(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let hist = stock.historical();
+            let mut builder = hist.candles().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get historical stats for a stock symbol
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @returns Promise resolving to historical stats data
+    #[napi(ts_return_type = "Promise<StatsResponse>")]
+    pub async fn stats(&self, symbol: String) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            inner.stock().historical().stats().symbol(&symbol).send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+}
+
+/// Stock snapshot data client
+#[napi]
+pub struct StockSnapshotClient {
+    inner: marketdata_core::RestClient,
+}
+
+#[napi]
+impl StockSnapshotClient {
+    /// Get snapshot quotes for a market
+    ///
+    /// @param market - Market code (e.g., "TSE", "OTC")
+    /// @param typeFilter - Optional type filter (e.g., "ALL", "COMMONSTOCK")
+    /// @returns Promise resolving to snapshot quotes data
+    #[napi(ts_return_type = "Promise<SnapshotQuotesResponse>")]
+    pub async fn quotes(&self, market: String, type_filter: Option<String>) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let snap = stock.snapshot();
+            let mut builder = snap.quotes().market(&market);
+            if let Some(tf) = type_filter {
+                builder = builder.type_filter(&tf);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get movers (top gainers/losers) for a market
+    ///
+    /// @param market - Market code (e.g., "TSE", "OTC")
+    /// @param direction - Direction filter ("up" or "down")
+    /// @param change - Change type ("percent" or "value")
+    /// @returns Promise resolving to movers data
+    #[napi(ts_return_type = "Promise<MoversResponse>")]
+    pub async fn movers(
+        &self,
+        market: String,
+        direction: Option<String>,
+        change: Option<String>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let snap = stock.snapshot();
+            let mut builder = snap.movers().market(&market);
+            if let Some(d) = direction {
+                builder = builder.direction(&d);
+            }
+            if let Some(c) = change {
+                builder = builder.change(&c);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get most actively traded stocks for a market
+    ///
+    /// @param market - Market code (e.g., "TSE", "OTC")
+    /// @param trade - Trade type filter ("volume" or "value")
+    /// @returns Promise resolving to actives data
+    #[napi(ts_return_type = "Promise<ActivesResponse>")]
+    pub async fn actives(&self, market: String, trade: Option<String>) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let snap = stock.snapshot();
+            let mut builder = snap.actives().market(&market);
+            if let Some(t) = trade {
+                builder = builder.trade(&t);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+}
+
+/// Stock technical indicators client
+#[napi]
+pub struct StockTechnicalClient {
+    inner: marketdata_core::RestClient,
+}
+
+#[napi]
+impl StockTechnicalClient {
+    /// Get SMA (Simple Moving Average) for a stock
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M")
+    /// @param period - SMA period (e.g., 20)
+    /// @returns Promise resolving to SMA data
+    #[napi(ts_return_type = "Promise<SmaResponse>")]
+    pub async fn sma(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let tech = stock.technical();
+            let mut builder = tech.sma().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(p) = period {
+                builder = builder.period(p);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get RSI (Relative Strength Index) for a stock
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M")
+    /// @param period - RSI period (e.g., 14)
+    /// @returns Promise resolving to RSI data
+    #[napi(ts_return_type = "Promise<RsiResponse>")]
+    pub async fn rsi(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let tech = stock.technical();
+            let mut builder = tech.rsi().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(p) = period {
+                builder = builder.period(p);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get KDJ (Stochastic Oscillator) for a stock
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M")
+    /// @param period - KDJ period (e.g., 9)
+    /// @returns Promise resolving to KDJ data
+    #[napi(ts_return_type = "Promise<KdjResponse>")]
+    pub async fn kdj(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let tech = stock.technical();
+            let mut builder = tech.kdj().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(p) = period {
+                builder = builder.period(p);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get MACD (Moving Average Convergence Divergence) for a stock
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M")
+    /// @param fast - Fast EMA period (default: 12)
+    /// @param slow - Slow EMA period (default: 26)
+    /// @param signal - Signal line period (default: 9)
+    /// @returns Promise resolving to MACD data
+    #[napi(ts_return_type = "Promise<MacdResponse>")]
+    pub async fn macd(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        fast: Option<u32>,
+        slow: Option<u32>,
+        signal: Option<u32>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let tech = stock.technical();
+            let mut builder = tech.macd().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(f) = fast {
+                builder = builder.fast(f);
+            }
+            if let Some(s) = slow {
+                builder = builder.slow(s);
+            }
+            if let Some(s) = signal {
+                builder = builder.signal(s);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get Bollinger Bands for a stock
+    ///
+    /// @param symbol - Stock symbol (e.g., "2330")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M")
+    /// @param period - SMA period (default: 20)
+    /// @param stddev - Standard deviation multiplier (default: 2.0)
+    /// @returns Promise resolving to Bollinger Bands data
+    #[napi(ts_return_type = "Promise<BbResponse>")]
+    pub async fn bb(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+        stddev: Option<f64>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let tech = stock.technical();
+            let mut builder = tech.bb().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(p) = period {
+                builder = builder.period(p);
+            }
+            if let Some(s) = stddev {
+                builder = builder.stddev(s);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+}
+
+/// Stock corporate actions client
+#[napi]
+pub struct StockCorporateActionsClient {
+    inner: marketdata_core::RestClient,
+}
+
+#[napi]
+impl StockCorporateActionsClient {
+    /// Get capital changes (capital structure changes)
+    ///
+    /// @param date - Specific date (YYYY-MM-DD)
+    /// @param startDate - Start date for range query (YYYY-MM-DD)
+    /// @param endDate - End date for range query (YYYY-MM-DD)
+    /// @returns Promise resolving to capital changes data
+    #[napi(ts_return_type = "Promise<CapitalChangesResponse>")]
+    pub async fn capital_changes(
+        &self,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let ca = stock.corporate_actions();
+            let mut builder = ca.capital_changes();
+            if let Some(d) = date {
+                builder = builder.date(&d);
+            }
+            if let Some(sd) = start_date {
+                builder = builder.start_date(&sd);
+            }
+            if let Some(ed) = end_date {
+                builder = builder.end_date(&ed);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get dividend announcements
+    ///
+    /// @param date - Specific date (YYYY-MM-DD)
+    /// @param startDate - Start date for range query (YYYY-MM-DD)
+    /// @param endDate - End date for range query (YYYY-MM-DD)
+    /// @returns Promise resolving to dividends data
+    #[napi(ts_return_type = "Promise<DividendsResponse>")]
+    pub async fn dividends(
+        &self,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let ca = stock.corporate_actions();
+            let mut builder = ca.dividends();
+            if let Some(d) = date {
+                builder = builder.date(&d);
+            }
+            if let Some(sd) = start_date {
+                builder = builder.start_date(&sd);
+            }
+            if let Some(ed) = end_date {
+                builder = builder.end_date(&ed);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get IPO listing applicants
+    ///
+    /// @param date - Specific date (YYYY-MM-DD)
+    /// @param startDate - Start date for range query (YYYY-MM-DD)
+    /// @param endDate - End date for range query (YYYY-MM-DD)
+    /// @returns Promise resolving to listing applicants data
+    #[napi(ts_return_type = "Promise<ListingApplicantsResponse>")]
+    pub async fn listing_applicants(
+        &self,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let ca = stock.corporate_actions();
+            let mut builder = ca.listing_applicants();
+            if let Some(d) = date {
+                builder = builder.date(&d);
+            }
+            if let Some(sd) = start_date {
+                builder = builder.start_date(&sd);
+            }
+            if let Some(ed) = end_date {
+                builder = builder.end_date(&ed);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+}
+
 /// Futures and Options market data client
 #[napi]
 pub struct FutOptClient {
@@ -220,6 +827,14 @@ impl FutOptClient {
     #[napi(getter)]
     pub fn intraday(&self) -> FutOptIntradayClient {
         FutOptIntradayClient {
+            inner: self.inner.clone(),
+        }
+    }
+
+    /// Get historical client for historical futures/options data
+    #[napi(getter)]
+    pub fn historical(&self) -> FutOptHistoricalClient {
+        FutOptHistoricalClient {
             inner: self.inner.clone(),
         }
     }
@@ -414,6 +1029,106 @@ impl FutOptIntradayClient {
     }
 }
 
+/// FutOpt historical data client
+#[napi]
+pub struct FutOptHistoricalClient {
+    inner: marketdata_core::RestClient,
+}
+
+#[napi]
+impl FutOptHistoricalClient {
+    /// Get historical candles for a futures/options contract
+    ///
+    /// @param symbol - Contract symbol (e.g., "TXFC4")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param timeframe - Timeframe ("D", "W", "M", "1", "5", etc.)
+    /// @param afterHours - Include after-hours data
+    /// @returns Promise resolving to historical candles data
+    #[napi(ts_return_type = "Promise<FutOptHistoricalCandlesResponse>")]
+    pub async fn candles(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        timeframe: Option<String>,
+        after_hours: Option<bool>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let futopt = inner.futopt();
+            let hist = futopt.historical();
+            let mut builder = hist.candles().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(ah) = after_hours {
+                builder = builder.after_hours(ah);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get daily historical data for a futures/options contract
+    ///
+    /// @param symbol - Contract symbol (e.g., "TXFC4")
+    /// @param from - Start date (YYYY-MM-DD)
+    /// @param to - End date (YYYY-MM-DD)
+    /// @param afterHours - Include after-hours data
+    /// @returns Promise resolving to daily historical data
+    #[napi(ts_return_type = "Promise<FutOptDailyResponse>")]
+    pub async fn daily(
+        &self,
+        symbol: String,
+        from: Option<String>,
+        to: Option<String>,
+        after_hours: Option<bool>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let futopt = inner.futopt();
+            let hist = futopt.historical();
+            let mut builder = hist.daily().symbol(&symbol);
+            if let Some(f) = from {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to {
+                builder = builder.to(&t);
+            }
+            if let Some(ah) = after_hours {
+                builder = builder.after_hours(ah);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(data) => {
+                serde_json::to_value(&data).map_err(|e| napi::Error::from_reason(e.to_string()))
+            }
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,6 +1146,10 @@ mod tests {
         let client = RestClient::new("test-api-key".to_string());
         let stock = client.stock();
         let _intraday = stock.intraday();
+        let _historical = stock.historical();
+        let _snapshot = stock.snapshot();
+        let _technical = stock.technical();
+        let _corporate_actions = stock.corporate_actions();
     }
 
     #[test]
@@ -438,5 +1157,6 @@ mod tests {
         let client = RestClient::new("test-api-key".to_string());
         let futopt = client.futopt();
         let _intraday = futopt.intraday();
+        let _historical = futopt.historical();
     }
 }
