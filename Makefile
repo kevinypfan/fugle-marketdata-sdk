@@ -1,4 +1,4 @@
-.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-csharp gen-go test test-python test-nodejs test-csharp
+.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-bindings gen-csharp gen-go build-csharp build-go test test-python test-nodejs test-csharp test-go
 
 # Default: Build all bindings in order (Python -> Node.js -> C#)
 all: python-release nodejs-release csharp-release
@@ -30,6 +30,9 @@ csharp-dev:
 csharp-release:
 	cargo build -p marketdata-uniffi --release
 
+# Generate all bindings (C# and Go)
+gen-bindings: gen-csharp gen-go
+
 # Generate C# bindings from UniFFI (library mode - proc-macro approach)
 # Post-processes generated file to make types public for consumer access
 gen-csharp:
@@ -55,6 +58,14 @@ gen-go:
 	mv bindings/go/tmp/marketdata_uniffi/* bindings/go/marketdata/
 	rmdir bindings/go/tmp/marketdata_uniffi bindings/go/tmp
 
+# Build C# project after generating bindings
+build-csharp: gen-csharp
+	dotnet build bindings/csharp/FugleMarketData.sln
+
+# Build Go module after generating bindings
+build-go: gen-go
+	cd bindings/go/marketdata && CGO_ENABLED=1 go build .
+
 # ============================================================
 # Testing
 # ============================================================
@@ -68,6 +79,10 @@ test-nodejs:
 
 test-csharp:
 	cargo test -p marketdata-uniffi
+	@echo "Run C# tests with: dotnet test bindings/csharp/FugleMarketData.Tests/"
+
+test-go:
+	cd bindings/go/marketdata && CGO_ENABLED=1 go test -v -short .
 
 # ============================================================
 # Workspace Operations
@@ -108,14 +123,18 @@ help:
 	@echo "  make nodejs-release   - Build Node.js binding (release)"
 	@echo "  make csharp-dev       - Build C# binding (dev)"
 	@echo "  make csharp-release   - Build C# binding (release)"
+	@echo "  make gen-bindings     - Generate all UniFFI bindings (C# + Go)"
 	@echo "  make gen-csharp       - Generate C# bindings from UniFFI"
 	@echo "  make gen-go           - Generate Go bindings from UniFFI"
+	@echo "  make build-csharp     - Build C# project"
+	@echo "  make build-go         - Build Go module"
 	@echo ""
 	@echo "Test targets:"
 	@echo "  make test             - Run all tests"
 	@echo "  make test-python      - Run Python tests"
 	@echo "  make test-nodejs      - Run Node.js tests"
 	@echo "  make test-csharp      - Run C# tests"
+	@echo "  make test-go          - Run Go tests"
 	@echo ""
 	@echo "Workspace targets:"
 	@echo "  make check            - Check workspace (fast)"
