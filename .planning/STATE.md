@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 5 of 7 (Cross-Platform Distribution)
-Plan: 3 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-31 - Completed 05-03-PLAN.md (UniFFI Build Workflow)
+Last activity: 2026-01-31 - Completed 05-05-PLAN.md (Publish Workflows)
 
-Progress: [█████████░] 94% (~29 of 31 plans complete)
+Progress: [█████████░] 97% (~30 of 31 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
+- Total plans completed: 30
 - Average duration: 6 min
-- Total execution time: ~2.6 hours
+- Total execution time: ~2.65 hours
 
 **By Phase:**
 
@@ -33,11 +33,11 @@ Progress: [█████████░] 94% (~29 of 31 plans complete)
 | 04-csharp-binding | 5 | 19min | 4min |
 | 04.1-uniffi-migration | 6 | 36min | 6min |
 | 04.2-java-binding | 3 | 18min | 6min |
-| 05-distribution | 3 | 8min | 3min |
+| 05-distribution | 5 | 13min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 04.2-03 (5min), 05-01 (4min), 05-02 (2min), 05-03 (2min)
-- Trend: Fast execution for GitHub Actions workflow plans
+- Last 5 plans: 05-01 (4min), 05-02 (2min), 05-03 (2min), 05-05 (5min)
+- Trend: Fast execution for GitHub Actions workflow plans (~3min average)
 
 *Updated after each plan completion*
 
@@ -140,6 +140,9 @@ Recent decisions affecting current work:
 - **05-03:** Separate macOS ARM64 and x64 builds (no universal2 for cdylib)
 - **05-03:** RID naming convention (linux-x64, osx-arm64, osx-x64, win-x64) matches NuGet runtimes
 - **05-03:** Consolidation job creates unified uniffi-all artifact for downstream packaging
+- **05-05:** Java publishes to GitHub Packages (automatic GITHUB_TOKEN) instead of Maven Central (requires GPG signing)
+- **05-05:** NuGet uses API key with skip-duplicate for idempotent publishing
+- **05-05:** Native libraries bundled at build time into package artifacts
 
 ### Roadmap Evolution
 
@@ -205,6 +208,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-03-PLAN.md (UniFFI Build Workflow)
+Stopped at: Completed 05-05-PLAN.md (Publish Workflows)
 Resume file: N/A
-Next: 05-04-PLAN.md (C# NuGet Package)
+Next: 05-06-PLAN.md (Release Coordination)
