@@ -136,6 +136,152 @@ impl<'a> StockClient<'a> {
             client: self.client,
         }
     }
+
+    /// Access historical data endpoints
+    ///
+    /// # Example
+    /// ```
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let historical = client.stock().historical();
+    /// ```
+    pub fn historical(&self) -> HistoricalClient<'a> {
+        HistoricalClient {
+            client: self.client,
+        }
+    }
+
+    /// Access technical indicator endpoints
+    ///
+    /// # Example
+    /// ```
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let technical = client.stock().technical();
+    /// ```
+    pub fn technical(&self) -> crate::rest::stock::technical::TechnicalClient<'a> {
+        crate::rest::stock::technical::TechnicalClient::new(self.client)
+    }
+
+    /// Access snapshot endpoints for market-wide data
+    ///
+    /// # Example
+    /// ```
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let snapshot = client.stock().snapshot();
+    /// ```
+    pub fn snapshot(&self) -> crate::rest::stock::snapshot::SnapshotClient<'a> {
+        crate::rest::stock::snapshot::SnapshotClient::new(self.client)
+    }
+
+    /// Access corporate actions endpoints (capital changes, dividends, IPO listings)
+    ///
+    /// # Example
+    /// ```
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let corporate_actions = client.stock().corporate_actions();
+    /// ```
+    pub fn corporate_actions(&self) -> CorporateActionsClient<'a> {
+        CorporateActionsClient {
+            client: self.client,
+        }
+    }
+}
+
+/// Corporate actions endpoints client
+pub struct CorporateActionsClient<'a> {
+    client: &'a RestClient,
+}
+
+impl<'a> CorporateActionsClient<'a> {
+    /// Get capital structure changes
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let changes = client.stock().corporate_actions().capital_changes().send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn capital_changes(&self) -> crate::rest::stock::corporate_actions::CapitalChangesRequestBuilder {
+        crate::rest::stock::corporate_actions::CapitalChangesRequestBuilder::new(self.client)
+    }
+
+    /// Get dividend announcements
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let dividends = client.stock().corporate_actions().dividends().send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn dividends(&self) -> crate::rest::stock::corporate_actions::DividendsRequestBuilder {
+        crate::rest::stock::corporate_actions::DividendsRequestBuilder::new(self.client)
+    }
+
+    /// Get IPO listing applicants
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let applicants = client.stock().corporate_actions().listing_applicants().send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn listing_applicants(&self) -> crate::rest::stock::corporate_actions::ListingApplicantsRequestBuilder {
+        crate::rest::stock::corporate_actions::ListingApplicantsRequestBuilder::new(self.client)
+    }
+}
+
+/// Historical data endpoints client
+pub struct HistoricalClient<'a> {
+    client: &'a RestClient,
+}
+
+impl<'a> HistoricalClient<'a> {
+    /// Get historical candles for a symbol
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let candles = client.stock().historical().candles()
+    ///     .symbol("2330")
+    ///     .from("2024-01-01")
+    ///     .to("2024-01-31")
+    ///     .send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn candles(&self) -> crate::rest::stock::historical::HistoricalCandlesRequestBuilder {
+        crate::rest::stock::historical::HistoricalCandlesRequestBuilder::new(self.client)
+    }
+
+    /// Get historical stats for a symbol
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let stats = client.stock().historical().stats()
+    ///     .symbol("2330")
+    ///     .send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn stats(&self) -> crate::rest::stock::historical::StatsRequestBuilder {
+        crate::rest::stock::historical::StatsRequestBuilder::new(self.client)
+    }
 }
 
 /// Intraday (real-time) endpoints client
@@ -322,5 +468,21 @@ mod tests {
         // Both stock and futopt should be accessible from the same client
         let _stock = client.stock().intraday();
         let _futopt = client.futopt().intraday();
+    }
+
+    #[test]
+    fn test_corporate_actions_client_creation() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        let corporate_actions = client.stock().corporate_actions();
+        assert_eq!(corporate_actions.client.get_base_url(), "https://api.fugle.tw/marketdata/v1.0");
+    }
+
+    #[test]
+    fn test_corporate_actions_chained_access() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        // Test that all corporate actions endpoints are accessible
+        let _capital_changes = client.stock().corporate_actions().capital_changes();
+        let _dividends = client.stock().corporate_actions().dividends();
+        let _listing_applicants = client.stock().corporate_actions().listing_applicants();
     }
 }
