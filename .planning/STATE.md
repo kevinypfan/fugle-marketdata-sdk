@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 
 ## Current Position
 
-Phase: 6 of 6 (Testing and Production Readiness)
-Plan: 9 of 9 in current phase (PHASE COMPLETE)
-Status: MILESTONE COMPLETE
-Last activity: 2026-01-31 - Completed gap closure plans 06-07, 06-08, 06-09
+Phase: 7 of 7 (Complete REST API Coverage)
+Plan: 4 of 9 in current phase
+Status: Executing Wave 1
+Last activity: 2026-01-31 - Completed 07-04-PLAN.md (Stock Corporate Actions)
 
-Progress: [███████████] 100% (39 of 39 plans complete)
+Progress: [██████████░] 93% (43 of 48 plans complete)
 
 ## Performance Metrics
 
@@ -171,6 +171,9 @@ Recent decisions affecting current work:
 
 ### Roadmap Evolution
 
+- Phase 7 added: Complete REST API Coverage (17 missing endpoints)
+  - Stock: Historical (2), Snapshot (3), Technical (5), Corporate Actions (3), Tickers batch (1)
+  - FutOpt: Historical (2), Tickers batch (1)
 - Phase 4.1 inserted after Phase 4: UniFFI Migration (COMPLETE)
   - Result: Successfully consolidated binding generation for C# and Go
   - PyO3 and napi-rs preserved for Python and Node.js (more mature, language-idiomatic)
@@ -244,9 +247,18 @@ Recent decisions affecting current work:
 - COMPLETE: Performance baselines for benchmark comparison
 - VERIFIED: All 4 success criteria pass in VERIFICATION.md
 
+**Phase 7 (Complete REST API Coverage):**
+- IN PROGRESS: Wave 1 execution
+- 07-01: Stock Historical endpoints (candles, stats) - COMPLETE
+- 07-02: Stock Snapshot endpoints (quotes, movers, actives) - COMPLETE
+- 07-03: Stock Technical Indicators (SMA, RSI, KDJ, MACD, BB) - COMPLETE
+- 07-04: Stock Corporate Actions (capital-changes, dividends, listing-applicants) - COMPLETE
+- 07-05: FutOpt Historical endpoints - IN PROGRESS
+- 07-06 to 07-09: Remaining endpoints TBD
+
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed gap closure plans 06-07, 06-08, 06-09
+Stopped at: Completed 07-04-PLAN.md (Stock Corporate Actions)
 Resume file: N/A
-Next: MILESTONE COMPLETE - All phases verified, ready for release
+Next: Continue Wave 1 execution with 07-05
