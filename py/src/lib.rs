@@ -103,10 +103,15 @@ fn marketdata_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register stock client classes
     m.add_class::<client::StockClient>()?;
     m.add_class::<client::StockIntradayClient>()?;
+    m.add_class::<client::StockHistoricalClient>()?;
+    m.add_class::<client::StockSnapshotClient>()?;
+    m.add_class::<client::StockTechnicalClient>()?;
+    m.add_class::<client::StockCorporateActionsClient>()?;
 
     // Register futopt client classes
     m.add_class::<client::FutOptClient>()?;
     m.add_class::<client::FutOptIntradayClient>()?;
+    m.add_class::<client::FutOptHistoricalClient>()?;
 
     // Register WebSocket client classes
     m.add_class::<websocket::WebSocketClient>()?;
