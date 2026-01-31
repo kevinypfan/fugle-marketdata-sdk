@@ -14,12 +14,24 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+/// Default health check enabled state - aligns with official SDKs (CON-01)
+pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = false;
+
+/// Default health check interval in milliseconds (CON-01)
+pub const DEFAULT_HEALTH_CHECK_INTERVAL_MS: u64 = 30000;
+
+/// Default maximum missed pongs before disconnect (CON-01)
+pub const DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS: u64 = 2;
+
+/// Minimum allowed health check interval to prevent excessive overhead
+pub const MIN_HEALTH_CHECK_INTERVAL_MS: u64 = 5000;
+
 /// Configuration for WebSocket health check
 ///
 /// From CONTEXT.md: Default values align with production requirements
 #[derive(Debug, Clone)]
 pub struct HealthCheckConfig {
-    /// Whether health check is enabled (default: true)
+    /// Whether health check is enabled (default: false, aligned with official SDKs)
     pub enabled: bool,
     /// Interval between ping messages (default: 30 seconds)
     pub interval: Duration,
@@ -30,9 +42,9 @@ pub struct HealthCheckConfig {
 impl Default for HealthCheckConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
-            interval: Duration::from_secs(30),
-            max_missed_pongs: 2,
+            enabled: DEFAULT_HEALTH_CHECK_ENABLED,
+            interval: Duration::from_millis(DEFAULT_HEALTH_CHECK_INTERVAL_MS),
+            max_missed_pongs: DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS,
         }
     }
 }
