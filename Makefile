@@ -1,4 +1,4 @@
-.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-csharp test test-python test-nodejs test-csharp
+.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-csharp gen-go test test-python test-nodejs test-csharp
 
 # Default: Build all bindings in order (Python -> Node.js -> C#)
 all: python-release nodejs-release csharp-release
@@ -34,6 +34,18 @@ csharp-release:
 gen-csharp:
 	cargo build -p marketdata-uniffi --release
 	uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.dylib -o bindings/csharp/MarketdataUniffi/
+
+# ============================================================
+# Go Bindings (via UniFFI)
+# ============================================================
+
+# Generate Go bindings from UniFFI (library mode - proc-macro approach)
+gen-go:
+	cargo build -p marketdata-uniffi --release
+	mkdir -p bindings/go/marketdata
+	uniffi-bindgen-go --library target/release/libmarketdata_uniffi.dylib -o bindings/go/tmp/
+	mv bindings/go/tmp/marketdata_uniffi/* bindings/go/marketdata/
+	rmdir bindings/go/tmp/marketdata_uniffi bindings/go/tmp
 
 # ============================================================
 # Testing
@@ -89,6 +101,7 @@ help:
 	@echo "  make csharp-dev       - Build C# binding (dev)"
 	@echo "  make csharp-release   - Build C# binding (release)"
 	@echo "  make gen-csharp       - Generate C# bindings from UniFFI"
+	@echo "  make gen-go           - Generate Go bindings from UniFFI"
 	@echo ""
 	@echo "Test targets:"
 	@echo "  make test             - Run all tests"
