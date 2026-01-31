@@ -2,21 +2,21 @@
 
 **Status:** In Progress
 **Target:** Align constructor APIs with official Fugle SDKs, expose WebSocket configuration options
-**Phases:** 8
+**Phases:** 8-15 (continuing from v0.2.0)
 
 ## Overview
 
 Transform the SDK constructor APIs from positional string arguments to options object patterns matching the official Fugle Python and Node.js SDKs. Expose WebSocket reconnection and health check configuration through all 5 language bindings (Python, Node.js, C#, Java, Go).
 
-**Note:** Phases 2-4 delivered foundational binding upgrades (async patterns, type safety, new FFI). Phases 5-7 deliver the v0.3.0 configuration exposure work.
+**Note:** Phases 9-11 delivered foundational binding upgrades (async patterns, type safety, new FFI). Phases 12-14 deliver the v0.3.0 configuration exposure work.
 
 ## Phases
 
-### Phase 1: Core Config Validation & Defaults ✓
+### Phase 8: Core Config Validation & Defaults ✓
 
 **Goal**: Establish canonical defaults, add comprehensive validation, align with official SDKs
 **Status**: Complete (2026-02-01)
-**Depends on**: Nothing (first phase)
+**Depends on**: Nothing (first phase of v0.3.0)
 **Plans:** 2 plans
 
 **Delivers:**
@@ -29,10 +29,10 @@ Transform the SDK constructor APIs from positional string arguments to options o
 **Requirements addressed:** VAL-01, VAL-02, VAL-03, VAL-04, CON-01
 
 Plans:
-- [x] 01-01-PLAN.md — ReconnectionConfig validation & default constants
-- [x] 01-02-PLAN.md — HealthCheckConfig validation, default alignment & exports
+- [x] 08-01-PLAN.md — ReconnectionConfig validation & default constants
+- [x] 08-02-PLAN.md — HealthCheckConfig validation, default alignment & exports
 
-### Phase 2: Python Async Foundation ✓
+### Phase 9: Python Async Foundation ✓
 
 **Goal**: Modernize Python binding with PyO3 0.27+ and native asyncio support
 **Status**: Complete (2026-01-31)
@@ -48,12 +48,12 @@ Plans:
 - `ReconnectConfig` class (partial - not connected to core)
 - Static auth methods: `with_bearer_token()`, `with_sdk_token()`
 
-**NOT delivered (deferred to Phase 5):**
+**NOT delivered (deferred to Phase 12):**
 - Options-based constructor with kwargs
 - `HealthCheckConfig` exposure
 - WebSocket config parameter acceptance
 
-### Phase 3: Node.js TypeScript Foundation ✓
+### Phase 10: Node.js TypeScript Foundation ✓
 
 **Goal**: Upgrade Node.js binding with napi-rs 3.x and comprehensive TypeScript definitions
 **Status**: Complete (2026-01-31)
@@ -67,12 +67,12 @@ Plans:
 - TypeScript definitions (813 lines, no `any` types)
 - API-compatible with @fugle/marketdata structure
 
-**NOT delivered (deferred to Phase 6):**
+**NOT delivered (deferred to Phase 13):**
 - `WebSocketOptions`, `ReconnectOptions`, `HealthCheckOptions` types
 - Options-based constructor
 - Runtime validation for config
 
-### Phase 4: C# csbindgen Foundation ✓
+### Phase 11: C# csbindgen Foundation ✓
 
 **Goal**: Replace UniFFI with csbindgen for idiomatic .NET interop
 **Status**: Complete (2026-01-31)
@@ -86,15 +86,15 @@ Plans:
 - FFI panic handling with `catch_unwind`
 - PascalCase naming matching .NET conventions
 
-**NOT delivered (deferred to Phase 7):**
+**NOT delivered (deferred to Phase 14):**
 - Java binding (needs separate implementation)
 - Go binding (needs separate implementation)
 - Config exposure for any language
 
-### Phase 5: Python Config Exposure
+### Phase 12: Python Config Exposure
 
 **Goal**: Add options-based constructor and config exposure to Python binding
-**Depends on**: Phase 1 (core validation), Phase 2 (async foundation)
+**Depends on**: Phase 8 (core validation), Phase 9 (async foundation)
 **Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
@@ -107,10 +107,10 @@ Plans:
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, TEST-01
 
-### Phase 6: Node.js Config Exposure
+### Phase 13: Node.js Config Exposure
 
 **Goal**: Add options-based constructor and config exposure to Node.js binding
-**Depends on**: Phase 1 (core validation), Phase 3 (TypeScript foundation)
+**Depends on**: Phase 8 (core validation), Phase 10 (TypeScript foundation)
 **Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
@@ -123,25 +123,25 @@ Plans:
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, CON-02, TEST-01
 
-### Phase 7: Java & Go Bindings
+### Phase 14: Java & Go Bindings
 
 **Goal**: Add Java and Go bindings with config support
-**Depends on**: Phase 1 (core validation)
+**Depends on**: Phase 8 (core validation)
 **Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
 - Java binding with builder pattern for configs
 - Go binding with functional options pattern
 - Config exposure for both languages
-- C# config exposure (extend Phase 4 work)
+- C# config exposure (extend Phase 11 work)
 - Tests for all three languages
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, CON-01, TEST-01, TEST-02
 
-### Phase 8: Documentation & Migration
+### Phase 15: Documentation & Migration
 
 **Goal**: Update all documentation and provide migration tooling
-**Depends on**: Phases 5, 6, 7
+**Depends on**: Phases 12, 13, 14
 **Plans:** (created by /gsd:plan-phase)
 
 **Delivers:**
@@ -158,16 +158,16 @@ Plans:
 ## Phase Dependencies
 
 ```
-Phase 1 (Core) ─────┬─→ Phase 5 (Py Config) ────┐
-                    ├─→ Phase 6 (JS Config) ────┼─→ Phase 8 (Docs)
-                    └─→ Phase 7 (Java/Go) ──────┘
+Phase 8 (Core) ─────┬─→ Phase 12 (Py Config) ────┐
+                    ├─→ Phase 13 (JS Config) ────┼─→ Phase 15 (Docs)
+                    └─→ Phase 14 (Java/Go) ──────┘
 
-Phase 2 (Py Async) ──→ Phase 5 (Py Config)
-Phase 3 (JS Types) ──→ Phase 6 (JS Config)
-Phase 4 (C# FFI) ────→ Phase 7 (Java/Go + C# Config)
+Phase 9 (Py Async) ──→ Phase 12 (Py Config)
+Phase 10 (JS Types) ─→ Phase 13 (JS Config)
+Phase 11 (C# FFI) ───→ Phase 14 (Java/Go + C# Config)
 ```
 
-Phases 5, 6, and 7 can run in parallel after their dependencies complete.
+Phases 12, 13, and 14 can run in parallel after their dependencies complete.
 
 ## Key Decisions
 
@@ -178,7 +178,7 @@ Phases 5, 6, and 7 can run in parallel after their dependencies complete.
 | Deprecation-first approach | Avoid breaking existing Python/Node.js users | Confirmed |
 | Defer `subscribe(dict)` to v0.4.0 | Deeper API change, separate scope | Confirmed |
 | Milliseconds at FFI boundary | Avoid Duration serialization complexity | Confirmed |
-| csbindgen over UniFFI for C# | Better .NET idioms, Task-based async | Confirmed (Phase 4) |
+| csbindgen over UniFFI for C# | Better .NET idioms, Task-based async | Confirmed (Phase 11) |
 
 ## Out of Scope
 
@@ -188,5 +188,5 @@ Phases 5, 6, and 7 can run in parallel after their dependencies complete.
 
 ---
 *Created: 2026-02-01*
-*Updated: 2026-02-01 — Restructured to reflect actual Phase 2-4 deliverables*
+*Updated: 2026-02-01 — Renumbered phases 8-15 per GSD continuity rule*
 *Research basis: .planning/research/v0.3.0-SUMMARY.md*
