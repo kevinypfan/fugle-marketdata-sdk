@@ -20,8 +20,14 @@
     <Compile Include="../Polyfills/IsExternalInit.cs" Link="Polyfills/IsExternalInit.cs" />
   </ItemGroup>
 
-  <!-- Include native library at runtime -->
-  <ItemGroup>
+  <!-- Include native library at runtime - supports both local dev and CI builds -->
+  <!-- CI build: native libraries copied to runtimes/ directory -->
+  <ItemGroup Condition="Exists('runtimes/linux-x64/native/libmarketdata_uniffi.so')">
+    <None Include="runtimes/**/*" Pack="true" PackagePath="runtimes/" />
+  </ItemGroup>
+
+  <!-- Local dev: native libraries from target/release/ (for development only) -->
+  <ItemGroup Condition="!Exists('runtimes/linux-x64/native/libmarketdata_uniffi.so')">
     <None Include="../../../target/release/libmarketdata_uniffi.dylib"
           Pack="true"
           PackagePath="runtimes/osx-arm64/native/"
