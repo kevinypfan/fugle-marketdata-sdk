@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 4.2 of 7 (Java Binding)
-Plan: 2 of 3 in current phase - COMPLETE
-Status: Java wrapper with builder pattern complete
-Last activity: 2026-01-31 - Completed 04.2-02-PLAN.md (Idiomatic Java Wrapper)
+Plan: 3 of 3 in current phase - COMPLETE
+Status: Java binding complete with WebSocket support, tests, and CI
+Last activity: 2026-01-31 - Completed 04.2-03-PLAN.md (Tests and CI)
 
-Progress: [████████░░] 85% (~25 of 28+ plans complete)
+Progress: [████████░░] 86% (~26 of 29 plans complete)
 
 ## Performance Metrics
 
@@ -32,10 +32,10 @@ Progress: [████████░░] 85% (~25 of 28+ plans complete)
 | 03-nodejs-binding | 4 | 32min | 8min |
 | 04-csharp-binding | 5 | 19min | 4min |
 | 04.1-uniffi-migration | 6 | 36min | 6min |
-| 04.2-java-binding | 2 | 13min | 7min |
+| 04.2-java-binding | 3 | 18min | 6min |
 
 **Recent Trend:**
-- Last 5 plans: 04.1-04 (6min), 04.1-05 (10min), 04.1-06 (8min), 04.2-01 (8min), 04.2-02 (5min)
+- Last 5 plans: 04.1-05 (10min), 04.1-06 (8min), 04.2-01 (8min), 04.2-02 (5min), 04.2-03 (5min)
 - Trend: Consistent 5-8min range for UniFFI binding phases
 
 *Updated after each plan completion*
@@ -126,6 +126,10 @@ Recent decisions affecting current work:
 - **04.2-02:** Unchecked exceptions (RuntimeException) for modern Java API, matching C# pattern
 - **04.2-02:** Builder pattern with apiKey()/bearerToken()/sdkToken() for flexible authentication
 - **04.2-02:** Dual sync/async methods: getQuote() blocks, getQuoteAsync() returns CompletableFuture
+- **04.2-02:** FugleException.from() for sync, unwrap() for async exception conversion
+- **04.2-03:** Dual streaming patterns: callback (WebSocketListener) and pull-based (BlockingQueue)
+- **04.2-03:** Reflection-based structural tests that pass without native library
+- **04.2-03:** Separate structural and integration tests with @Tag annotation
 
 ### Roadmap Evolution
 
@@ -175,10 +179,10 @@ Recent decisions affecting current work:
 - 04.1-06: Testing and cleanup (15 C# tests, 14 Go tests, CI workflow)
 
 **Phase 4.2 (Java Binding):**
-- IN PROGRESS: 2 of 3 plans complete
+- PHASE COMPLETE: All 3 plans executed successfully
 - 04.2-01: Java binding infrastructure (uniffi-bindgen-java, Gradle 8.5, JNA 5.14.0, 152 generated files)
 - 04.2-02: Idiomatic Java wrapper (builder pattern, FugleException hierarchy, dual sync/async)
-- READY FOR: 04.2-03 (Testing)
+- 04.2-03: WebSocket wrapper with dual streaming patterns, JUnit 5 tests, GitHub Actions CI
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -191,6 +195,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.2-02-PLAN.md (Idiomatic Java Wrapper)
+Stopped at: Completed 04.2-03-PLAN.md (WebSocket Wrapper, Tests, and CI)
 Resume file: N/A
-Next: Phase 4.2 Plan 03 - Testing
+Next: Phase 5 (Python SDK Modernization) or Phase 6 (Documentation)
