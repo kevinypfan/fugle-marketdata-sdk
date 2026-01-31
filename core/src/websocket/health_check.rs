@@ -50,19 +50,69 @@ impl Default for HealthCheckConfig {
 }
 
 impl HealthCheckConfig {
+    /// Create a new health check config with validation
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if:
+    /// - `interval` is less than 5000ms (5 seconds)
+    /// - `max_missed_pongs` is 0 (must be >= 1)
+    pub fn new(
+        enabled: bool,
+        interval: Duration,
+        max_missed_pongs: u64,
+    ) -> Result<Self, MarketDataError> {
+        if interval < Duration::from_millis(MIN_HEALTH_CHECK_INTERVAL_MS) {
+            return Err(MarketDataError::ConfigError(format!(
+                "health_check interval must be >= {}ms (got {}ms)",
+                MIN_HEALTH_CHECK_INTERVAL_MS,
+                interval.as_millis()
+            )));
+        }
+
+        if max_missed_pongs == 0 {
+            return Err(MarketDataError::ConfigError(
+                "max_missed_pongs must be >= 1".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            enabled,
+            interval,
+            max_missed_pongs,
+        })
+    }
+
     /// Create a new health check config with custom interval
-    pub fn with_interval(mut self, interval: Duration) -> Self {
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if `interval` is less than 5000ms
+    pub fn with_interval(mut self, interval: Duration) -> Result<Self, MarketDataError> {
+        if interval < Duration::from_millis(MIN_HEALTH_CHECK_INTERVAL_MS) {
+            return Err(MarketDataError::ConfigError(format!(
+                "health_check interval must be >= {}ms (got {}ms)",
+                MIN_HEALTH_CHECK_INTERVAL_MS,
+                interval.as_millis()
+            )));
+        }
         self.interval = interval;
-        self
+        Ok(self)
     }
 
     /// Set maximum missed pongs before disconnect
-    pub fn with_max_missed_pongs(mut self, max: u64) -> Self {
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if `max` is 0
+    pub fn with_max_missed_pongs(mut self, max: u64) -> Result<Self, MarketDataError> {
+        if max == 0 {
+            return Err(MarketDataError::ConfigError(
+                "max_missed_pongs must be >= 1".to_string(),
+            ));
+        }
         self.max_missed_pongs = max;
-        self
+        Ok(self)
     }
 
-    /// Enable or disable health check
+    /// Enable or disable health check (no validation needed)
     pub fn with_enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
