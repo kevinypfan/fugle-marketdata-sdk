@@ -1,4 +1,4 @@
-.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release test test-python test-nodejs test-csharp
+.PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-csharp test test-python test-nodejs test-csharp
 
 # Default: Build all bindings in order (Python -> Node.js -> C#)
 all: python-release nodejs-release csharp-release
@@ -22,13 +22,18 @@ nodejs-release:
 	cd js && npm run build
 
 # ============================================================
-# C# Bindings (via cargo, csbindgen in Phase 4)
+# C# Bindings (via UniFFI)
 # ============================================================
 csharp-dev:
 	cargo build -p marketdata-uniffi
 
 csharp-release:
 	cargo build -p marketdata-uniffi --release
+
+# Generate C# bindings from UniFFI (library mode - proc-macro approach)
+gen-csharp:
+	cargo build -p marketdata-uniffi --release
+	uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.dylib -o bindings/csharp/MarketdataUniffi/
 
 # ============================================================
 # Testing
@@ -83,6 +88,7 @@ help:
 	@echo "  make nodejs-release   - Build Node.js binding (release)"
 	@echo "  make csharp-dev       - Build C# binding (dev)"
 	@echo "  make csharp-release   - Build C# binding (release)"
+	@echo "  make gen-csharp       - Generate C# bindings from UniFFI"
 	@echo ""
 	@echo "Test targets:"
 	@echo "  make test             - Run all tests"
