@@ -137,7 +137,7 @@ class StockClient:
     """Stock market data client.
 
     Access via `client.stock`. Provides access to intraday, historical,
-    and snapshot stock data.
+    snapshot, technical, and corporate actions stock data.
     """
 
     @property
@@ -146,6 +146,42 @@ class StockClient:
 
         Returns:
             StockIntradayClient for accessing intraday endpoints
+        """
+        ...
+
+    @property
+    def historical(self) -> "StockHistoricalClient":
+        """Access historical stock data endpoints.
+
+        Returns:
+            StockHistoricalClient for accessing historical endpoints
+        """
+        ...
+
+    @property
+    def snapshot(self) -> "StockSnapshotClient":
+        """Access snapshot endpoints for market-wide data.
+
+        Returns:
+            StockSnapshotClient for accessing snapshot endpoints
+        """
+        ...
+
+    @property
+    def technical(self) -> "StockTechnicalClient":
+        """Access technical indicator endpoints.
+
+        Returns:
+            StockTechnicalClient for accessing technical endpoints
+        """
+        ...
+
+    @property
+    def corporate_actions(self) -> "StockCorporateActionsClient":
+        """Access corporate actions endpoints.
+
+        Returns:
+            StockCorporateActionsClient for accessing corporate actions endpoints
         """
         ...
 
@@ -237,10 +273,402 @@ class StockIntradayClient:
         ...
 
 
+class StockHistoricalClient:
+    """Stock historical data endpoints client.
+
+    Access via `client.stock.historical`. All methods are async and
+    return coroutines that resolve to dict objects.
+    """
+
+    async def candles(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        fields: Optional[str] = None,
+        sort: Optional[str] = None,
+        adjusted: Optional[bool] = None,
+    ) -> dict[str, Any]:
+        """Get historical candles for a stock symbol.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", "10", "15", "30", "60")
+            fields: Optional field selection
+            sort: Sort order ("asc" or "desc")
+            adjusted: Whether to adjust for splits/dividends
+
+        Returns:
+            Historical candles data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            candles = await client.stock.historical.candles(
+                "2330",
+                from_date="2024-01-01",
+                to_date="2024-01-31",
+                timeframe="D"
+            )
+            ```
+        """
+        ...
+
+    async def stats(self, symbol: str) -> dict[str, Any]:
+        """Get historical stats for a stock symbol.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+
+        Returns:
+            Historical stats data including 52-week high/low
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            stats = await client.stock.historical.stats("2330")
+            print(f"52-week high: {stats['week52High']}")
+            ```
+        """
+        ...
+
+
+class StockSnapshotClient:
+    """Stock snapshot endpoints client.
+
+    Access via `client.stock.snapshot`. All methods are async and
+    return coroutines that resolve to dict objects.
+    """
+
+    async def quotes(
+        self,
+        market: str,
+        *,
+        type_filter: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get snapshot quotes for a market.
+
+        Args:
+            market: Market code ("TSE", "OTC", "ESB", "TIB", "PSB")
+            type_filter: Type filter ("ALL", "ALLBUT0999", "COMMONSTOCK")
+
+        Returns:
+            Market-wide quotes snapshot
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            quotes = await client.stock.snapshot.quotes("TSE", type_filter="COMMONSTOCK")
+            ```
+        """
+        ...
+
+    async def movers(
+        self,
+        market: str,
+        *,
+        direction: Optional[str] = None,
+        change: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get top movers for a market.
+
+        Args:
+            market: Market code ("TSE", "OTC", "ESB", "TIB", "PSB")
+            direction: Direction filter ("up" for gainers, "down" for losers)
+            change: Change type ("percent" or "value")
+
+        Returns:
+            Top movers data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            movers = await client.stock.snapshot.movers("TSE", direction="up", change="percent")
+            ```
+        """
+        ...
+
+    async def actives(
+        self,
+        market: str,
+        *,
+        trade: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get most active stocks for a market.
+
+        Args:
+            market: Market code ("TSE", "OTC", "ESB", "TIB", "PSB")
+            trade: Trade type ("volume" or "value")
+
+        Returns:
+            Most active stocks data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            actives = await client.stock.snapshot.actives("TSE", trade="volume")
+            ```
+        """
+        ...
+
+
+class StockTechnicalClient:
+    """Stock technical indicator endpoints client.
+
+    Access via `client.stock.technical`. All methods are async and
+    return coroutines that resolve to dict objects.
+    """
+
+    async def sma(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Get Simple Moving Average (SMA) data.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", etc.)
+            period: Moving average period
+
+        Returns:
+            SMA indicator data
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def rsi(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Get Relative Strength Index (RSI) data.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", etc.)
+            period: RSI period (default 14)
+
+        Returns:
+            RSI indicator data
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def kdj(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Get KDJ (Stochastic Oscillator) data.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", etc.)
+            period: KDJ period
+
+        Returns:
+            KDJ indicator data with K, D, J values
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def macd(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        fast: Optional[int] = None,
+        slow: Optional[int] = None,
+        signal: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Get MACD (Moving Average Convergence Divergence) data.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", etc.)
+            fast: Fast EMA period (default 12)
+            slow: Slow EMA period (default 26)
+            signal: Signal line period (default 9)
+
+        Returns:
+            MACD indicator data with MACD, signal, histogram
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def bb(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+        stddev: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """Get Bollinger Bands (BB) data.
+
+        Args:
+            symbol: Stock symbol (e.g., "2330" for TSMC)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", etc.)
+            period: Moving average period (default 20)
+            stddev: Standard deviation multiplier (default 2.0)
+
+        Returns:
+            Bollinger Bands data with upper, middle, lower bands
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+
+class StockCorporateActionsClient:
+    """Stock corporate actions endpoints client.
+
+    Access via `client.stock.corporate_actions`. All methods are async and
+    return coroutines that resolve to dict objects.
+    """
+
+    async def capital_changes(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get capital changes (stock splits, rights issues, etc.)
+
+        Args:
+            date: Specific date (YYYY-MM-DD)
+            start_date: Start date for range query (YYYY-MM-DD)
+            end_date: End date for range query (YYYY-MM-DD)
+
+        Returns:
+            Capital changes data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            changes = await client.stock.corporate_actions.capital_changes(
+                start_date="2024-01-01",
+                end_date="2024-01-31"
+            )
+            ```
+        """
+        ...
+
+    async def dividends(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get dividend announcements.
+
+        Args:
+            date: Specific date (YYYY-MM-DD)
+            start_date: Start date for range query (YYYY-MM-DD)
+            end_date: End date for range query (YYYY-MM-DD)
+
+        Returns:
+            Dividend data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            dividends = await client.stock.corporate_actions.dividends(
+                start_date="2024-01-01",
+                end_date="2024-12-31"
+            )
+            ```
+        """
+        ...
+
+    async def listing_applicants(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Get IPO listing applicants.
+
+        Args:
+            date: Specific date (YYYY-MM-DD)
+            start_date: Start date for range query (YYYY-MM-DD)
+            end_date: End date for range query (YYYY-MM-DD)
+
+        Returns:
+            Listing applicants data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            applicants = await client.stock.corporate_actions.listing_applicants()
+            ```
+        """
+        ...
+
+
 class FutOptClient:
     """Futures and options market data client.
 
-    Access via `client.futopt`. Provides access to intraday
+    Access via `client.futopt`. Provides access to intraday and historical
     futures and options data.
     """
 
@@ -250,6 +678,15 @@ class FutOptClient:
 
         Returns:
             FutOptIntradayClient for accessing intraday endpoints
+        """
+        ...
+
+    @property
+    def historical(self) -> "FutOptHistoricalClient":
+        """Access historical FutOpt data endpoints.
+
+        Returns:
+            FutOptHistoricalClient for accessing historical endpoints
         """
         ...
 
@@ -281,6 +718,83 @@ class FutOptIntradayClient:
 
             # After-hours session
             ah_quote = await client.futopt.intraday.quote("TXFC4", after_hours=True)
+            ```
+        """
+        ...
+
+
+class FutOptHistoricalClient:
+    """FutOpt historical data endpoints client.
+
+    Access via `client.futopt.historical`. All methods are async and
+    return coroutines that resolve to dict objects.
+    """
+
+    async def candles(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        after_hours: bool = False,
+    ) -> dict[str, Any]:
+        """Get historical candles for a FutOpt contract.
+
+        Args:
+            symbol: Contract symbol (e.g., "TXFC4" for TAIEX futures)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            timeframe: Timeframe ("D", "W", "M", "1", "5", "10", "15", "30", "60")
+            after_hours: Whether to include after-hours session data (default: False)
+
+        Returns:
+            Historical candles data
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            candles = await client.futopt.historical.candles(
+                "TXFC4",
+                from_date="2024-01-01",
+                to_date="2024-01-31",
+                timeframe="D"
+            )
+            ```
+        """
+        ...
+
+    async def daily(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        after_hours: bool = False,
+    ) -> dict[str, Any]:
+        """Get daily historical data for a FutOpt contract.
+
+        Args:
+            symbol: Contract symbol (e.g., "TXFC4" for TAIEX futures)
+            from_date: Start date (YYYY-MM-DD)
+            to_date: End date (YYYY-MM-DD)
+            after_hours: Whether to include after-hours session data (default: False)
+
+        Returns:
+            Daily historical data with settlement prices
+
+        Raises:
+            MarketDataError: If the request fails
+
+        Example:
+            ```python
+            daily = await client.futopt.historical.daily(
+                "TXFC4",
+                from_date="2024-01-01",
+                to_date="2024-01-31"
+            )
             ```
         """
         ...
