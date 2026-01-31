@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 4.1 of 7 (UniFFI Migration) - IN PROGRESS
-Plan: 3 of 6 in current phase - COMPLETE
-Status: Plan 04.1-03 complete - WebSocket client with foreign trait callbacks
-Last activity: 2026-01-31 - Completed 04.1-03-PLAN.md (WebSocket streaming implementation)
+Plan: 5 of 6 in current phase - COMPLETE
+Status: Plan 04.1-05 complete - Go binding generation with channel wrapper
+Last activity: 2026-01-31 - Completed 04.1-05-PLAN.md (Go bindings via uniffi-bindgen-go)
 
-Progress: [████████░░] 74% (~20 of 27 plans complete)
+Progress: [████████░░] 81% (~22 of 27 plans complete)
 
 ## Performance Metrics
 
@@ -108,6 +108,12 @@ Recent decisions affecting current work:
 - **04.1-03:** Proc-macro with_foreign pattern (not deprecated callback interface) for WebSocketListener trait
 - **04.1-03:** receive_timeout with 100ms interval enables graceful shutdown via AtomicBool signal
 - **04.1-03:** Arc<AtomicBool> for connected/shutdown state (AtomicBool not Clone, Arc enables sharing)
+- **04.1-04:** uniffi-bindgen-cs generates C# with IWebSocketListener interface for callbacks
+- **04.1-04:** C# project targets netstandard2.0 for broad .NET compatibility
+- **04.1-05:** uniffi-bindgen-go --library mode extracts metadata from cdylib (no UDL file)
+- **04.1-05:** Package name marketdata_uniffi matches crate convention
+- **04.1-05:** Separate cgo.go file for LDFLAGS (generated code lacks linker directives)
+- **04.1-05:** Channel wrapper bridges WebSocketListener callbacks to Go channels for idiomatic streaming
 
 ### Roadmap Evolution
 
@@ -149,13 +155,15 @@ None yet.
 - Method-level unsafe enables async/await in disposal patterns
 
 **Phase 4.1 (UniFFI Migration):**
-- IN PROGRESS: Plan 3 of 6 complete
+- IN PROGRESS: Plan 5 of 6 complete
 - 04.1-01: Typed UniFFI interface with proc-macro approach (23 Record structs, flat error enum)
 - 04.1-02: Typed REST client with async/sync methods (spawn_blocking for core calls)
 - 04.1-03: WebSocket client with WebSocketListener foreign trait and StreamMessage delivery
+- 04.1-04: C# binding generation via uniffi-bindgen-cs (MarketdataUniffi namespace)
+- 04.1-05: Go binding generation via uniffi-bindgen-go with channel wrapper for streaming
 - Deviation: Split impl blocks required (UniFFI doesn't support associated functions in exports)
-- Deviation: Plan referenced UDL file; used proc-macro with_foreign instead
-- PENDING: C# generation (04.1-04), Go generation (04.1-05), testing (04.1-06)
+- Deviation: Plans referenced UDL file; used proc-macro --library mode instead
+- PENDING: Testing (04.1-06)
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -168,6 +176,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.1-03-PLAN.md (WebSocket client with foreign trait callbacks)
+Stopped at: Completed 04.1-05-PLAN.md (Go bindings via uniffi-bindgen-go)
 Resume file: N/A
-Next: Phase 4.1 Plan 04 - C# binding generation
+Next: Phase 4.1 Plan 06 - Testing
