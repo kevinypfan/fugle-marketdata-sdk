@@ -19,8 +19,8 @@ name = "marketdata_uniffi"
 # Core dependency
 marketdata-core.workspace = true
 
-# UniFFI for cross-language bindings
-uniffi = { version = "0.28", features = ["cli"] }
+# UniFFI for cross-language bindings (tokio feature enables async_runtime = "tokio")
+uniffi = { version = "0.28", features = ["cli", "tokio"] }
 
 # Serialization for JSON return values
 serde_json = { workspace = true }
@@ -32,7 +32,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 
 [build-dependencies]
-uniffi = { version = "0.28", features = ["build"] }
+uniffi = { version = "0.28", features = ["build", "tokio"] }
 
 [dev-dependencies]
 # Testing utilities
