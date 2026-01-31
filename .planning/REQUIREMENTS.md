@@ -65,12 +65,12 @@ Align SDK constructor APIs with official Fugle marketdata SDKs (Python and Node.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| API-01 to API-05 | Phase 2-4 | Pending |
-| WS-01 to WS-06 | Phase 1-4 | Pending |
-| VAL-01 to VAL-04 | Phase 1 | Pending |
-| CON-01 to CON-03 | Phase 1-4 | Pending |
+| API-01 to API-05 | Phase 2-4 | Phase 2 (Python): Complete |
+| WS-01 to WS-06 | Phase 1-4 | Phase 1 (Core): Complete, Phase 2 (Python): Complete |
+| VAL-01 to VAL-04 | Phase 1 | Complete |
+| CON-01 to CON-03 | Phase 1-4 | Phase 1 (Core): Complete, Phase 2 (Python): Complete |
 | DOC-01 to DOC-03 | Phase 5 | Pending |
-| TEST-01 to TEST-04 | Phase 1-4 | Pending |
+| TEST-01 to TEST-04 | Phase 1-4 | Phase 1 (Core): Complete, Phase 2 (Python): Complete |
 
 ---
 *Created: 2026-02-01 from v0.3.0 research synthesis*
