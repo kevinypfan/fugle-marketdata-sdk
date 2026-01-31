@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 4 Complete - Ready for Phase 4.1 (UniFFI Migration)
+**Current focus:** Phase 4.1 Complete - Ready for Phase 5 (Distribution)
 
 ## Current Position
 
-Phase: 4.1 of 7 (UniFFI Migration) - IN PROGRESS
-Plan: 4 of 6 in current phase - COMPLETE
-Status: Plan 04.1-04 complete - C# binding generation with FubonNeo wrapper
-Last activity: 2026-01-31 - Completed 04.1-04-PLAN.md (C# bindings via uniffi-bindgen-cs)
+Phase: 4.1 of 7 (UniFFI Migration) - COMPLETE
+Plan: 6 of 6 in current phase - COMPLETE
+Status: Phase 4.1 complete - All UniFFI bindings validated with tests and CI
+Last activity: 2026-01-31 - Completed 04.1-06-PLAN.md (Testing and Cleanup)
 
-Progress: [████████░░] 78% (~21 of 27 plans complete)
+Progress: [████████░░] 85% (~23 of 27 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 23
 - Average duration: 6 min
-- Total execution time: ~1.8 hours
+- Total execution time: ~2.3 hours
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [████████░░] 78% (~21 of 27 plans complete)
 | 02-python-binding | 5 | 38min | 8min |
 | 03-nodejs-binding | 4 | 32min | 8min |
 | 04-csharp-binding | 5 | 19min | 4min |
+| 04.1-uniffi-migration | 6 | 36min | 6min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (2min), 04-03 (3min), 04-02 (4min), 04-04 (6min), 04-05 (4min)
-- Trend: Phase 4 consistently fast (4min avg) due to patterns from Python/Node.js
+- Last 5 plans: 04.1-02 (5min), 04.1-03 (7min), 04.1-04 (6min), 04.1-05 (10min), 04.1-06 (8min)
+- Trend: Phase 4.1 consistent (6min avg) with proc-macro approach
 
 *Updated after each plan completion*
 
@@ -112,13 +113,19 @@ Recent decisions affecting current work:
 - **04.1-04:** Post-process generated bindings with sed to change internal to public visibility
 - **04.1-04:** FugleRestClient wrapper provides GetQuoteAsync/GetQuote pattern matching FubonNeo
 - **04.1-04:** Multi-target project (netstandard2.0, net6.0, net8.0) with IsExternalInit polyfill
+- **04.1-05:** uniffi-bindgen-go --library mode for Go bindings (same pattern as C#)
+- **04.1-05:** Go channel wrapper (StreamingClient) for idiomatic message consumption with range loops
+- **04.1-05:** WebSocketListener interface implemented by channelListener for callback-to-channel bridge
+- **04.1-06:** Test skipping strategy: structural tests pass without native library, integration tests require it
+- **04.1-06:** CI uses matrix builds with artifact sharing for cross-platform testing
+- **04.1-06:** csbindgen removed from workspace (cs/ deleted, uniffi is now sole C#/Go binding approach)
 
 ### Roadmap Evolution
 
-- Phase 4.1 inserted after Phase 4: UniFFI Migration (URGENT)
-  - Rationale: Consolidate language-specific FFI (PyO3, napi-rs, csbindgen) into unified UniFFI architecture
-  - Benefits: Single UDL source, easier Go/Swift support, reduced maintenance burden
-  - Trade-off: Requires rewriting existing bindings, may lose some language-idiomatic optimizations
+- Phase 4.1 inserted after Phase 4: UniFFI Migration (COMPLETE)
+  - Result: Successfully consolidated binding generation for C# and Go
+  - PyO3 and napi-rs preserved for Python and Node.js (more mature, language-idiomatic)
+  - csbindgen removed (replaced by UniFFI for C#)
 
 ### Pending Todos
 
@@ -142,26 +149,17 @@ None yet.
 - PENDING: Memory leak testing for Buffer/TypedArray handling (deferred to Phase 6)
 
 **Phase 4 (C#):**
-- PHASE COMPLETE: All 5 plans executed successfully
-- 04-01: csbindgen FFI foundation with error codes and panic recovery
-- 04-02: REST client FFI with 8 async callback endpoints (stock/futopt intraday)
-- 04-03: WebSocket FFI with polling-based message retrieval and generic subscription API
-- 04-04: C# wrapper layer (RestClient with Task-based async, exception hierarchy, record models)
-- 04-05: WebSocketClient with EventHandler streaming + MSTest suite (56 tests)
-- Send trait issue resolved via usize pointer conversion pattern
-- IsExternalInit polyfill enables records in netstandard2.0
-- Method-level unsafe enables async/await in disposal patterns
+- SUPERSEDED: Replaced by Phase 4.1 UniFFI approach
+- Legacy csbindgen implementation deleted
 
 **Phase 4.1 (UniFFI Migration):**
-- IN PROGRESS: Plan 4 of 6 complete
+- PHASE COMPLETE: All 6 plans executed successfully
 - 04.1-01: Typed UniFFI interface with proc-macro approach (23 Record structs, flat error enum)
 - 04.1-02: Typed REST client with async/sync methods (spawn_blocking for core calls)
 - 04.1-03: WebSocket client with WebSocketListener foreign trait and StreamMessage delivery
-- 04.1-04: C# binding generation via uniffi-bindgen-cs with FubonNeo-compatible wrapper (7320 lines)
-- Deviation: Split impl blocks required (UniFFI doesn't support associated functions in exports)
-- Deviation: Plans referenced UDL file; used proc-macro --library mode instead
-- Deviation: Generated types are internal; post-processing with sed to make public
-- PENDING: Go binding generation (04.1-05), Testing (04.1-06)
+- 04.1-04: C# binding generation via uniffi-bindgen-cs with FubonNeo-compatible wrapper
+- 04.1-05: Go binding generation via uniffi-bindgen-go with channel wrapper
+- 04.1-06: Testing and cleanup (15 C# tests, 14 Go tests, CI workflow)
 
 **Phase 5 (Distribution):**
 - macOS code signing and universal2 builds require Apple Developer account configuration
@@ -174,6 +172,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.1-04-PLAN.md (C# bindings via uniffi-bindgen-cs)
+Stopped at: Completed 04.1-06-PLAN.md (Testing and Cleanup)
 Resume file: N/A
-Next: Phase 4.1 Plan 05 - Go binding generation
+Next: Phase 5 - Distribution
