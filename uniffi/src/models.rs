@@ -713,6 +713,683 @@ impl From<core::futopt::ProductsResponse> for ProductsResponse {
 }
 
 // ============================================================================
+// Stock Historical Models
+// ============================================================================
+
+/// Historical stats response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct StatsResponse {
+    pub date: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub symbol: String,
+    pub name: String,
+    pub open_price: f64,
+    pub high_price: f64,
+    pub low_price: f64,
+    pub close_price: f64,
+    pub change: f64,
+    pub change_percent: f64,
+    pub trade_volume: i64,
+    pub trade_value: f64,
+    pub previous_close: f64,
+    pub week52_high: f64,
+    pub week52_low: f64,
+}
+
+impl From<core::StatsResponse> for StatsResponse {
+    fn from(s: core::StatsResponse) -> Self {
+        Self {
+            date: s.date,
+            data_type: s.data_type,
+            exchange: s.exchange,
+            market: s.market,
+            symbol: s.symbol,
+            name: s.name,
+            open_price: s.open_price,
+            high_price: s.high_price,
+            low_price: s.low_price,
+            close_price: s.close_price,
+            change: s.change,
+            change_percent: s.change_percent,
+            trade_volume: s.trade_volume,
+            trade_value: s.trade_value,
+            previous_close: s.previous_close,
+            week52_high: s.week52_high,
+            week52_low: s.week52_low,
+        }
+    }
+}
+
+// ============================================================================
+// Stock Snapshot Models
+// ============================================================================
+
+/// Snapshot quotes response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SnapshotQuotesResponse {
+    pub date: String,
+    pub time: String,
+    pub market: String,
+    pub data: Vec<SnapshotQuote>,
+}
+
+impl From<core::SnapshotQuotesResponse> for SnapshotQuotesResponse {
+    fn from(r: core::SnapshotQuotesResponse) -> Self {
+        Self {
+            date: r.date,
+            time: r.time,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Single snapshot quote
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SnapshotQuote {
+    pub data_type: Option<String>,
+    pub symbol: String,
+    pub name: Option<String>,
+    pub open_price: Option<f64>,
+    pub high_price: Option<f64>,
+    pub low_price: Option<f64>,
+    pub close_price: Option<f64>,
+    pub change: Option<f64>,
+    pub change_percent: Option<f64>,
+    pub trade_volume: Option<i64>,
+    pub trade_value: Option<f64>,
+    pub last_updated: Option<i64>,
+}
+
+impl From<core::SnapshotQuote> for SnapshotQuote {
+    fn from(q: core::SnapshotQuote) -> Self {
+        Self {
+            data_type: q.data_type,
+            symbol: q.symbol,
+            name: q.name,
+            open_price: q.open_price,
+            high_price: q.high_price,
+            low_price: q.low_price,
+            close_price: q.close_price,
+            change: q.change,
+            change_percent: q.change_percent,
+            trade_volume: q.trade_volume,
+            trade_value: q.trade_value,
+            last_updated: q.last_updated,
+        }
+    }
+}
+
+/// Movers response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MoversResponse {
+    pub date: String,
+    pub time: String,
+    pub market: String,
+    pub data: Vec<Mover>,
+}
+
+impl From<core::MoversResponse> for MoversResponse {
+    fn from(r: core::MoversResponse) -> Self {
+        Self {
+            date: r.date,
+            time: r.time,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Single mover entry
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct Mover {
+    pub data_type: Option<String>,
+    pub symbol: String,
+    pub name: Option<String>,
+    pub open_price: Option<f64>,
+    pub high_price: Option<f64>,
+    pub low_price: Option<f64>,
+    pub close_price: Option<f64>,
+    pub change: Option<f64>,
+    pub change_percent: Option<f64>,
+    pub trade_volume: Option<i64>,
+    pub trade_value: Option<f64>,
+    pub last_updated: Option<i64>,
+}
+
+impl From<core::Mover> for Mover {
+    fn from(m: core::Mover) -> Self {
+        Self {
+            data_type: m.data_type,
+            symbol: m.symbol,
+            name: m.name,
+            open_price: m.open_price,
+            high_price: m.high_price,
+            low_price: m.low_price,
+            close_price: m.close_price,
+            change: m.change,
+            change_percent: m.change_percent,
+            trade_volume: m.trade_volume,
+            trade_value: m.trade_value,
+            last_updated: m.last_updated,
+        }
+    }
+}
+
+/// Actives response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ActivesResponse {
+    pub date: String,
+    pub time: String,
+    pub market: String,
+    pub data: Vec<Active>,
+}
+
+impl From<core::ActivesResponse> for ActivesResponse {
+    fn from(r: core::ActivesResponse) -> Self {
+        Self {
+            date: r.date,
+            time: r.time,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Single active entry
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct Active {
+    pub data_type: Option<String>,
+    pub symbol: String,
+    pub name: Option<String>,
+    pub open_price: Option<f64>,
+    pub high_price: Option<f64>,
+    pub low_price: Option<f64>,
+    pub close_price: Option<f64>,
+    pub change: Option<f64>,
+    pub change_percent: Option<f64>,
+    pub trade_volume: Option<i64>,
+    pub trade_value: Option<f64>,
+    pub last_updated: Option<i64>,
+}
+
+impl From<core::Active> for Active {
+    fn from(a: core::Active) -> Self {
+        Self {
+            data_type: a.data_type,
+            symbol: a.symbol,
+            name: a.name,
+            open_price: a.open_price,
+            high_price: a.high_price,
+            low_price: a.low_price,
+            close_price: a.close_price,
+            change: a.change,
+            change_percent: a.change_percent,
+            trade_volume: a.trade_volume,
+            trade_value: a.trade_value,
+            last_updated: a.last_updated,
+        }
+    }
+}
+
+// ============================================================================
+// Technical Indicator Models
+// ============================================================================
+
+/// SMA response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SmaResponse {
+    pub symbol: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub timeframe: String,
+    pub period: u32,
+    pub data: Vec<SmaDataPoint>,
+}
+
+impl From<core::SmaResponse> for SmaResponse {
+    fn from(r: core::SmaResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            timeframe: r.timeframe,
+            period: r.period,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// SMA data point
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SmaDataPoint {
+    pub date: String,
+    pub sma: f64,
+}
+
+impl From<core::SmaDataPoint> for SmaDataPoint {
+    fn from(p: core::SmaDataPoint) -> Self {
+        Self { date: p.date, sma: p.sma }
+    }
+}
+
+/// RSI response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RsiResponse {
+    pub symbol: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub timeframe: String,
+    pub period: u32,
+    pub data: Vec<RsiDataPoint>,
+}
+
+impl From<core::RsiResponse> for RsiResponse {
+    fn from(r: core::RsiResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            timeframe: r.timeframe,
+            period: r.period,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// RSI data point
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RsiDataPoint {
+    pub date: String,
+    pub rsi: f64,
+}
+
+impl From<core::RsiDataPoint> for RsiDataPoint {
+    fn from(p: core::RsiDataPoint) -> Self {
+        Self { date: p.date, rsi: p.rsi }
+    }
+}
+
+/// KDJ response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct KdjResponse {
+    pub symbol: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub timeframe: String,
+    pub period: u32,
+    pub data: Vec<KdjDataPoint>,
+}
+
+impl From<core::KdjResponse> for KdjResponse {
+    fn from(r: core::KdjResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            timeframe: r.timeframe,
+            period: r.period,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// KDJ data point
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct KdjDataPoint {
+    pub date: String,
+    pub k: f64,
+    pub d: f64,
+    pub j: f64,
+}
+
+impl From<core::KdjDataPoint> for KdjDataPoint {
+    fn from(p: core::KdjDataPoint) -> Self {
+        Self { date: p.date, k: p.k, d: p.d, j: p.j }
+    }
+}
+
+/// MACD response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MacdResponse {
+    pub symbol: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub timeframe: String,
+    pub fast: u32,
+    pub slow: u32,
+    pub signal: u32,
+    pub data: Vec<MacdDataPoint>,
+}
+
+impl From<core::MacdResponse> for MacdResponse {
+    fn from(r: core::MacdResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            timeframe: r.timeframe,
+            fast: r.fast,
+            slow: r.slow,
+            signal: r.signal,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// MACD data point
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MacdDataPoint {
+    pub date: String,
+    pub macd: f64,
+    pub signal_value: f64,
+    pub histogram: f64,
+}
+
+impl From<core::MacdDataPoint> for MacdDataPoint {
+    fn from(p: core::MacdDataPoint) -> Self {
+        Self { date: p.date, macd: p.macd, signal_value: p.signal_value, histogram: p.histogram }
+    }
+}
+
+/// Bollinger Bands response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct BbResponse {
+    pub symbol: String,
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub timeframe: String,
+    pub period: u32,
+    pub stddev: f64,
+    pub data: Vec<BbDataPoint>,
+}
+
+impl From<core::BbResponse> for BbResponse {
+    fn from(r: core::BbResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            timeframe: r.timeframe,
+            period: r.period,
+            stddev: r.stddev,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Bollinger Bands data point
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct BbDataPoint {
+    pub date: String,
+    pub upper: f64,
+    pub middle: f64,
+    pub lower: f64,
+}
+
+impl From<core::BbDataPoint> for BbDataPoint {
+    fn from(p: core::BbDataPoint) -> Self {
+        Self { date: p.date, upper: p.upper, middle: p.middle, lower: p.lower }
+    }
+}
+
+// ============================================================================
+// Corporate Actions Models
+// ============================================================================
+
+/// Capital changes response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct CapitalChangesResponse {
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub data: Vec<CapitalChange>,
+}
+
+impl From<core::CapitalChangesResponse> for CapitalChangesResponse {
+    fn from(r: core::CapitalChangesResponse) -> Self {
+        Self {
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Capital change entry
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct CapitalChange {
+    pub symbol: String,
+    pub name: Option<String>,
+    pub date: String,
+    pub previous_capital: Option<f64>,
+    pub current_capital: Option<f64>,
+    pub change_type: Option<String>,
+    pub reason: Option<String>,
+}
+
+impl From<core::CapitalChange> for CapitalChange {
+    fn from(c: core::CapitalChange) -> Self {
+        Self {
+            symbol: c.symbol,
+            name: c.name,
+            date: c.date,
+            previous_capital: c.previous_capital,
+            current_capital: c.current_capital,
+            change_type: c.change_type,
+            reason: c.reason,
+        }
+    }
+}
+
+/// Dividends response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct DividendsResponse {
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub data: Vec<Dividend>,
+}
+
+impl From<core::DividendsResponse> for DividendsResponse {
+    fn from(r: core::DividendsResponse) -> Self {
+        Self {
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Dividend entry
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct Dividend {
+    pub symbol: String,
+    pub name: Option<String>,
+    pub ex_dividend_date: Option<String>,
+    pub payment_date: Option<String>,
+    pub cash_dividend: Option<f64>,
+    pub stock_dividend: Option<f64>,
+    pub dividend_year: Option<String>,
+}
+
+impl From<core::Dividend> for Dividend {
+    fn from(d: core::Dividend) -> Self {
+        Self {
+            symbol: d.symbol,
+            name: d.name,
+            ex_dividend_date: d.ex_dividend_date,
+            payment_date: d.payment_date,
+            cash_dividend: d.cash_dividend,
+            stock_dividend: d.stock_dividend,
+            dividend_year: d.dividend_year,
+        }
+    }
+}
+
+/// Listing applicants response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ListingApplicantsResponse {
+    pub data_type: String,
+    pub exchange: String,
+    pub market: String,
+    pub data: Vec<ListingApplicant>,
+}
+
+impl From<core::ListingApplicantsResponse> for ListingApplicantsResponse {
+    fn from(r: core::ListingApplicantsResponse) -> Self {
+        Self {
+            data_type: r.data_type,
+            exchange: r.exchange,
+            market: r.market,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Listing applicant entry
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ListingApplicant {
+    pub symbol: String,
+    pub name: Option<String>,
+    pub application_date: Option<String>,
+    pub listing_date: Option<String>,
+    pub status: Option<String>,
+    pub industry: Option<String>,
+}
+
+impl From<core::ListingApplicant> for ListingApplicant {
+    fn from(a: core::ListingApplicant) -> Self {
+        Self {
+            symbol: a.symbol,
+            name: a.name,
+            application_date: a.application_date,
+            listing_date: a.listing_date,
+            status: a.status,
+            industry: a.industry,
+        }
+    }
+}
+
+// ============================================================================
+// FutOpt Historical Models
+// ============================================================================
+
+/// FutOpt historical candles response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FutOptHistoricalCandlesResponse {
+    pub symbol: String,
+    pub data_type: Option<String>,
+    pub exchange: Option<String>,
+    pub timeframe: Option<String>,
+    pub candles: Vec<FutOptHistoricalCandle>,
+}
+
+impl From<core::futopt::FutOptHistoricalCandlesResponse> for FutOptHistoricalCandlesResponse {
+    fn from(r: core::futopt::FutOptHistoricalCandlesResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            timeframe: r.timeframe,
+            candles: r.candles.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// FutOpt historical candle
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FutOptHistoricalCandle {
+    pub date: String,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub volume: u64,
+    pub open_interest: Option<u64>,
+    pub change: Option<f64>,
+    pub change_percent: Option<f64>,
+}
+
+impl From<core::futopt::FutOptHistoricalCandle> for FutOptHistoricalCandle {
+    fn from(c: core::futopt::FutOptHistoricalCandle) -> Self {
+        Self {
+            date: c.date,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            open_interest: c.open_interest,
+            change: c.change,
+            change_percent: c.change_percent,
+        }
+    }
+}
+
+/// FutOpt daily response
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FutOptDailyResponse {
+    pub symbol: String,
+    pub data_type: Option<String>,
+    pub exchange: Option<String>,
+    pub data: Vec<FutOptDailyData>,
+}
+
+impl From<core::futopt::FutOptDailyResponse> for FutOptDailyResponse {
+    fn from(r: core::futopt::FutOptDailyResponse) -> Self {
+        Self {
+            symbol: r.symbol,
+            data_type: r.data_type,
+            exchange: r.exchange,
+            data: r.data.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// FutOpt daily data
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FutOptDailyData {
+    pub date: String,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub volume: u64,
+    pub open_interest: Option<u64>,
+    pub settlement_price: Option<f64>,
+}
+
+impl From<core::futopt::FutOptDailyData> for FutOptDailyData {
+    fn from(d: core::futopt::FutOptDailyData) -> Self {
+        Self {
+            date: d.date,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+            volume: d.volume,
+            open_interest: d.open_interest,
+            settlement_price: d.settlement_price,
+        }
+    }
+}
+
+// ============================================================================
 // WebSocket Message Model
 // ============================================================================
 

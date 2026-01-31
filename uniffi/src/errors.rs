@@ -77,6 +77,9 @@ impl From<CoreError> for MarketDataError {
             }
             CoreError::WebSocketError { msg } => MarketDataError::WebSocketError { msg },
             CoreError::ClientClosed => MarketDataError::ClientClosed,
+            CoreError::InvalidParameter { name, reason } => MarketDataError::ApiError {
+                msg: format!("Invalid parameter '{}': {}", name, reason),
+            },
             CoreError::Other(err) => MarketDataError::Other {
                 msg: err.to_string(),
             },
