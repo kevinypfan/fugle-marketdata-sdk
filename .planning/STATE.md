@@ -9,12 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 ## Current Position
 
-Phase: 3 of 5 — Node.js Binding Enhancement
-Plan: 4/4 complete
-Status: Phase 3 complete ✓ (verified)
-Last activity: 2026-02-01 - Phase 3 already executed, updating state
+Phase: 4 of 8 — C# csbindgen Foundation
+Plan: 5/5 complete
+Status: Phase 4 complete ✓ (verified)
+Last activity: 2026-02-01 - Restructured roadmap to reflect actual deliverables
 
-Progress: [██████░░░░] 60% (Phase 3 complete, 3/5 phases done)
+Progress: [████░░░░░░] 50% (Phases 1-4 complete, 4/8 phases done)
+
+**Note:** Phases 2-4 delivered foundational binding work (async, types, FFI). Phases 5-7 deliver the v0.3.0 config exposure work.
 
 ## Milestone History
 
@@ -32,30 +34,32 @@ Key decisions logged in v0.3.0 ROADMAP.md:
 - Health check default: `false` (aligned with official SDKs)
 - Deprecation-first approach for Python/Node.js
 - Defer `subscribe(dict)` signature change to v0.4.0
+- csbindgen over UniFFI for C# (better .NET idioms)
 
-From 01-01 execution:
+From Phase 1 execution:
 - MIN_INITIAL_DELAY_MS = 100ms to prevent connection storms
 - max_attempts must be >= 1 (zero attempts is invalid)
 - max_delay must be >= initial_delay (logical constraint)
 - Config validation returns Result<Self, MarketDataError::ConfigError>
-
-From 01-02 execution:
 - DEFAULT_HEALTH_CHECK_ENABLED = false (aligned with official SDKs per CON-01)
 - MIN_HEALTH_CHECK_INTERVAL_MS = 5000ms (prevent excessive overhead)
-- with_enabled() returns Self not Result (any bool is valid)
 - All 8 config constants re-exported from lib.rs for binding layers
 
 ### Patterns Established
 
-From 01-01 and 01-02 execution:
+From Phase 1-4 execution:
 - Config validation pattern: new() returns Result with ConfigError on invalid input
 - Default constants pattern: pub const DEFAULT_* for binding layer reference
 - Error message pattern: include field name, constraint, and actual value
-- Builder method pattern: methods that validate return Result, methods that don't return Self
+- Python async pattern: `future_into_py` + `spawn_blocking` for GIL safety
+- Node.js async pattern: `Arc<ThreadsafeFunction>` + `NonBlocking` mode
+- C# async pattern: `Task<T>` + `TaskCompletionSource` + `Task.Run`
 
 ### Roadmap Evolution
 
-- v0.3.0 milestone defined: 5 phases
+- v0.3.0 milestone restructured: 8 phases (was 5)
+- Phases 2-4 delivered foundational binding work, not config exposure
+- Phases 5-7 added for actual v0.3.0 config exposure work
 - Research complete: PYTHON-PATTERNS.md, NODEJS-PATTERNS.md, ARCHITECTURE.md, PITFALLS.md
 - Summary: .planning/research/v0.3.0-SUMMARY.md
 
@@ -66,11 +70,11 @@ From 01-01 and 01-02 execution:
 
 ### Blockers/Concerns
 
-None — Phase 3 complete. Phase 4 (UniFFI) can proceed.
+None — Phases 1-4 complete. Phases 5, 6, 7 can run in parallel.
 
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Phase 3 already executed and verified (4/4 must-haves)
+Stopped at: Restructured ROADMAP to reflect actual Phase 2-4 deliverables
 Resume file: N/A
-Next: `/gsd:plan-phase 4` (UniFFI) or `/gsd:execute-phase 4` if plans exist
+Next: `/gsd:plan-phase 5` (Python Config) or `/gsd:plan-phase 6` (Node.js Config) or `/gsd:plan-phase 7` (Java/Go)

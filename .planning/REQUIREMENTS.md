@@ -63,14 +63,16 @@ Align SDK constructor APIs with official Fugle marketdata SDKs (Python and Node.
 
 ## Traceability
 
+**Note:** Roadmap restructured. Phases 2-4 delivered foundational binding work. Phases 5-7 deliver config exposure.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| API-01 to API-05 | Phase 2-4 | Phase 2 (Python): Complete, Phase 3 (Node.js): Complete |
-| WS-01 to WS-06 | Phase 1-4 | Phase 1-3: Complete |
+| API-01 to API-05 | Phase 5-7 | Pending (foundations ready in 2-4) |
+| WS-01 to WS-06 | Phase 1, 5-7 | Phase 1 (Core): Complete |
 | VAL-01 to VAL-04 | Phase 1 | Complete |
-| CON-01 to CON-03 | Phase 1-4 | Phase 1-3: Complete |
-| DOC-01 to DOC-03 | Phase 5 | Pending |
-| TEST-01 to TEST-04 | Phase 1-4 | Phase 1-3: Complete |
+| CON-01 to CON-03 | Phase 1, 5-7 | Phase 1 (Core): Complete |
+| DOC-01 to DOC-03 | Phase 8 | Pending |
+| TEST-01 to TEST-04 | Phase 1, 5-7 | Phase 1 (Core): Complete |
 
 ---
 *Created: 2026-02-01 from v0.3.0 research synthesis*
