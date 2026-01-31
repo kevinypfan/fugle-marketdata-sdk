@@ -123,6 +123,156 @@ class TestRestClientAPICompatibility:
         assert callable(client.futopt.intraday.quote)
 
 
+class TestNewRestEndpointsCompatibility:
+    """Verify new REST endpoints added in Phase 7.
+
+    Tests for:
+    - Stock Historical: candles(), stats()
+    - Stock Snapshot: quotes(), movers(), actives()
+    - Stock Technical: sma(), rsi(), kdj(), macd(), bb()
+    - Stock Corporate Actions: capital_changes(), dividends(), listing_applicants()
+    - FutOpt Historical: candles(), daily()
+    """
+
+    # ========== Stock Historical ==========
+
+    def test_stock_has_historical_client(self):
+        """client.stock.historical property should exist"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock, 'historical')
+        assert client.stock.historical is not None
+
+    def test_historical_has_candles_method(self):
+        """client.stock.historical.candles(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.historical, 'candles')
+        assert callable(client.stock.historical.candles)
+
+    def test_historical_candles_accepts_params(self):
+        """historical.candles() accepts all expected parameters"""
+        client = RestClient("test-key")
+        sig = inspect.signature(client.stock.historical.candles)
+        params = list(sig.parameters.keys())
+        assert 'symbol' in params
+        # Optional params may include: from_date, to_date, timeframe, etc.
+
+    def test_historical_has_stats_method(self):
+        """client.stock.historical.stats(symbol)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.historical, 'stats')
+        assert callable(client.stock.historical.stats)
+
+    # ========== Stock Snapshot ==========
+
+    def test_stock_has_snapshot_client(self):
+        """client.stock.snapshot property should exist"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock, 'snapshot')
+        assert client.stock.snapshot is not None
+
+    def test_snapshot_has_quotes_method(self):
+        """client.stock.snapshot.quotes(market, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.snapshot, 'quotes')
+        assert callable(client.stock.snapshot.quotes)
+
+    def test_snapshot_has_movers_method(self):
+        """client.stock.snapshot.movers(market, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.snapshot, 'movers')
+        assert callable(client.stock.snapshot.movers)
+
+    def test_snapshot_has_actives_method(self):
+        """client.stock.snapshot.actives(market, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.snapshot, 'actives')
+        assert callable(client.stock.snapshot.actives)
+
+    # ========== Stock Technical ==========
+
+    def test_stock_has_technical_client(self):
+        """client.stock.technical property should exist"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock, 'technical')
+        assert client.stock.technical is not None
+
+    def test_technical_has_sma_method(self):
+        """client.stock.technical.sma(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.technical, 'sma')
+        assert callable(client.stock.technical.sma)
+
+    def test_technical_has_rsi_method(self):
+        """client.stock.technical.rsi(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.technical, 'rsi')
+        assert callable(client.stock.technical.rsi)
+
+    def test_technical_has_kdj_method(self):
+        """client.stock.technical.kdj(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.technical, 'kdj')
+        assert callable(client.stock.technical.kdj)
+
+    def test_technical_has_macd_method(self):
+        """client.stock.technical.macd(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.technical, 'macd')
+        assert callable(client.stock.technical.macd)
+
+    def test_technical_has_bb_method(self):
+        """client.stock.technical.bb(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.technical, 'bb')
+        assert callable(client.stock.technical.bb)
+
+    # ========== Stock Corporate Actions ==========
+
+    def test_stock_has_corporate_actions_client(self):
+        """client.stock.corporate_actions property should exist"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock, 'corporate_actions')
+        assert client.stock.corporate_actions is not None
+
+    def test_corporate_actions_has_capital_changes_method(self):
+        """client.stock.corporate_actions.capital_changes(...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.corporate_actions, 'capital_changes')
+        assert callable(client.stock.corporate_actions.capital_changes)
+
+    def test_corporate_actions_has_dividends_method(self):
+        """client.stock.corporate_actions.dividends(...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.corporate_actions, 'dividends')
+        assert callable(client.stock.corporate_actions.dividends)
+
+    def test_corporate_actions_has_listing_applicants_method(self):
+        """client.stock.corporate_actions.listing_applicants(...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.stock.corporate_actions, 'listing_applicants')
+        assert callable(client.stock.corporate_actions.listing_applicants)
+
+    # ========== FutOpt Historical ==========
+
+    def test_futopt_has_historical_client(self):
+        """client.futopt.historical property should exist"""
+        client = RestClient("test-key")
+        assert hasattr(client.futopt, 'historical')
+        assert client.futopt.historical is not None
+
+    def test_futopt_historical_has_candles_method(self):
+        """client.futopt.historical.candles(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.futopt.historical, 'candles')
+        assert callable(client.futopt.historical.candles)
+
+    def test_futopt_historical_has_daily_method(self):
+        """client.futopt.historical.daily(symbol, ...)"""
+        client = RestClient("test-key")
+        assert hasattr(client.futopt.historical, 'daily')
+        assert callable(client.futopt.historical.daily)
+
+
 class TestWebSocketClientAPICompatibility:
     """Verify WebSocket client API matches official SDK structure.
 

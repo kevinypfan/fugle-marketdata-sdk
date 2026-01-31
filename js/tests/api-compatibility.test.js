@@ -140,6 +140,218 @@ describe('API Compatibility', () => {
         await expect(result).rejects.toThrow();
       });
     });
+
+    // ========== New Endpoints (Phase 7) ==========
+
+    describe('stock.historical methods', () => {
+      let historical;
+
+      beforeAll(() => {
+        historical = client.stock.historical;
+      });
+
+      test('stock.historical exists', () => {
+        expect(historical).toBeDefined();
+      });
+
+      test('candles method exists and is a function', () => {
+        expect(typeof historical.candles).toBe('function');
+      });
+
+      test('candles returns a Promise-like object', async () => {
+        const result = historical.candles('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('stats method exists and is a function', () => {
+        expect(typeof historical.stats).toBe('function');
+      });
+
+      test('stats returns a Promise-like object', async () => {
+        const result = historical.stats('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+    });
+
+    describe('stock.snapshot methods', () => {
+      let snapshot;
+
+      beforeAll(() => {
+        snapshot = client.stock.snapshot;
+      });
+
+      test('stock.snapshot exists', () => {
+        expect(snapshot).toBeDefined();
+      });
+
+      test('quotes method exists and is a function', () => {
+        expect(typeof snapshot.quotes).toBe('function');
+      });
+
+      test('quotes returns a Promise-like object', async () => {
+        const result = snapshot.quotes('TSE');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('movers method exists and is a function', () => {
+        expect(typeof snapshot.movers).toBe('function');
+      });
+
+      test('movers returns a Promise-like object', async () => {
+        const result = snapshot.movers('TSE');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('actives method exists and is a function', () => {
+        expect(typeof snapshot.actives).toBe('function');
+      });
+
+      test('actives returns a Promise-like object', async () => {
+        const result = snapshot.actives('TSE');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+    });
+
+    describe('stock.technical methods', () => {
+      let technical;
+
+      beforeAll(() => {
+        technical = client.stock.technical;
+      });
+
+      test('stock.technical exists', () => {
+        expect(technical).toBeDefined();
+      });
+
+      test('sma method exists and is a function', () => {
+        expect(typeof technical.sma).toBe('function');
+      });
+
+      test('sma returns a Promise-like object', async () => {
+        const result = technical.sma('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('rsi method exists and is a function', () => {
+        expect(typeof technical.rsi).toBe('function');
+      });
+
+      test('rsi returns a Promise-like object', async () => {
+        const result = technical.rsi('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('kdj method exists and is a function', () => {
+        expect(typeof technical.kdj).toBe('function');
+      });
+
+      test('kdj returns a Promise-like object', async () => {
+        const result = technical.kdj('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('macd method exists and is a function', () => {
+        expect(typeof technical.macd).toBe('function');
+      });
+
+      test('macd returns a Promise-like object', async () => {
+        const result = technical.macd('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('bb method exists and is a function', () => {
+        expect(typeof technical.bb).toBe('function');
+      });
+
+      test('bb returns a Promise-like object', async () => {
+        const result = technical.bb('2330');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+    });
+
+    describe('stock.corporateActions methods', () => {
+      let corporateActions;
+
+      beforeAll(() => {
+        corporateActions = client.stock.corporateActions;
+      });
+
+      test('stock.corporateActions exists', () => {
+        expect(corporateActions).toBeDefined();
+      });
+
+      test('capitalChanges method exists and is a function', () => {
+        expect(typeof corporateActions.capitalChanges).toBe('function');
+      });
+
+      test('capitalChanges returns a Promise-like object', async () => {
+        const result = corporateActions.capitalChanges();
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('dividends method exists and is a function', () => {
+        expect(typeof corporateActions.dividends).toBe('function');
+      });
+
+      test('dividends returns a Promise-like object', async () => {
+        const result = corporateActions.dividends();
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('listingApplicants method exists and is a function', () => {
+        expect(typeof corporateActions.listingApplicants).toBe('function');
+      });
+
+      test('listingApplicants returns a Promise-like object', async () => {
+        const result = corporateActions.listingApplicants();
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+    });
+
+    describe('futopt.historical methods', () => {
+      let historical;
+
+      beforeAll(() => {
+        historical = client.futopt.historical;
+      });
+
+      test('futopt.historical exists', () => {
+        expect(historical).toBeDefined();
+      });
+
+      test('candles method exists and is a function', () => {
+        expect(typeof historical.candles).toBe('function');
+      });
+
+      test('candles returns a Promise-like object', async () => {
+        const result = historical.candles('TXFC4');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+
+      test('daily method exists and is a function', () => {
+        expect(typeof historical.daily).toBe('function');
+      });
+
+      test('daily returns a Promise-like object', async () => {
+        const result = historical.daily('TXFC4');
+        expect(isPromiseLike(result)).toBe(true);
+        await expect(result).rejects.toThrow();
+      });
+    });
   });
 
   describe('WebSocketClient structure', () => {
