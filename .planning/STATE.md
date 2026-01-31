@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2025-01-30)
 
 **Core value:** API-compatible drop-in replacement for official Fugle SDKs
-**Current focus:** Phase 4.1 Complete - Ready for Phase 4.2 (Java Binding)
+**Current focus:** Phase 5 (Cross-Platform Distribution)
 
 ## Current Position
 
-Phase: 4.2 of 7 (Java Binding)
-Plan: 3 of 3 in current phase - COMPLETE
-Status: Java binding complete with WebSocket support, tests, and CI
-Last activity: 2026-01-31 - Completed 04.2-03-PLAN.md (Tests and CI)
+Phase: 5 of 7 (Cross-Platform Distribution)
+Plan: 2 of 6 in current phase
+Status: In progress
+Last activity: 2026-01-31 - Completed 05-02-PLAN.md (Node.js Build Workflow)
 
-Progress: [████████░░] 86% (~26 of 29 plans complete)
+Progress: [████████░░] 90% (~28 of 31 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
+- Total plans completed: 28
 - Average duration: 6 min
-- Total execution time: ~2.4 hours
+- Total execution time: ~2.6 hours
 
 **By Phase:**
 
@@ -33,10 +33,11 @@ Progress: [████████░░] 86% (~26 of 29 plans complete)
 | 04-csharp-binding | 5 | 19min | 4min |
 | 04.1-uniffi-migration | 6 | 36min | 6min |
 | 04.2-java-binding | 3 | 18min | 6min |
+| 05-distribution | 2 | 6min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 04.1-05 (10min), 04.1-06 (8min), 04.2-01 (8min), 04.2-02 (5min), 04.2-03 (5min)
-- Trend: Consistent 5-8min range for UniFFI binding phases
+- Last 5 plans: 04.2-02 (5min), 04.2-03 (5min), 05-01 (4min), 05-02 (2min)
+- Trend: Fast execution for GitHub Actions workflow plans
 
 *Updated after each plan completion*
 
@@ -130,6 +131,12 @@ Recent decisions affecting current work:
 - **04.2-03:** Dual streaming patterns: callback (WebSocketListener) and pull-based (BlockingQueue)
 - **04.2-03:** Reflection-based structural tests that pass without native library
 - **04.2-03:** Separate structural and integration tests with @Tag annotation
+- **05-01:** manylinux 2_17 for glibc compatibility (Rust 1.64+ requires glibc 2.17 minimum)
+- **05-01:** Swatinem/rust-cache with shared-key python-release for cross-job caching
+- **05-01:** workflow_dispatch alongside workflow_call for manual testing before release integration
+- **05-02:** Cross-compilation for Linux ARM64 on ubuntu-latest with gcc-aarch64-linux-gnu
+- **05-02:** Artifact naming: bindings-{target} pattern for napi-rs targets
+- **05-02:** napi prepublish generates optionalDependencies packages
 
 ### Roadmap Evolution
 
@@ -195,6 +202,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04.2-03-PLAN.md (WebSocket Wrapper, Tests, and CI)
+Stopped at: Completed 05-02-PLAN.md (Node.js Build Workflow)
 Resume file: N/A
-Next: Phase 5 (Python SDK Modernization) or Phase 6 (Documentation)
+Next: 05-03-PLAN.md (UniFFI Build Workflow)
