@@ -1,9 +1,56 @@
 plugins {
     `java-library`
+    `maven-publish`
 }
 
 group = "tw.com.fugle"
 version = "0.2.0"
+
+publishing {
+    publications {
+        create<MavenPublication>("gpr") {
+            from(components["java"])
+            groupId = "tw.com.fugle"
+            artifactId = "marketdata-java"
+
+            pom {
+                name.set("Fugle Market Data SDK for Java")
+                description.set("UniFFI-generated Java bindings for Fugle Market Data SDK")
+                url.set("https://github.com/fugle-dev/fugle-marketdata-sdk")
+
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("fugle-dev")
+                        name.set("Fugle Development Team")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com/fugle-dev/fugle-marketdata-sdk.git")
+                    developerConnection.set("scm:git:ssh://github.com:fugle-dev/fugle-marketdata-sdk.git")
+                    url.set("https://github.com/fugle-dev/fugle-marketdata-sdk")
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/fugle-dev/fugle-marketdata-sdk")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
