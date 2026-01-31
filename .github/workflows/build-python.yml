@@ -1,0 +1,76 @@
+name: Build Python Wheels
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+        default: 'dev'
+    outputs:
+      version:
+        description: "Package version from Cargo.toml"
+        value: ${{ jobs.build.outputs.version }}
+  workflow_dispatch:
+    inputs:
+      version:
+        required: false
+        type: string
+        default: 'dev'
+        description: "Version to build (for artifact naming)"
+
+jobs:
+  build:
+    name: Build wheel (${{ matrix.os }}-${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - os: ubuntu-latest
+            target: x86_64
+            manylinux: '2_17'
+          # Linux aarch64 (ARM64 via QEMU cross-compilation)
+          - os: ubuntu-latest
+            target: aarch64
+            manylinux: '2_17'
+          # macOS universal2 (Intel + Apple Silicon)
+          - os: macos-latest
+            target: universal2
+          # Windows x64
+          - os: windows-latest
+            target: x64
+
+    runs-on: ${{ matrix.os }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: py -> target
+          shared-key: python-release
+
+      - name: Extract version from Cargo.toml
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep -A1 '\[workspace.package\]' Cargo.toml | grep 'version' | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'auto' }}
+          args: --release -m py/Cargo.toml --out dist
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/*.whl
+          retention-days: 5
