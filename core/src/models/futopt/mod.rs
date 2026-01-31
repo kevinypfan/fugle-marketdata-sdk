@@ -67,6 +67,7 @@
 
 mod channel;
 mod common;
+mod historical;
 mod product;
 mod quote;
 mod ticker;
@@ -74,6 +75,9 @@ mod ticker;
 // Re-export all types
 pub use channel::FutOptChannel;
 pub use common::{ContractType, FutOptSession, FutOptType, OptionRight};
+pub use historical::{
+    FutOptDailyData, FutOptDailyResponse, FutOptHistoricalCandle, FutOptHistoricalCandlesResponse,
+};
 pub use product::{Product, ProductsResponse};
 pub use quote::{FutOptLastTrade, FutOptPriceLevel, FutOptQuote, FutOptTotalStats};
 pub use ticker::FutOptTicker;

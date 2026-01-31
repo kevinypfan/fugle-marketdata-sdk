@@ -15,6 +15,10 @@ pub enum MarketDataError {
     #[error("Invalid symbol: {symbol}")]
     InvalidSymbol { symbol: String },
 
+    /// Invalid or missing parameter
+    #[error("Invalid parameter '{name}': {reason}")]
+    InvalidParameter { name: String, reason: String },
+
     /// JSON deserialization failed
     #[error("Deserialization failed: {source}")]
     DeserializationError {
@@ -105,6 +109,7 @@ impl MarketDataError {
     pub fn to_error_code(&self) -> i32 {
         match self {
             Self::InvalidSymbol { .. } => 1001,
+            Self::InvalidParameter { .. } => 1005,
             Self::DeserializationError { .. } => 1002,
             Self::RuntimeError { .. } => 1003,
             Self::ConfigError(_) => 1004,
@@ -125,6 +130,8 @@ impl MarketDataError {
             Self::ConnectionError { .. } | Self::TimeoutError { .. } | Self::WebSocketError { .. } => true,
             // API errors with 429 or 5xx status codes are retryable
             Self::ApiError { status, .. } => *status == 429 || (500..=599).contains(status),
+            // Parameter errors are never retryable (user must fix input)
+            Self::InvalidParameter { .. } => false,
             // All other errors are not retryable
             _ => false,
         }
