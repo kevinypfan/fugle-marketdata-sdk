@@ -15,6 +15,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       nodejs: ${{ steps.filter.outputs.nodejs }}
       csharp: ${{ steps.filter.outputs.csharp }}
+      uniffi: ${{ steps.filter.outputs.uniffi }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -40,6 +41,12 @@ jobs:
               - 'core/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
+            uniffi:
+              - 'uniffi/**'
+              - 'bindings/**'
+              - 'core/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
 
   python:
     name: Python Bindings
@@ -58,3 +65,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.csharp == 'true' }}
     uses: ./.github/workflows/csharp.yml
+
+  uniffi:
+    name: UniFFI Bindings (C#, Go)
+    needs: changes
+    if: ${{ needs.changes.outputs.uniffi == 'true' }}
+    uses: ./.github/workflows/uniffi.yml
