@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 6 of 7 (Testing and Production Readiness)
-Plan: 2 of 5 in current phase (IN PROGRESS)
+Plan: 3 of 5 in current phase (IN PROGRESS)
 Status: Phase 6 In Progress
-Last activity: 2026-01-31 - Completed 06-02-PLAN.md (Node.js Response Compatibility)
+Last activity: 2026-01-31 - Completed 06-06-PLAN.md (FFI Boundary Tests)
 
-Progress: [██████████░] 95% (33 of 35 plans complete)
+Progress: [██████████░] 97% (34 of 35 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 33
+- Total plans completed: 34
 - Average duration: 6 min
-- Total execution time: ~2.88 hours
+- Total execution time: ~2.96 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [██████████░] 95% (33 of 35 plans complete)
 | 04.1-uniffi-migration | 6 | 36min | 6min |
 | 04.2-java-binding | 3 | 18min | 6min |
 | 05-distribution | 6 | 15min | 3min |
-| 06-testing | 2 | 9min | 5min |
+| 06-testing | 3 | 17min | 6min |
 
 **Recent Trend:**
-- Last 5 plans: 05-04 (4min), 05-05 (5min), 05-06 (2min), 06-03 (4min), 06-02 (5min)
-- Trend: Consistent fast execution for infrastructure and testing plans (~4min average)
+- Last 5 plans: 05-05 (5min), 05-06 (2min), 06-03 (4min), 06-02 (5min), 06-06 (8min)
+- Trend: Testing plans average 6min (FFI boundary tests took 8min due to async pattern adjustments)
 
 *Updated after each plan completion*
 
@@ -147,6 +147,10 @@ Recent decisions affecting current work:
 - **05-06:** Version check runs on all PRs (not path-filtered) for early drift detection
 - **05-06:** Release notes include installation instructions for all 4 package managers
 - **05-06:** Prerelease flag auto-detected from version suffix (e.g., -alpha, -beta)
+- **06-06:** Python FFI tests use pytest-asyncio for async/await verification (Python binding is async-only)
+- **06-06:** Node.js FFI tests use synchronous expect for type conversion errors (napi-rs fails at conversion boundary)
+- **06-06:** C# FFI tests use Assert.Inconclusive for graceful skip when native library unavailable
+- **06-06:** All FFI tests verify error messages are readable UTF-8 strings without null bytes (memory corruption detection)
 - **06-02:** Nock cannot intercept native Rust HTTP calls from ureq
 - **06-02:** Fixture validation approach: validate fixture structure, optional real API tests
 - **06-02:** Integration tests use describe.skip pattern for conditional execution
@@ -221,18 +225,21 @@ Recent decisions affecting current work:
 - PENDING: Alpine/musl builds need validation if musllinux wheels required
 
 **Phase 6 (Testing):**
-- PHASE IN PROGRESS: 2 of 5 plans complete
+- PHASE IN PROGRESS: 3 of 5 plans complete
 - 06-02: Node.js response compatibility testing (fixture-based validation, 4 passing tests)
 - 06-03: Performance benchmarking infrastructure (pytest-benchmark, Jest, official SDK comparison)
+- 06-06: FFI boundary tests for all bindings (Python: 13 tests, Node.js: 22 tests, C#: 19 tests)
 - READY: Baseline recording scripts for official SDK performance capture
 - READY: Threshold assertions (Python ≤2x, Node.js ≤1.5x) validating SC #4
 - READY: Response structure validation without network calls (90+ fields)
+- READY: FFI boundary verification (error handling, panic recovery, memory safety, async/thread safety)
 - PENDING: Integration benchmarks require FUGLE_API_KEY and official SDK installation
 - PENDING: Baseline recording required before comparison tests can validate thresholds
+- PENDING: C# FFI tests need native library build to run full suite (18/19 tests skip gracefully)
 
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 06-02-PLAN.md (Node.js Response Compatibility)
+Stopped at: Completed 06-06-PLAN.md (FFI Boundary Tests)
 Resume file: N/A
-Next: Continue Phase 6 (Testing) - 3 plans remaining
+Next: Continue Phase 6 (Testing) - 2 plans remaining (06-04, 06-05)
