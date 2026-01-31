@@ -116,10 +116,3 @@ coverage/
 *.lcov
 test-results/
 
-# --------------------------------------------
-# Local test files (may contain API keys)
-# --------------------------------------------
-py/test_*.py
-js/test_*.js
-bindings/go/examples/*.go
-!bindings/go/examples/go.mod
