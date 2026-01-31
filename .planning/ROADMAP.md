@@ -10,9 +10,10 @@ Transform the SDK constructor APIs from positional string arguments to options o
 
 ## Phases
 
-### Phase 1: Core Config Validation & Defaults
+### Phase 1: Core Config Validation & Defaults ✓
 
 **Goal**: Establish canonical defaults, add comprehensive validation, align with official SDKs
+**Status**: Complete (2026-02-01)
 **Depends on**: Nothing (first phase)
 **Plans:** 2 plans
 
@@ -26,8 +27,8 @@ Transform the SDK constructor APIs from positional string arguments to options o
 **Requirements addressed:** VAL-01, VAL-02, VAL-03, VAL-04, CON-01
 
 Plans:
-- [ ] 01-01-PLAN.md — ReconnectionConfig validation & default constants
-- [ ] 01-02-PLAN.md — HealthCheckConfig validation, default alignment & exports
+- [x] 01-01-PLAN.md — ReconnectionConfig validation & default constants
+- [x] 01-02-PLAN.md — HealthCheckConfig validation, default alignment & exports
 
 ### Phase 2: Python Binding Enhancement
 
