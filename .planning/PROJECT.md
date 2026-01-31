@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A unified multi-language SDK for Fugle Market Data API, built on a Rust core with bindings for Python, Node.js, and C#. This project extracts and generalizes the SDK from the fubon-sdk-core project, replacing language-specific implementations with a single Rust codebase that provides consistent behavior and API compatibility across all target languages.
+A unified multi-language SDK for Fugle Market Data API, built on a Rust core with production-ready bindings for Python, Node.js, C#, Java, and Go. Provides complete REST API coverage (26+ endpoints) and real-time WebSocket streaming with native async support in all languages.
 
 ## Core Value
 
@@ -12,67 +12,85 @@ A unified multi-language SDK for Fugle Market Data API, built on a Rust core wit
 
 ### Validated
 
-- ✓ Rust core REST client implementation — existing
-- ✓ Rust core WebSocket client implementation — existing
-- ✓ Python binding via PyO3/maturin — existing, tested
-- ✓ Node.js binding via napi-rs — existing, untested
+- ✓ Cargo workspace setup with shared dependencies — v0.2.0
+- ✓ Cross-platform build support (Linux, macOS, Windows) — v0.2.0
+- ✓ CI/CD pipeline for automated builds and tests — v0.2.0
+- ✓ PyO3 0.27+ with maturin 1.11+ for Python binding — v0.2.0
+- ✓ Native asyncio integration for Python async/await — v0.2.0
+- ✓ Python API compatibility with fugle-marketdata-python — v0.2.0
+- ✓ Complete PEP 484 type hints for Python — v0.2.0
+- ✓ Python wheels published to PyPI — v0.2.0
+- ✓ napi-rs 3.4+ for Node.js binding — v0.2.0
+- ✓ Native event loop integration for Node.js async — v0.2.0
+- ✓ Node.js API compatibility with fugle-marketdata-node — v0.2.0
+- ✓ Complete TypeScript type definitions — v0.2.0
+- ✓ Node.js native addon published to npm — v0.2.0
+- ✓ UniFFI-based C# binding with Task async — v0.2.0
+- ✓ C# API compatibility with FubonNeo patterns — v0.2.0
+- ✓ C# package published to NuGet — v0.2.0
+- ✓ Java binding via uniffi-bindgen-java with CompletableFuture — v0.2.0
+- ✓ Idiomatic Java wrapper with builder pattern — v0.2.0
+- ✓ Go binding via uniffi-bindgen-go with channel wrapper — v0.2.0
+- ✓ Unit tests for all language bindings — v0.2.0
+- ✓ API compatibility tests against official SDKs — v0.2.0
+- ✓ Integration tests with real Fugle API — v0.2.0
+- ✓ Complete REST API coverage (Historical, Snapshot, Technical, Corporate) — v0.2.0
 
 ### Active
 
-- [ ] Python API compatibility with fugle-marketdata-python
-- [ ] Python test coverage for all endpoints
-- [ ] Node.js API compatibility with fugle-marketdata-node
-- [ ] Node.js test coverage for all endpoints
-- [ ] C# binding via UniFFI
-- [ ] C# API compatibility with FubonNeo patterns
-- [ ] C# test coverage for all endpoints
-- [ ] PyPI package publishing setup
-- [ ] npm package publishing setup
-- [ ] NuGet package publishing setup
+(None — fresh requirements defined in next milestone)
 
 ### Out of Scope
 
-- Mobile SDKs (Swift/Kotlin) — focus on server-side languages first
-- WebSocket Historical API — only REST Historical needed
+- Mobile SDKs (Swift/Kotlin) — focus on server-side languages first, consider for v0.3.0
+- WebSocket Historical API — only REST Historical needed per API spec
 - Breaking API changes — must maintain compatibility with official SDKs
 - Custom API extensions — stick to official SDK feature set
+- Synchronous-only APIs — async-first approach validated
+- Embedded data storage — SDK should remain stateless
 
 ## Context
 
-**Origin:** This project was extracted from `/Users/zackfan/Project/fubon/sdk-core` to create a standalone, multi-language SDK package.
+**Current State (v0.2.0):**
+- 78,000 lines of code across Rust, Python, TypeScript, C#, Java, Go
+- Tech stack: Rust core (ureq, tokio-tungstenite), PyO3, napi-rs, UniFFI
+- 5 production-ready language bindings with complete API parity
+- 182+ tests with real API verification
+- Automated distribution to PyPI, npm, NuGet, GitHub Packages
 
-**Reference SDKs (for API compatibility validation):**
-- Python: `/Users/zackfan/Project/fugle/fugle-marketdata-python/`
-- Node.js: `/Users/zackfan/Project/fugle/fugle-marketdata-node/`
-- C#: `/Users/zackfan/Project/fubon/sdk-core/fubon-cs/FubonNeo`
-
-**Current Architecture:**
+**Architecture:**
 - `core/` — Rust core library (REST + WebSocket clients)
 - `py/` — Python bindings via PyO3 + maturin
 - `js/` — Node.js bindings via napi-rs
-- `uniffi/` — UniFFI definitions (for C# and future mobile support)
+- `uniffi/` — UniFFI bindings for C#, Java, Go
+- `dotnet/` — C# wrapper project
+- `java/` — Java wrapper with Gradle
+- `go/` — Go wrapper with channel-based streaming
 
-**API Coverage:**
-- REST Intraday: quotes, trades, volumes, etc.
-- REST Historical: candles, historical quotes
-- WebSocket Intraday: real-time market data streaming
+**Reference SDKs (for API compatibility):**
+- Python: `/Users/zackfan/Project/fugle/fugle-marketdata-python/`
+- Node.js: `/Users/zackfan/Project/fugle/fugle-marketdata-node/`
 
 ## Constraints
 
-- **API Compatibility**: Must match official SDK method signatures and response structures exactly
-- **Tech Stack**: Rust core with language-specific FFI bindings (PyO3, napi-rs, UniFFI)
-- **Build Targets**: Must support common platforms (Linux, macOS, Windows) for each language
+- **API Compatibility**: Must match official SDK method signatures and response structures
+- **Tech Stack**: Rust core with language-specific FFI (PyO3, napi-rs, UniFFI)
+- **Build Targets**: Linux (x86_64, aarch64), macOS (x64, arm64), Windows (x64)
 - **Dependencies**: Minimize runtime dependencies in binding layers
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Rust as core language | Memory safety, performance, cross-platform FFI support | — Pending |
-| PyO3 for Python binding | Most mature Rust-Python FFI solution | — Pending |
-| napi-rs for Node.js binding | Native Node.js addon with good async support | — Pending |
-| UniFFI for C# binding | Multi-language support from single definition | — Pending |
-| Priority: Python → Node.js → C# | Python already working, Node.js implemented, C# needs new work | — Pending |
+| Rust as core language | Memory safety, performance, cross-platform FFI | ✓ Good |
+| PyO3 for Python binding | Most mature Rust-Python FFI, native asyncio | ✓ Good |
+| napi-rs for Node.js binding | Native Node.js addon with async support | ✓ Good |
+| UniFFI for C#/Java/Go | Single definition, multi-language output | ✓ Good |
+| Priority: Python → Node.js → C# | Risk-ordered by binding maturity | ✓ Good |
+| Proc-macro UniFFI (not UDL) | Avoids duplicate type generation | ✓ Good |
+| spawn_blocking for REST | Core uses blocking ureq, wrap in async | ✓ Good |
+| Decimal phase numbering | Clear insertion semantics for urgent work | ✓ Good |
+| GitHub Packages for Java | Avoids Maven Central GPG signing complexity | ✓ Good |
 
 ---
-*Last updated: 2025-01-30 after initialization*
+*Last updated: 2026-01-31 after v0.2.0 milestone*
