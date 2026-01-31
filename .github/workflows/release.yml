@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Extract version from tag
+  extract-version:
+    name: Extract Version from Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "## Release v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Starting coordinated release for version **$VERSION**" >> $GITHUB_STEP_SUMMARY
+
+  # Wave 1: Build all platforms in parallel
+  build-python:
+    name: Build Python Wheels
+    needs: extract-version
+    uses: ./.github/workflows/build-python.yml
+    with:
+      version: ${{ needs.extract-version.outputs.version }}
+
+  build-nodejs:
+    name: Build Node.js Native Addon
+    needs: extract-version
+    uses: ./.github/workflows/build-nodejs.yml
+    with:
+      version: ${{ needs.extract-version.outputs.version }}
+
+  build-uniffi:
+    name: Build UniFFI Native Libraries
+    needs: extract-version
+    uses: ./.github/workflows/build-uniffi.yml
+
+  # Wave 2: Publish after builds complete
+  publish-python:
+    name: Publish to PyPI
+    needs: build-python
+    uses: ./.github/workflows/publish-python.yml
+
+  publish-nodejs:
+    name: Publish to npm
+    needs: build-nodejs
+    uses: ./.github/workflows/publish-nodejs.yml
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-nuget:
+    name: Publish to NuGet
+    needs: build-uniffi
+    uses: ./.github/workflows/publish-nuget.yml
+    secrets:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+  publish-java:
+    name: Publish to GitHub Packages
+    needs: build-uniffi
+    uses: ./.github/workflows/publish-java.yml
+
+  # Wave 3: Create GitHub Release after all publishes
+  create-release:
+    name: Create GitHub Release
+    needs: [extract-version, publish-python, publish-nodejs, publish-nuget, publish-java]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate release notes
+        run: |
+          VERSION=${{ needs.extract-version.outputs.version }}
+          cat << 'NOTES' > release_notes.md
+          ## What's Changed
+
+          This release publishes version ${VERSION} across all supported platforms.
+
+          ### Installation
+
+          **Python** (via pip):
+          ```bash
+          pip install fugle-marketdata==${VERSION}
+          ```
+
+          **Node.js** (via npm):
+          ```bash
+          npm install @fugle/marketdata@${VERSION}
+          ```
+
+          **C#** (via NuGet):
+          ```bash
+          dotnet add package MarketdataUniffi --version ${VERSION}
+          ```
+
+          **Java** (via GitHub Packages):
+          Add to your `build.gradle.kts`:
+          ```kotlin
+          repositories {
+              maven {
+                  url = uri("https://maven.pkg.github.com/fugle-dev/fugle-marketdata-sdk")
+                  credentials {
+                      username = System.getenv("GITHUB_ACTOR")
+                      password = System.getenv("GITHUB_TOKEN")
+                  }
+              }
+          }
+
+          dependencies {
+              implementation("tw.com.fugle:marketdata-java:${VERSION}")
+          }
+          ```
+
+          ### Packages Published
+
+          | Platform | Package | Registry |
+          |----------|---------|----------|
+          | Python | `fugle-marketdata` | [PyPI](https://pypi.org/project/fugle-marketdata/) |
+          | Node.js | `@fugle/marketdata` | [npm](https://www.npmjs.com/package/@fugle/marketdata) |
+          | C# | `MarketdataUniffi` | [NuGet](https://www.nuget.org/packages/MarketdataUniffi/) |
+          | Java | `tw.com.fugle:marketdata-java` | GitHub Packages |
+          NOTES
+
+          # Replace ${VERSION} with actual version
+          sed -i "s/\${VERSION}/$VERSION/g" release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(needs.extract-version.outputs.version, '-') }}
+
+      - name: Release Summary
+        run: |
+          VERSION=${{ needs.extract-version.outputs.version }}
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Package | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python | fugle-marketdata | $VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js | @fugle/marketdata | $VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| C# | MarketdataUniffi | $VERSION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Java | marketdata-java | $VERSION |" >> $GITHUB_STEP_SUMMARY
