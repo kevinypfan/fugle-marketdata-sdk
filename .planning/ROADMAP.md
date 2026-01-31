@@ -20,6 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4.2: Java Binding via UniFFI** - Generate Java bindings using uniffi-bindgen-java with CompletableFuture async (INSERTED) ✓
 - [x] **Phase 5: Cross-Platform Distribution** - Package publishing for PyPI, npm, and NuGet ✓
 - [x] **Phase 6: Testing & Production Readiness** - Comprehensive API compatibility and integration testing ✓
+- [ ] **Phase 7: Complete REST API Coverage** - Implement all missing REST endpoints (Historical, Snapshot, Technical, Corporate Actions)
 
 ## Phase Details
 
@@ -171,10 +172,33 @@ Plans:
 - [x] 06-08-PLAN.md — (Gap Closure) Record official SDK performance baselines ✓
 - [x] 06-09-PLAN.md — (Gap Closure) Execute integration tests with real API key and document results ✓
 
+### Phase 7: Complete REST API Coverage
+**Goal**: Implement all missing REST API endpoints to achieve 100% API parity with official Fugle SDKs
+**Depends on**: Phase 6 (testing infrastructure for validation)
+**Requirements**: API-COMPLETE-01, API-COMPLETE-02, API-COMPLETE-03, API-COMPLETE-04
+**Success Criteria** (what must be TRUE):
+  1. All Stock endpoints implemented: Historical (candles, stats), Snapshot (quotes, movers, actives), Technical (SMA, RSI, KDJ, MACD, BB), Corporate Actions (capital-changes, dividends, listing-applicants), and batch Tickers
+  2. All FutOpt endpoints implemented: Historical (candles, daily) and batch Tickers
+  3. All new endpoints exposed through all 5 language bindings (Python, Node.js, C#, Java, Go)
+  4. Response types match official SDK structures exactly (verified by compatibility tests)
+  5. Integration tests pass for all new endpoints with real API calls
+**Plans**: 9 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Stock Historical endpoints (candles, stats) in Rust core
+- [ ] 07-02-PLAN.md — Stock Snapshot endpoints (quotes, movers, actives) in Rust core
+- [ ] 07-03-PLAN.md — Stock Technical indicators (SMA, RSI, KDJ, MACD, BB) in Rust core
+- [ ] 07-04-PLAN.md — Stock Corporate Actions (capital-changes, dividends, listing-applicants) in Rust core
+- [ ] 07-05-PLAN.md — FutOpt Historical endpoints (candles, daily) in Rust core
+- [ ] 07-06-PLAN.md — UniFFI bindings for C#, Java, Go (all new endpoints)
+- [ ] 07-07-PLAN.md — Python bindings via PyO3 (all new endpoints)
+- [ ] 07-08-PLAN.md — Node.js bindings via napi-rs (all new endpoints)
+- [ ] 07-09-PLAN.md — Comprehensive compatibility and integration tests
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 4.2 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 4.2 → 5 → 6 → 7
 
 Note: Phases 2 and 3 can proceed in parallel after Phase 1 completes.
 Note: Phase 4.1 and 4.2 are inserted phases to complete UniFFI bindings before distribution.
@@ -189,3 +213,4 @@ Note: Phase 4.1 and 4.2 are inserted phases to complete UniFFI bindings before d
 | 4.2 Java Binding | 3/3 | Complete ✓ | 2026-01-31 |
 | 5. Distribution | 6/6 | Complete ✓ | 2026-01-31 |
 | 6. Testing | 9/9 | Complete ✓ | 2026-01-31 |
+| 7. REST API Coverage | 0/9 | Not Started | - |
