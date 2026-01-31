@@ -577,10 +577,15 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.FutOptClient = nativeBinding.FutOptClient
+module.exports.FutOptHistoricalClient = nativeBinding.FutOptHistoricalClient
 module.exports.FutOptIntradayClient = nativeBinding.FutOptIntradayClient
 module.exports.FutOptWebSocketClient = nativeBinding.FutOptWebSocketClient
 module.exports.RestClient = nativeBinding.RestClient
 module.exports.StockClient = nativeBinding.StockClient
+module.exports.StockCorporateActionsClient = nativeBinding.StockCorporateActionsClient
+module.exports.StockHistoricalClient = nativeBinding.StockHistoricalClient
 module.exports.StockIntradayClient = nativeBinding.StockIntradayClient
+module.exports.StockSnapshotClient = nativeBinding.StockSnapshotClient
+module.exports.StockTechnicalClient = nativeBinding.StockTechnicalClient
 module.exports.StockWebSocketClient = nativeBinding.StockWebSocketClient
 module.exports.WebSocketClient = nativeBinding.WebSocketClient
