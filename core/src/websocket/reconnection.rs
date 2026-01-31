@@ -41,31 +41,91 @@ impl Default for ReconnectionConfig {
 }
 
 impl ReconnectionConfig {
-    /// Create a new reconnection config with custom values
-    pub fn new(max_attempts: u32, initial_delay: Duration, max_delay: Duration) -> Self {
-        Self {
+    /// Create a new reconnection config with validation
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if:
+    /// - `max_attempts` is 0 (must be >= 1)
+    /// - `initial_delay` is less than 100ms
+    /// - `max_delay` is less than `initial_delay`
+    pub fn new(
+        max_attempts: u32,
+        initial_delay: Duration,
+        max_delay: Duration,
+    ) -> Result<Self, MarketDataError> {
+        if max_attempts == 0 {
+            return Err(MarketDataError::ConfigError(
+                "max_attempts must be >= 1".to_string(),
+            ));
+        }
+
+        if initial_delay < Duration::from_millis(MIN_INITIAL_DELAY_MS) {
+            return Err(MarketDataError::ConfigError(format!(
+                "initial_delay must be >= {}ms (got {}ms)",
+                MIN_INITIAL_DELAY_MS,
+                initial_delay.as_millis()
+            )));
+        }
+
+        if max_delay < initial_delay {
+            return Err(MarketDataError::ConfigError(format!(
+                "max_delay ({}ms) must be >= initial_delay ({}ms)",
+                max_delay.as_millis(),
+                initial_delay.as_millis()
+            )));
+        }
+
+        Ok(Self {
             max_attempts,
             initial_delay,
             max_delay,
+        })
+    }
+
+    /// Builder: set max attempts with validation
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if `max_attempts` is 0
+    pub fn with_max_attempts(mut self, max_attempts: u32) -> Result<Self, MarketDataError> {
+        if max_attempts == 0 {
+            return Err(MarketDataError::ConfigError(
+                "max_attempts must be >= 1".to_string(),
+            ));
         }
-    }
-
-    /// Builder: set max attempts
-    pub fn with_max_attempts(mut self, max_attempts: u32) -> Self {
         self.max_attempts = max_attempts;
-        self
+        Ok(self)
     }
 
-    /// Builder: set initial delay
-    pub fn with_initial_delay(mut self, initial_delay: Duration) -> Self {
+    /// Builder: set initial delay with validation
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if `initial_delay` is less than 100ms
+    pub fn with_initial_delay(mut self, initial_delay: Duration) -> Result<Self, MarketDataError> {
+        if initial_delay < Duration::from_millis(MIN_INITIAL_DELAY_MS) {
+            return Err(MarketDataError::ConfigError(format!(
+                "initial_delay must be >= {}ms (got {}ms)",
+                MIN_INITIAL_DELAY_MS,
+                initial_delay.as_millis()
+            )));
+        }
         self.initial_delay = initial_delay;
-        self
+        Ok(self)
     }
 
-    /// Builder: set max delay
-    pub fn with_max_delay(mut self, max_delay: Duration) -> Self {
+    /// Builder: set max delay with validation
+    ///
+    /// # Errors
+    /// Returns `MarketDataError::ConfigError` if `max_delay` is less than `initial_delay`
+    pub fn with_max_delay(mut self, max_delay: Duration) -> Result<Self, MarketDataError> {
+        if max_delay < self.initial_delay {
+            return Err(MarketDataError::ConfigError(format!(
+                "max_delay ({}ms) must be >= initial_delay ({}ms)",
+                max_delay.as_millis(),
+                self.initial_delay.as_millis()
+            )));
+        }
         self.max_delay = max_delay;
-        self
+        Ok(self)
     }
 }
 
