@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2025-01-30)
 ## Current Position
 
 Phase: 7 of 7 (Complete REST API Coverage)
-Plan: 5 of 9 in current phase
-Status: Executing Wave 1
-Last activity: 2026-01-31 - Completed 07-05-PLAN.md (FutOpt Historical)
+Plan: 8 of 9 in current phase
+Status: Executing Wave 2
+Last activity: 2026-01-31 - Completed 07-08-PLAN.md (Node.js Bindings)
 
-Progress: [██████████░] 94% (44 of 48 plans complete)
+Progress: [██████████░] 98% (47 of 48 plans complete)
 
 ## Performance Metrics
 
@@ -168,6 +168,9 @@ Recent decisions affecting current work:
 - **06-05:** Java uses Class.forName() for UniFFI-generated types in uniffi.marketdata_uniffi package
 - **06-05:** Go uses reflect.TypeOf() for struct field validation with public field names
 - **06-05:** All UniFFI bindings validate both required (symbol, date) and optional (name, exchange) fields
+- **07-08:** Intermediate let bindings for Rust lifetime management when chaining napi-rs client calls
+- **07-08:** Pass after_hours as Option<bool> instead of flag method (core API requires boolean argument)
+- **07-08:** TypeScript dev dependency added for npx tsc --noEmit validation of type definitions
 
 ### Roadmap Evolution
 
@@ -248,17 +251,20 @@ Recent decisions affecting current work:
 - VERIFIED: All 4 success criteria pass in VERIFICATION.md
 
 **Phase 7 (Complete REST API Coverage):**
-- IN PROGRESS: Wave 1 execution
+- IN PROGRESS: Wave 2 execution
 - 07-01: Stock Historical endpoints (candles, stats) - COMPLETE
 - 07-02: Stock Snapshot endpoints (quotes, movers, actives) - COMPLETE
 - 07-03: Stock Technical Indicators (SMA, RSI, KDJ, MACD, BB) - COMPLETE
 - 07-04: Stock Corporate Actions (capital-changes, dividends, listing-applicants) - COMPLETE
 - 07-05: FutOpt Historical endpoints (candles, daily) - COMPLETE
-- 07-06 to 07-09: Remaining endpoints TBD
+- 07-06: Python bindings for new REST endpoints - COMPLETE
+- 07-07: UniFFI bindings for new REST endpoints - COMPLETE
+- 07-08: Node.js bindings for new REST endpoints - COMPLETE
+- 07-09: Remaining (UniFFI bindings for C#/Java/Go) - TBD
 
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 07-05-PLAN.md (FutOpt Historical)
+Stopped at: Completed 07-08-PLAN.md (Node.js Bindings)
 Resume file: N/A
-Next: Continue Wave 1 execution with 07-06
+Next: Continue Wave 2 execution with 07-09 (UniFFI bindings for C#/Java/Go)
