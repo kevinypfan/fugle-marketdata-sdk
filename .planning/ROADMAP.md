@@ -137,7 +137,8 @@ Plans:
   1. Python users can `pip install fugle-marketdata` on Linux (x86_64, aarch64), macOS (universal2), and Windows without requiring Rust toolchain
   2. Node.js users can `npm install @fugle/marketdata` and receive pre-built native addons for their platform without compilation
   3. C# users can install from NuGet and reference the package with native binaries bundled for Windows, Linux, and macOS
-  4. Automated release workflow publishes all packages with synchronized version numbers on a single trigger
+  4. Java users can add the Gradle dependency and get pre-built native libraries bundled in the JAR
+  5. Automated release workflow publishes all packages (Python, Node.js, C#, Java) with synchronized version numbers on a single trigger
 **Plans**: 6 plans
 
 Plans:
