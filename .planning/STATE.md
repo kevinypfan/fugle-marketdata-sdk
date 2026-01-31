@@ -257,14 +257,14 @@ Recent decisions affecting current work:
 - 07-03: Stock Technical Indicators (SMA, RSI, KDJ, MACD, BB) - COMPLETE
 - 07-04: Stock Corporate Actions (capital-changes, dividends, listing-applicants) - COMPLETE
 - 07-05: FutOpt Historical endpoints (candles, daily) - COMPLETE
-- 07-06: Python bindings for new REST endpoints - COMPLETE
-- 07-07: UniFFI bindings for new REST endpoints - COMPLETE
+- 07-06: UniFFI bindings for new REST endpoints - COMPLETE
+- 07-07: Python bindings for new REST endpoints - COMPLETE (5 client classes, 17 methods, 516 lines type stubs)
 - 07-08: Node.js bindings for new REST endpoints - COMPLETE
-- 07-09: Remaining (UniFFI bindings for C#/Java/Go) - TBD
+- 07-09: Remaining plans TBD
 
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 07-08-PLAN.md (Node.js Bindings)
+Stopped at: Completed 07-07-PLAN.md (Python Bindings)
 Resume file: N/A
-Next: Continue Wave 2 execution with 07-09 (UniFFI bindings for C#/Java/Go)
+Next: Continue Wave 2 execution
