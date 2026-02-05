@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 12 of 15 — Python Config Exposure
-Plan: 2/3 complete (12-02-PLAN.md complete ✓)
-Status: Phase 8-11 complete ✓, Phase 12 in progress
-Last activity: 2026-02-05 - Completed 12-02-PLAN.md (Client kwargs constructors)
+Plan: 3/3 complete ✓ (Phase 12 complete)
+Status: Phases 8-12 complete ✓
+Last activity: 2026-02-05 - Completed 12-03-PLAN.md (Config unit tests & type stubs)
 
-Progress: [████▓░░░░░] 54% (Phases 8-11 complete, Plans 12-01, 12-02 complete)
+Progress: [█████░░░░░] 56% (Phases 8-12 complete)
 
-**Note:** Phase 12-02 added kwargs constructors to RestClient and WebSocketClient with auth validation. Ready for 12-03 (Integration tests).
+**Note:** Phase 12 complete - Python SDK now has full v0.3.0 config exposure with kwargs constructors, comprehensive test coverage (32 tests), and accurate type stubs for IDE support.
 
 ## Milestone History
 
@@ -58,6 +58,12 @@ From Phase 12-02 execution:
 - Core uses base_url() method (not with_base_url())
 - WebSocketClient stores configs for future propagation to child clients
 
+From Phase 12-03 execution:
+- Comprehensive test coverage: 32 unit tests for all config classes and constructors
+- Test pattern: construction, validation, field access, error paths
+- Type stub accuracy: field names and signatures match implementation exactly
+- Validation constraints documented in type stub docstrings for IDE hints
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -94,6 +100,6 @@ None — Phases 8-11 complete. Phases 12, 13, 14 can run in parallel.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 12-02-PLAN.md (Client kwargs constructors with auth validation)
+Stopped at: Completed 12-03-PLAN.md (Phase 12 complete ✓)
 Resume file: N/A
-Next: `/gsd:execute-phase 12 03` (Integration tests) or continue with other v0.3.0 phases
+Next: Phase 13 (Node.js config exposure) or Phase 14 (C# config exposure) - can run in parallel
