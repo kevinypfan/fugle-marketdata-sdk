@@ -251,10 +251,14 @@ impl Default for HealthCheckConfig {
 /// # Example (Python)
 ///
 /// ```python
-/// from marketdata_py import WebSocketClient
+/// from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
 ///
 /// # Create client with API key
-/// ws = WebSocketClient("your-api-key")
+/// ws = WebSocketClient(api_key="your-api-key")
+///
+/// # With custom reconnect config
+/// rc = ReconnectConfig(max_attempts=10)
+/// ws = WebSocketClient(api_key="your-key", reconnect=rc)
 ///
 /// # Access stock streaming
 /// ws.stock.connect()
@@ -263,38 +267,110 @@ impl Default for HealthCheckConfig {
 #[pyclass]
 pub struct WebSocketClient {
     api_key: String,
+    base_url: Option<String>,
+    reconnect_config: ReconnectConfig,
+    health_check_config: HealthCheckConfig,
 }
 
 #[pymethods]
 impl WebSocketClient {
-    /// Create a new WebSocket client with API key authentication
+    /// Create a new WebSocket client with authentication
     ///
-    /// Args:
-    ///     api_key: Your Fugle API key
+    /// Provide exactly one authentication method:
+    ///   - api_key: Your Fugle API key
+    ///   - bearer_token: Bearer token for authentication
+    ///   - sdk_token: SDK token for authentication
+    ///
+    /// Optional configuration:
+    ///   - base_url: Custom base URL for WebSocket endpoint
+    ///   - reconnect: ReconnectConfig for auto-reconnection behavior
+    ///   - health_check: HealthCheckConfig for connection monitoring
     ///
     /// Returns:
     ///     A new WebSocketClient instance
+    ///
+    /// Raises:
+    ///     ValueError: If zero or multiple auth methods provided
+    ///
+    /// Example:
+    ///     ```python
+    ///     # Simple usage
+    ///     ws = WebSocketClient(api_key="your-key")
+    ///
+    ///     # With custom reconnect
+    ///     rc = ReconnectConfig(max_attempts=10)
+    ///     ws = WebSocketClient(api_key="key", reconnect=rc)
+    ///
+    ///     # With health check
+    ///     hc = HealthCheckConfig(enabled=True, interval_ms=15000)
+    ///     ws = WebSocketClient(api_key="key", health_check=hc)
+    ///     ```
     #[new]
-    pub fn new(api_key: String) -> Self {
-        Self { api_key }
+    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None, reconnect=None, health_check=None))]
+    pub fn new(
+        api_key: Option<String>,
+        bearer_token: Option<String>,
+        sdk_token: Option<String>,
+        base_url: Option<String>,
+        reconnect: Option<&Bound<'_, ReconnectConfig>>,
+        health_check: Option<&Bound<'_, HealthCheckConfig>>,
+    ) -> PyResult<Self> {
+        // Validate exactly one auth method (fail fast)
+        let auth_count = [&api_key, &bearer_token, &sdk_token]
+            .iter()
+            .filter(|opt| opt.is_some())
+            .count();
+
+        if auth_count != 1 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Provide exactly one of: api_key, bearer_token, sdk_token"
+            ));
+        }
+
+        // Extract the auth key (for now, WebSocket uses string key internally)
+        let auth_key = api_key.or(bearer_token).or(sdk_token).unwrap();
+
+        // Extract configs with defaults (clone from Bound to avoid lifetime issues)
+        let reconnect_config = if let Some(cfg) = reconnect {
+            cfg.borrow().clone()
+        } else {
+            ReconnectConfig::default()
+        };
+
+        let health_check_config = if let Some(cfg) = health_check {
+            cfg.borrow().clone()
+        } else {
+            HealthCheckConfig::default()
+        };
+
+        Ok(Self {
+            api_key: auth_key,
+            base_url,
+            reconnect_config,
+            health_check_config,
+        })
     }
 
     /// Access stock market data WebSocket streaming
     ///
     /// Returns:
-    ///     StockWebSocketClient for stock streaming
+    ///     StockWebSocketClient for stock streaming with inherited config
     #[getter]
     pub fn stock(&self) -> StockWebSocketClient {
         StockWebSocketClient::new(self.api_key.clone())
+        // TODO: Pass reconnect_config and health_check_config to child client
+        // when core WebSocket supports runtime configuration
     }
 
     /// Access futures and options WebSocket streaming
     ///
     /// Returns:
-    ///     FutOptWebSocketClient for FutOpt streaming
+    ///     FutOptWebSocketClient for FutOpt streaming with inherited config
     #[getter]
     pub fn futopt(&self) -> FutOptWebSocketClient {
         FutOptWebSocketClient::new(self.api_key.clone())
+        // TODO: Pass reconnect_config and health_check_config to child client
+        // when core WebSocket supports runtime configuration
     }
 }
 
