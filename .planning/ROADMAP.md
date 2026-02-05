@@ -91,9 +91,10 @@ Plans:
 - Go binding (needs separate implementation)
 - Config exposure for any language
 
-### Phase 12: Python Config Exposure
+### Phase 12: Python Config Exposure ✓
 
 **Goal**: Add options-based constructor and config exposure to Python binding
+**Status**: Complete (2026-02-05)
 **Depends on**: Phase 8 (core validation), Phase 9 (async foundation)
 **Plans:** 3 plans
 
@@ -103,14 +104,14 @@ Plans:
 - Modified `WebSocketClient` to accept optional `reconnect` and `health_check` configs
 - Wire `ReconnectConfig` to core's validated config
 - Authentication validation (exactly one method required)
-- Unit tests for all constructor patterns
+- Unit tests for all constructor patterns (32 tests, 100% pass)
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, TEST-01
 
 Plans:
-- [ ] 12-01-PLAN.md — Config classes (HealthCheckConfig, updated ReconnectConfig)
-- [ ] 12-02-PLAN.md — Client constructors (RestClient/WebSocketClient kwargs)
-- [ ] 12-03-PLAN.md — Tests and type stubs
+- [x] 12-01-PLAN.md — Config classes (HealthCheckConfig, updated ReconnectConfig)
+- [x] 12-02-PLAN.md — Client constructors (RestClient/WebSocketClient kwargs)
+- [x] 12-03-PLAN.md — Tests and type stubs
 
 ### Phase 13: Node.js Config Exposure
 
@@ -193,5 +194,5 @@ Phases 12, 13, and 14 can run in parallel after their dependencies complete.
 
 ---
 *Created: 2026-02-01*
-*Updated: 2026-02-05 — Added Phase 12 plans*
+*Updated: 2026-02-05 — Phase 12 complete*
 *Research basis: .planning/research/v0.3.0-SUMMARY.md*

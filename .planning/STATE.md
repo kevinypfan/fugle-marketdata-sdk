@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 Phase: 12 of 15 — Python Config Exposure
 Plan: 3/3 complete ✓ (Phase 12 complete)
-Status: Phases 8-12 complete ✓
+Status: Phases 8-12 complete ✓ (verified)
 Last activity: 2026-02-05 - Completed 12-03-PLAN.md (Config unit tests & type stubs)
 
-Progress: [█████░░░░░] 56% (Phases 8-12 complete)
+Progress: [██████░░░░] 63% (Phases 8-12 complete, 5/8 v0.3.0 phases done)
 
 **Note:** Phase 12 complete - Python SDK now has full v0.3.0 config exposure with kwargs constructors, comprehensive test coverage (32 tests), and accurate type stubs for IDE support.
 
