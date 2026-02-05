@@ -33,17 +33,69 @@ pub struct RestClient {
 
 #[pymethods]
 impl RestClient {
-    /// Create a new REST client with API key authentication
+    /// Create a new REST client with authentication
     ///
-    /// Args:
-    ///     api_key: Your Fugle API key
+    /// Provide exactly one authentication method:
+    ///   - api_key: Your Fugle API key
+    ///   - bearer_token: Bearer token for authentication
+    ///   - sdk_token: SDK token for authentication
+    ///
+    /// Optional:
+    ///   - base_url: Custom base URL for API endpoint
     ///
     /// Returns:
     ///     A new RestClient instance
+    ///
+    /// Raises:
+    ///     ValueError: If zero or multiple auth methods provided
+    ///
+    /// Example:
+    ///     ```python
+    ///     # API key auth
+    ///     client = RestClient(api_key="your-api-key")
+    ///
+    ///     # Bearer token auth
+    ///     client = RestClient(bearer_token="your-token")
+    ///
+    ///     # With custom base URL
+    ///     client = RestClient(api_key="key", base_url="https://custom.api")
+    ///     ```
     #[new]
-    pub fn new(api_key: String) -> Self {
-        let inner = marketdata_core::RestClient::new(marketdata_core::Auth::ApiKey(api_key));
-        Self { inner }
+    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None))]
+    pub fn new(
+        api_key: Option<String>,
+        bearer_token: Option<String>,
+        sdk_token: Option<String>,
+        base_url: Option<String>,
+    ) -> PyResult<Self> {
+        // Validate exactly one auth method (fail fast)
+        let auth_count = [&api_key, &bearer_token, &sdk_token]
+            .iter()
+            .filter(|opt| opt.is_some())
+            .count();
+
+        if auth_count != 1 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Provide exactly one of: api_key, bearer_token, sdk_token"
+            ));
+        }
+
+        // Build Auth enum after validation
+        let auth = if let Some(key) = api_key {
+            marketdata_core::Auth::ApiKey(key)
+        } else if let Some(token) = bearer_token {
+            marketdata_core::Auth::BearerToken(token)
+        } else {
+            marketdata_core::Auth::SdkToken(sdk_token.unwrap())
+        };
+
+        // Create client with optional base_url
+        let mut inner = marketdata_core::RestClient::new(auth);
+        if let Some(url) = base_url {
+            inner = inner.base_url(&url);
+        }
+
+        Ok(Self { inner })
     }
 
     /// Create a REST client with bearer token authentication
