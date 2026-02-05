@@ -117,7 +117,7 @@ Plans:
 
 **Goal**: Add options-based constructor and config exposure to Node.js binding
 **Depends on**: Phase 8 (core validation), Phase 10 (TypeScript foundation)
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 3 plans
 
 **Delivers:**
 - `WebSocketOptions` napi object with nested config types
@@ -128,6 +128,11 @@ Plans:
 - Updated `index.d.ts` with config option types
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, CON-02, TEST-01
+
+Plans:
+- [ ] 13-01-PLAN.md — Config option structs (ReconnectOptions, HealthCheckOptions, client options)
+- [ ] 13-02-PLAN.md — Client constructors (RestClient/WebSocketClient options acceptance)
+- [ ] 13-03-PLAN.md — TypeScript definitions and tests
 
 ### Phase 14: Java & Go Bindings
 
