@@ -1436,9 +1436,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_websocket_client_creation() {
-        let _client = WebSocketClient::new("test-key".to_string());
-        // Client should be created without error
+    fn test_websocket_client_creation_with_api_key() {
+        // WebSocketClient::new requires Python bindings, test the internal child client instead
+        let client = StockWebSocketClient::new("test-key".to_string());
+        let state = client.state.lock().unwrap();
+        assert!(state.is_none());
     }
 
     #[test]

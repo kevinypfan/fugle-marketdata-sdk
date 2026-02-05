@@ -1313,8 +1313,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rest_client_creation() {
-        let _client = RestClient::new("test-key".to_string());
+    fn test_rest_client_creation_with_api_key() {
+        let _client = RestClient::new(
+            Some("test-key".to_string()),
+            None,
+            None,
+            None,
+        ).unwrap();
         // Client should be created without error
     }
 
@@ -1328,5 +1333,22 @@ mod tests {
     fn test_rest_client_with_sdk_token() {
         let _client = RestClient::with_sdk_token("test-sdk-token".to_string());
         // Client should be created without error
+    }
+
+    #[test]
+    fn test_rest_client_no_auth_fails() {
+        let result = RestClient::new(None, None, None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rest_client_multiple_auth_fails() {
+        let result = RestClient::new(
+            Some("key".to_string()),
+            Some("token".to_string()),
+            None,
+            None,
+        );
+        assert!(result.is_err());
     }
 }
