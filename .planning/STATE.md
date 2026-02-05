@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 12 of 15 — Python Config Exposure
-Plan: 1/3 complete (12-01-PLAN.md complete ✓)
+Plan: 2/3 complete (12-02-PLAN.md complete ✓)
 Status: Phase 8-11 complete ✓, Phase 12 in progress
-Last activity: 2026-02-05 - Completed 12-01-PLAN.md (HealthCheckConfig + ReconnectConfig)
+Last activity: 2026-02-05 - Completed 12-02-PLAN.md (Client kwargs constructors)
 
-Progress: [████▓░░░░░] 53% (Phases 8-11 complete, Plan 12-01 complete)
+Progress: [████▓░░░░░] 54% (Phases 8-11 complete, Plans 12-01, 12-02 complete)
 
-**Note:** Phase 12-01 established Python config classes with core validation. Ready for 12-02 (RestClient options) and 12-03 (WebSocketClient options).
+**Note:** Phase 12-02 added kwargs constructors to RestClient and WebSocketClient with auth validation. Ready for 12-03 (Integration tests).
 
 ## Milestone History
 
@@ -50,6 +50,13 @@ From Phase 12-01 execution:
 - Config fields are immutable after construction (#[pyo3(get)] only, no set)
 - Validation happens at construction time (fail-fast Python convention)
 - to_core() method uses .expect() since validation already happened in constructor
+
+From Phase 12-02 execution:
+- Kwargs-only constructors (signature with *) matching official SDK pattern
+- Exactly-one-auth validation: ValueError if zero or multiple auth methods provided
+- Config objects passed as &Bound<'_, ConfigType> and cloned for storage
+- Core uses base_url() method (not with_base_url())
+- WebSocketClient stores configs for future propagation to child clients
 
 ### Patterns Established
 
@@ -87,6 +94,6 @@ None — Phases 8-11 complete. Phases 12, 13, 14 can run in parallel.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 12-01-PLAN.md (HealthCheckConfig + ReconnectConfig PyClasses)
+Stopped at: Completed 12-02-PLAN.md (Client kwargs constructors with auth validation)
 Resume file: N/A
-Next: `/gsd:execute-phase 12 02` (RestClient options constructor) or continue with other v0.3.0 phases
+Next: `/gsd:execute-phase 12 03` (Integration tests) or continue with other v0.3.0 phases
