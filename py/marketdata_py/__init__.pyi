@@ -82,11 +82,39 @@ class RestClient:
         ```
     """
 
-    def __init__(self, api_key: str) -> None:
-        """Create a new REST client with API key authentication.
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        bearer_token: str | None = None,
+        sdk_token: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        """Create a new REST client with authentication.
 
         Args:
-            api_key: Your Fugle API key
+            api_key: Your Fugle API key (exactly one auth method required)
+            bearer_token: Bearer token for authentication (exactly one auth method required)
+            sdk_token: SDK token for authentication (exactly one auth method required)
+            base_url: Optional custom base URL
+
+        Raises:
+            ValueError: If zero or multiple auth methods provided
+
+        Example:
+            ```python
+            # API key auth
+            client = RestClient(api_key="your-key")
+
+            # Bearer token auth
+            client = RestClient(bearer_token="your-token")
+
+            # SDK token auth
+            client = RestClient(sdk_token="your-sdk-token")
+
+            # With custom base URL
+            client = RestClient(api_key="key", base_url="https://custom.api")
+            ```
         """
         ...
 
@@ -99,6 +127,10 @@ class RestClient:
 
         Returns:
             A new RestClient instance
+
+        Note:
+            This is a convenience method for backwards compatibility.
+            Prefer using RestClient(bearer_token="token").
         """
         ...
 
@@ -111,6 +143,10 @@ class RestClient:
 
         Returns:
             A new RestClient instance
+
+        Note:
+            This is a convenience method for backwards compatibility.
+            Prefer using RestClient(sdk_token="token").
         """
         ...
 
@@ -801,6 +837,54 @@ class FutOptHistoricalClient:
 
 
 # WebSocket Client
+class HealthCheckConfig:
+    """Health check (ping-pong) configuration.
+
+    Controls WebSocket health check behavior to detect stale connections.
+    When enabled, sends periodic pings and tracks missed pongs.
+
+    Example:
+        ```python
+        from marketdata_py import HealthCheckConfig, WebSocketClient
+
+        config = HealthCheckConfig(
+            enabled=True,
+            interval_ms=15000,
+            max_missed_pongs=3
+        )
+        ws = WebSocketClient(api_key="key", health_check=config)
+        ```
+    """
+
+    enabled: bool
+    """Whether health check is enabled."""
+
+    interval_ms: int
+    """Ping interval in milliseconds."""
+
+    max_missed_pongs: int
+    """Maximum missed pongs before considering connection stale."""
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = False,
+        interval_ms: int = 30000,
+        max_missed_pongs: int = 2,
+    ) -> None:
+        """Create a new health check configuration.
+
+        Args:
+            enabled: Whether health check is enabled (default: False)
+            interval_ms: Ping interval in milliseconds (default: 30000ms = 30s, min: 5000ms)
+            max_missed_pongs: Maximum missed pongs (default: 2, min: 1)
+
+        Raises:
+            ValueError: If interval_ms < 5000 or max_missed_pongs < 1
+        """
+        ...
+
+
 class ReconnectConfig:
     """Auto-reconnect configuration.
 
@@ -813,46 +897,50 @@ class ReconnectConfig:
 
         config = ReconnectConfig(
             enabled=True,
-            max_retries=5,
-            base_delay_ms=1000,
-            max_delay_ms=30000
+            max_attempts=5,
+            initial_delay_ms=1000,
+            max_delay_ms=60000
         )
-        ws = WebSocketClient("your-api-key")
+        ws = WebSocketClient(api_key="key", reconnect=config)
         ```
     """
 
     enabled: bool
     """Whether auto-reconnect is enabled."""
 
-    max_retries: int
-    """Maximum number of reconnection attempts (0 = unlimited)."""
+    max_attempts: int
+    """Maximum number of reconnection attempts."""
 
-    base_delay_ms: int
-    """Base delay in milliseconds for exponential backoff."""
+    initial_delay_ms: int
+    """Initial delay in milliseconds for exponential backoff."""
 
     max_delay_ms: int
     """Maximum delay in milliseconds (caps exponential backoff)."""
 
     def __init__(
         self,
+        *,
         enabled: bool = True,
-        max_retries: int = 5,
-        base_delay_ms: int = 1000,
-        max_delay_ms: int = 30000,
+        max_attempts: int = 5,
+        initial_delay_ms: int = 1000,
+        max_delay_ms: int = 60000,
     ) -> None:
         """Create a new reconnect configuration.
 
         Args:
             enabled: Whether auto-reconnect is enabled (default: True)
-            max_retries: Maximum reconnection attempts, 0 for unlimited (default: 5)
-            base_delay_ms: Base delay for exponential backoff (default: 1000ms)
-            max_delay_ms: Maximum delay cap (default: 30000ms = 30s)
+            max_attempts: Maximum reconnection attempts (default: 5, min: 1)
+            initial_delay_ms: Initial delay for exponential backoff (default: 1000ms, min: 100ms)
+            max_delay_ms: Maximum delay cap (default: 60000ms = 60s)
+
+        Raises:
+            ValueError: If max_attempts < 1, initial_delay_ms < 100, or max_delay_ms < initial_delay_ms
         """
         ...
 
     @staticmethod
     def default_config() -> "ReconnectConfig":
-        """Create a default reconnect configuration (enabled with 5 retries)."""
+        """Create a default reconnect configuration (enabled with 5 attempts)."""
         ...
 
     @staticmethod
@@ -869,9 +957,18 @@ class WebSocketClient:
 
     Example:
         ```python
-        from marketdata_py import WebSocketClient
+        from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
 
-        ws = WebSocketClient("your-api-key")
+        # Basic usage
+        ws = WebSocketClient(api_key="your-key")
+
+        # With custom reconnect config
+        rc = ReconnectConfig(max_attempts=10, initial_delay_ms=2000)
+        ws = WebSocketClient(api_key="key", reconnect=rc)
+
+        # With health check enabled
+        hc = HealthCheckConfig(enabled=True, interval_ms=15000)
+        ws = WebSocketClient(api_key="key", health_check=hc)
 
         # Callback mode
         def on_message(msg):
@@ -889,11 +986,43 @@ class WebSocketClient:
         ```
     """
 
-    def __init__(self, api_key: str) -> None:
-        """Create a new WebSocket client with API key authentication.
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        bearer_token: str | None = None,
+        sdk_token: str | None = None,
+        base_url: str | None = None,
+        reconnect: ReconnectConfig | None = None,
+        health_check: HealthCheckConfig | None = None,
+    ) -> None:
+        """Create a new WebSocket client with authentication and configuration.
 
         Args:
-            api_key: Your Fugle API key
+            api_key: Your Fugle API key (exactly one auth method required)
+            bearer_token: Bearer token for authentication (exactly one auth method required)
+            sdk_token: SDK token for authentication (exactly one auth method required)
+            base_url: Optional custom base URL
+            reconnect: Optional reconnect configuration (default: enabled with 5 attempts)
+            health_check: Optional health check configuration (default: disabled)
+
+        Raises:
+            ValueError: If zero or multiple auth methods provided
+
+        Example:
+            ```python
+            # API key auth
+            ws = WebSocketClient(api_key="your-key")
+
+            # With custom configs
+            rc = ReconnectConfig(max_attempts=10)
+            hc = HealthCheckConfig(enabled=True)
+            ws = WebSocketClient(
+                bearer_token="token",
+                reconnect=rc,
+                health_check=hc
+            )
+            ```
         """
         ...
 
