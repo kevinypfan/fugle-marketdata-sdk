@@ -44,6 +44,7 @@ from .marketdata_py import (
     WebSocketError,
     # Config
     ReconnectConfig,
+    HealthCheckConfig,
 )
 
 __version__ = "0.2.0"
@@ -66,5 +67,6 @@ __all__ = [
     "TimeoutError",
     "WebSocketError",
     "ReconnectConfig",
+    "HealthCheckConfig",
     "__version__",
 ]

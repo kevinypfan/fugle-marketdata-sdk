@@ -45,8 +45,8 @@ use crate::errors;
 ///
 /// config = ReconnectConfig(
 ///     enabled=True,
-///     max_retries=5,
-///     base_delay_ms=1000,
+///     max_attempts=5,
+///     initial_delay_ms=1000,
 ///     max_delay_ms=30000
 /// )
 /// ```
@@ -54,16 +54,16 @@ use crate::errors;
 #[derive(Clone)]
 pub struct ReconnectConfig {
     /// Whether auto-reconnect is enabled
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub enabled: bool,
-    /// Maximum number of reconnection attempts (0 = unlimited)
-    #[pyo3(get, set)]
-    pub max_retries: u32,
-    /// Base delay in milliseconds for exponential backoff
-    #[pyo3(get, set)]
-    pub base_delay_ms: u64,
+    /// Maximum number of reconnection attempts
+    #[pyo3(get)]
+    pub max_attempts: u32,
+    /// Initial delay in milliseconds for exponential backoff
+    #[pyo3(get)]
+    pub initial_delay_ms: u64,
     /// Maximum delay in milliseconds (caps exponential backoff)
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     pub max_delay_ms: u64,
 }
 
@@ -73,36 +73,176 @@ impl ReconnectConfig {
     ///
     /// Args:
     ///     enabled: Whether auto-reconnect is enabled (default: True)
-    ///     max_retries: Maximum reconnection attempts, 0 for unlimited (default: 5)
-    ///     base_delay_ms: Base delay for exponential backoff (default: 1000ms)
-    ///     max_delay_ms: Maximum delay cap (default: 30000ms = 30s)
+    ///     max_attempts: Maximum reconnection attempts (default: 5, min: 1)
+    ///     initial_delay_ms: Initial delay for exponential backoff (default: 1000ms, min: 100ms)
+    ///     max_delay_ms: Maximum delay cap (default: 60000ms = 60s)
+    ///
+    /// Raises:
+    ///     ValueError: If validation fails
     #[new]
-    #[pyo3(signature = (enabled=true, max_retries=5, base_delay_ms=1000, max_delay_ms=30000))]
-    pub fn new(enabled: bool, max_retries: u32, base_delay_ms: u64, max_delay_ms: u64) -> Self {
-        Self {
+    #[pyo3(signature = (*, enabled=true, max_attempts=5, initial_delay_ms=1000, max_delay_ms=60000))]
+    pub fn new(
+        enabled: bool,
+        max_attempts: u32,
+        initial_delay_ms: u64,
+        max_delay_ms: u64,
+    ) -> PyResult<Self> {
+        // Validate using core's validation logic (fail fast)
+        let _ = marketdata_core::ReconnectionConfig::new(
+            max_attempts,
+            Duration::from_millis(initial_delay_ms),
+            Duration::from_millis(max_delay_ms),
+        )
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self {
             enabled,
-            max_retries,
-            base_delay_ms,
+            max_attempts,
+            initial_delay_ms,
             max_delay_ms,
-        }
+        })
     }
 
-    /// Create a default reconnect configuration (enabled with 5 retries)
+    /// Create a default reconnect configuration (enabled with 5 attempts)
     #[staticmethod]
     pub fn default_config() -> Self {
-        Self::new(true, 5, 1000, 30000)
+        Self {
+            enabled: true,
+            max_attempts: 5,
+            initial_delay_ms: 1000,
+            max_delay_ms: 60000,
+        }
     }
 
     /// Create a disabled reconnect configuration
     #[staticmethod]
     pub fn disabled() -> Self {
-        Self::new(false, 0, 1000, 30000)
+        Self {
+            enabled: false,
+            max_attempts: 5,
+            initial_delay_ms: 1000,
+            max_delay_ms: 60000,
+        }
+    }
+}
+
+impl ReconnectConfig {
+    /// Convert to core ReconnectionConfig
+    ///
+    /// This should not fail since validation already happened in __new__
+    pub fn to_core(&self) -> marketdata_core::ReconnectionConfig {
+        marketdata_core::ReconnectionConfig::new(
+            self.max_attempts,
+            Duration::from_millis(self.initial_delay_ms),
+            Duration::from_millis(self.max_delay_ms),
+        )
+        .expect("Config already validated in constructor")
     }
 }
 
 impl Default for ReconnectConfig {
     fn default() -> Self {
-        Self::new(true, 5, 1000, 30000)
+        Self {
+            enabled: true,
+            max_attempts: 5,
+            initial_delay_ms: 1000,
+            max_delay_ms: 60000,
+        }
+    }
+}
+
+/// Health check configuration for WebSocket connections
+///
+/// Configures ping/pong based connection monitoring.
+///
+/// # Example (Python)
+///
+/// ```python
+/// from marketdata_py import HealthCheckConfig, WebSocketClient
+///
+/// # Custom health check
+/// health_check = HealthCheckConfig(
+///     enabled=True,
+///     interval_ms=15000,  # 15 seconds
+///     max_missed_pongs=3
+/// )
+///
+/// ws = WebSocketClient(
+///     api_key="your-key",
+///     health_check=health_check
+/// )
+/// ```
+#[pyclass]
+#[derive(Clone)]
+pub struct HealthCheckConfig {
+    /// Whether health check is enabled
+    #[pyo3(get)]
+    pub enabled: bool,
+    /// Interval between ping messages in milliseconds
+    #[pyo3(get)]
+    pub interval_ms: u64,
+    /// Maximum missed pongs before disconnect
+    #[pyo3(get)]
+    pub max_missed_pongs: u64,
+}
+
+#[pymethods]
+impl HealthCheckConfig {
+    /// Create a new health check configuration
+    ///
+    /// Args:
+    ///     enabled: Whether health check is enabled (default: False)
+    ///     interval_ms: Interval between pings in milliseconds (default: 30000, min: 5000)
+    ///     max_missed_pongs: Max missed pongs before disconnect (default: 2, min: 1)
+    ///
+    /// Raises:
+    ///     ValueError: If validation fails (interval < 5000ms or max_missed_pongs == 0)
+    ///
+    /// Example:
+    ///     ```python
+    ///     # Default config (disabled)
+    ///     config = HealthCheckConfig()
+    ///
+    ///     # Enabled with custom settings
+    ///     config = HealthCheckConfig(enabled=True, interval_ms=15000, max_missed_pongs=3)
+    ///     ```
+    #[new]
+    #[pyo3(signature = (*, enabled=false, interval_ms=30000, max_missed_pongs=2))]
+    pub fn new(enabled: bool, interval_ms: u64, max_missed_pongs: u64) -> PyResult<Self> {
+        // Validate using core's validation logic (fail fast)
+        let duration = Duration::from_millis(interval_ms);
+        let _ = marketdata_core::HealthCheckConfig::new(enabled, duration, max_missed_pongs)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self {
+            enabled,
+            interval_ms,
+            max_missed_pongs,
+        })
+    }
+}
+
+impl HealthCheckConfig {
+    /// Convert to core HealthCheckConfig
+    ///
+    /// This should not fail since validation already happened in __new__
+    pub fn to_core(&self) -> marketdata_core::HealthCheckConfig {
+        marketdata_core::HealthCheckConfig::new(
+            self.enabled,
+            Duration::from_millis(self.interval_ms),
+            self.max_missed_pongs,
+        )
+        .expect("Config already validated in constructor")
+    }
+}
+
+impl Default for HealthCheckConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_ms: 30000,
+            max_missed_pongs: 2,
+        }
     }
 }
 
