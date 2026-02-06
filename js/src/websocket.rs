@@ -20,6 +20,40 @@ use std::time::Duration;
 /// We use Arc<ThreadsafeFunction> to allow cloning for use across threads.
 pub type JsCallback = Arc<ThreadsafeFunction<String>>;
 
+/// Reconnection options for WebSocket clients
+///
+/// All fields are optional - defaults are applied when not specified:
+/// - maxAttempts: 5
+/// - initialDelayMs: 1000
+/// - maxDelayMs: 60000
+#[napi(object)]
+#[derive(Debug, Clone, Default)]
+pub struct ReconnectOptions {
+    /// Maximum reconnection attempts (default: 5, min: 1)
+    pub max_attempts: Option<u32>,
+    /// Initial reconnection delay in milliseconds (default: 1000, min: 100)
+    pub initial_delay_ms: Option<f64>,
+    /// Maximum reconnection delay in milliseconds (default: 60000)
+    pub max_delay_ms: Option<f64>,
+}
+
+/// Health check options for WebSocket connections
+///
+/// All fields are optional - defaults are applied when not specified:
+/// - enabled: false
+/// - intervalMs: 30000
+/// - maxMissedPongs: 2
+#[napi(object)]
+#[derive(Debug, Clone, Default)]
+pub struct HealthCheckOptions {
+    /// Whether health check is enabled (default: false)
+    pub enabled: Option<bool>,
+    /// Interval between ping messages in milliseconds (default: 30000, min: 5000)
+    pub interval_ms: Option<f64>,
+    /// Maximum missed pongs before disconnect (default: 2, min: 1)
+    pub max_missed_pongs: Option<f64>,
+}
+
 /// Command sent to WebSocket worker thread
 #[derive(Debug)]
 enum WsCommand {
