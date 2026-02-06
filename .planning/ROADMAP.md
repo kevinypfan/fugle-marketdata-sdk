@@ -113,26 +113,28 @@ Plans:
 - [x] 12-02-PLAN.md — Client constructors (RestClient/WebSocketClient kwargs)
 - [x] 12-03-PLAN.md — Tests and type stubs
 
-### Phase 13: Node.js Config Exposure
+### Phase 13: Node.js Config Exposure ✓
 
 **Goal**: Add options-based constructor and config exposure to Node.js binding
+**Status**: Complete (2026-02-06)
 **Depends on**: Phase 8 (core validation), Phase 10 (TypeScript foundation)
 **Plans:** 3 plans
 
 **Delivers:**
-- `WebSocketOptions` napi object with nested config types
+- `WebSocketClientOptions` napi object with nested config types
 - `ReconnectOptions` and `HealthCheckOptions` napi objects
 - Modified `RestClient` to accept options object
 - Modified `WebSocketClient` to accept options object
-- Runtime validation despite TypeScript types
-- Updated `index.d.ts` with config option types
+- Runtime validation despite TypeScript types (exactly-one-auth + config constraints)
+- Updated `index.d.ts` with union types for compile-time auth enforcement
+- Comprehensive test suite (188 lines)
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, CON-02, TEST-01
 
 Plans:
-- [ ] 13-01-PLAN.md — Config option structs (ReconnectOptions, HealthCheckOptions, client options)
-- [ ] 13-02-PLAN.md — Client constructors (RestClient/WebSocketClient options acceptance)
-- [ ] 13-03-PLAN.md — TypeScript definitions and tests
+- [x] 13-01-PLAN.md — Config option structs (ReconnectOptions, HealthCheckOptions, client options)
+- [x] 13-02-PLAN.md — Client constructors (RestClient/WebSocketClient options acceptance)
+- [x] 13-03-PLAN.md — TypeScript definitions and tests
 
 ### Phase 14: Java & Go Bindings
 
@@ -199,5 +201,5 @@ Phases 12, 13, and 14 can run in parallel after their dependencies complete.
 
 ---
 *Created: 2026-02-01*
-*Updated: 2026-02-05 — Phase 12 complete*
+*Updated: 2026-02-06 — Phase 13 complete*
 *Research basis: .planning/research/v0.3.0-SUMMARY.md*
