@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 13 of 15 — Node.js Config Exposure
-Plan: 1/4 complete (13-01 complete ✓)
+Plan: 2/3 complete (13-01, 13-02 complete ✓)
 Status: Phases 8-12 complete ✓, Phase 13 in progress
-Last activity: 2026-02-06 - Completed 13-01-PLAN.md (Config option napi structs)
+Last activity: 2026-02-06 - Completed 13-02-PLAN.md (REST/WebSocket constructors)
 
-Progress: [██████░░░░] 64% (Phases 8-12 complete, Phase 13 started, 6/8 v0.3.0 phases in progress)
+Progress: [██████░░░░] 65% (Phases 8-12 complete, Phase 13 in progress, 6/8 v0.3.0 phases in progress)
 
-**Note:** Phase 13-01 complete - Four napi object structs defined for TypeScript config interfaces (ReconnectOptions, HealthCheckOptions, RestClientOptions, WebSocketClientOptions).
+**Note:** Phase 13-02 complete - RestClient and WebSocketClient constructors accept options objects with exactly-one-auth validation and config delegation to core.
 
 ## Milestone History
 
@@ -70,6 +70,12 @@ From Phase 13-01 execution:
 - All config fields are Option<T> - TypeScript optional fields, runtime validation in constructors
 - RestClientOptions defined in websocket.rs for re-export (shared by REST and WebSocket clients)
 
+From Phase 13-02 execution:
+- Breaking change: String constructor removed, only options object accepted per CONTEXT.md
+- Error message format matches Python: "Provide exactly one of: apiKey, bearerToken, sdkToken"
+- WebSocketClient configs validated but stored as _ (ConnectionConfig doesn't accept them yet)
+- RestClient uses base_url() method (not with_base_url) per Phase 12-02 learning
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -112,6 +118,6 @@ None — Phases 8-11 complete. Phases 12, 13, 14 can run in parallel.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 13-01-PLAN.md (napi config structs)
+Stopped at: Completed 13-02-PLAN.md (REST/WebSocket constructors)
 Resume file: N/A
-Next: Phase 13-02 (REST client constructor) or continue Phase 13
+Next: Phase 13-03 (TypeScript type generation) or continue Phase 13
