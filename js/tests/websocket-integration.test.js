@@ -21,7 +21,7 @@ describeWithApiKey('WebSocket Integration Tests', () => {
     let stockWs;
 
     beforeEach(() => {
-      client = new WebSocketClient(API_KEY);
+      client = new WebSocketClient({ apiKey: API_KEY });
       stockWs = client.stock;
     });
 
@@ -112,7 +112,7 @@ describeWithApiKey('WebSocket Integration Tests', () => {
     let futoptWs;
 
     beforeEach(() => {
-      client = new WebSocketClient(API_KEY);
+      client = new WebSocketClient({ apiKey: API_KEY });
       futoptWs = client.futopt;
     });
 

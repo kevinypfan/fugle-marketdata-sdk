@@ -19,7 +19,7 @@ describeWithApiKey('REST Integration Tests', () => {
   let client;
 
   beforeAll(() => {
-    client = new RestClient(API_KEY);
+    client = new RestClient({ apiKey: API_KEY });
   });
 
   describe('Stock Intraday', () => {

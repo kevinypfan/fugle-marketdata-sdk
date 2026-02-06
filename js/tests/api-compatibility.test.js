@@ -21,11 +21,11 @@ describe('API Compatibility', () => {
     let client;
 
     beforeAll(() => {
-      client = new RestClient('test-api-key');
+      client = new RestClient({ apiKey: 'test-api-key' });
     });
 
-    test('RestClient constructor accepts API key', () => {
-      expect(() => new RestClient('any-key')).not.toThrow();
+    test('RestClient constructor accepts options object', () => {
+      expect(() => new RestClient({ apiKey: 'any-key' })).not.toThrow();
     });
 
     test('RestClient has stock property', () => {
@@ -358,11 +358,11 @@ describe('API Compatibility', () => {
     let client;
 
     beforeAll(() => {
-      client = new WebSocketClient('test-api-key');
+      client = new WebSocketClient({ apiKey: 'test-api-key' });
     });
 
-    test('WebSocketClient constructor accepts API key', () => {
-      expect(() => new WebSocketClient('any-key')).not.toThrow();
+    test('WebSocketClient constructor accepts options object', () => {
+      expect(() => new WebSocketClient({ apiKey: 'any-key' })).not.toThrow();
     });
 
     test('WebSocketClient has stock property', () => {
@@ -456,7 +456,7 @@ describe('API Compatibility', () => {
 
   describe('Event callback registration', () => {
     test('stock WebSocket accepts event callbacks without error', () => {
-      const client = new WebSocketClient('test-key');
+      const client = new WebSocketClient({ apiKey: 'test-key' });
 
       expect(() => {
         client.stock.on('message', (data) => {});
@@ -468,7 +468,7 @@ describe('API Compatibility', () => {
     });
 
     test('futopt WebSocket accepts event callbacks without error', () => {
-      const client = new WebSocketClient('test-key');
+      const client = new WebSocketClient({ apiKey: 'test-key' });
 
       expect(() => {
         client.futopt.on('message', (data) => {});

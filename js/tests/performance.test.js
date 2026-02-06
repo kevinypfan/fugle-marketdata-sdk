@@ -32,7 +32,7 @@ describe('Performance Benchmarks', () => {
       const start = performance.now();
 
       for (let i = 0; i < iterations; i++) {
-        const client = new RestClient('test-key');
+        const client = new RestClient({ apiKey: 'test-key' });
       }
 
       const elapsed = performance.now() - start;
@@ -45,7 +45,7 @@ describe('Performance Benchmarks', () => {
 
   describe('FFI Overhead', () => {
     test('quote method call overhead (no network)', async () => {
-      const client = new RestClient('test-key');
+      const client = new RestClient({ apiKey: 'test-key' });
       const iterations = 10;
       const latencies = [];
 
@@ -85,7 +85,7 @@ describe('Integration Performance Benchmarks', () => {
     let client;
 
     beforeAll(() => {
-      client = new RestClient(apiKey);
+      client = new RestClient({ apiKey });
     });
 
     test('quote latency', async () => {
@@ -128,7 +128,7 @@ describe('Official SDK Comparison', () => {
     let client;
 
     beforeAll(() => {
-      client = new RestClient(apiKey);
+      client = new RestClient({ apiKey });
     });
 
     test('quote within 1.5x of official SDK', async () => {

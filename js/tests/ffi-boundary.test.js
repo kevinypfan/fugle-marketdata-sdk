@@ -18,7 +18,7 @@ const { RestClient, WebSocketClient } = require('../');
 
 describe('FFI Boundary - Error Propagation', () => {
   test('invalid symbol throws Error with readable message', async () => {
-    const client = new RestClient('test-api-key');
+    const client = new RestClient({ apiKey: 'test-api-key' });
 
     await expect(
       client.stock.intraday.quote('INVALID_SYMBOL_12345')
@@ -38,7 +38,7 @@ describe('FFI Boundary - Error Propagation', () => {
   });
 
   test('authentication failure throws Error', async () => {
-    const client = new RestClient('mock-api-key');
+    const client = new RestClient({ apiKey: 'mock-api-key' });
 
     try {
       await client.stock.intraday.quote('2330');
@@ -51,7 +51,7 @@ describe('FFI Boundary - Error Propagation', () => {
   });
 
   test('error includes error code in message', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     try {
       await client.stock.intraday.quote('INVALID');
@@ -62,7 +62,7 @@ describe('FFI Boundary - Error Propagation', () => {
   });
 
   test('error stack trace is available', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     try {
       await client.stock.intraday.quote('INVALID');
@@ -76,31 +76,39 @@ describe('FFI Boundary - Error Propagation', () => {
 
 describe('FFI Boundary - Panic Recovery', () => {
   test('empty API key does not crash process', () => {
-    // Empty API key should not panic
+    // Empty API key is valid (counts as exactly one auth method)
+    // Will fail at runtime when making API calls, but doesn't crash at construction
     expect(() => {
-      new RestClient('');
+      new RestClient({ apiKey: '' });
     }).not.toThrow();
 
-    const client = new RestClient('');
+    const client = new RestClient({ apiKey: '' });
     expect(client).toBeTruthy();
   });
 
-  test('null API key throws Error', () => {
-    // null should be rejected at type conversion (napi-rs throws Error)
+  test('null options throws Error', () => {
+    // null options should be rejected at type conversion (napi-rs throws Error)
     expect(() => {
       new RestClient(null);
     }).toThrow();
   });
 
-  test('undefined API key throws Error', () => {
-    // undefined should be rejected at type conversion (napi-rs throws Error)
+  test('undefined options throws Error', () => {
+    // undefined options should be rejected at type conversion (napi-rs throws Error)
     expect(() => {
       new RestClient(undefined);
     }).toThrow();
   });
 
+  test('empty options (no auth) throws Error', () => {
+    // Empty options should fail "exactly one auth" validation
+    expect(() => {
+      new RestClient({});
+    }).toThrow(/exactly one of/i);
+  });
+
   test('very long input strings do not overflow', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     // Try extremely long symbol (potential buffer overflow)
     const longSymbol = 'A'.repeat(10000);
@@ -113,7 +121,7 @@ describe('FFI Boundary - Panic Recovery', () => {
   });
 
   test('unicode input handled safely', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     const unicodeSymbols = [
       '中文',  // Chinese characters
@@ -133,7 +141,7 @@ describe('FFI Boundary - Panic Recovery', () => {
   });
 
   test('non-string inputs throw Error', () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     const invalidInputs = [
       123,
@@ -156,7 +164,7 @@ describe('FFI Boundary - Memory Safety', () => {
     const clients = [];
 
     for (let i = 0; i < 10; i++) {
-      clients.push(new RestClient(`key_${i}`));
+      clients.push(new RestClient({ apiKey: `key_${i}` }));
     }
 
     // All clients should be independent
@@ -167,7 +175,7 @@ describe('FFI Boundary - Memory Safety', () => {
   });
 
   test('client remains usable after error', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     // Cause an error
     try {
@@ -183,7 +191,7 @@ describe('FFI Boundary - Memory Safety', () => {
   });
 
   test('concurrent operations on same client', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     // Multiple concurrent calls on same client
     const promises = [];
@@ -198,7 +206,7 @@ describe('FFI Boundary - Memory Safety', () => {
   });
 
   test('buffer handling is safe', () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     // Try buffer inputs (should fail at type conversion)
     const bufferInputs = [
@@ -217,7 +225,7 @@ describe('FFI Boundary - Memory Safety', () => {
   test('garbage collection does not cause crashes', async () => {
     // Create and destroy many clients
     for (let i = 0; i < 100; i++) {
-      const client = new RestClient(`key_${i}`);
+      const client = new RestClient({ apiKey: `key_${i}` });
       // Let it go out of scope
     }
 
@@ -227,14 +235,14 @@ describe('FFI Boundary - Memory Safety', () => {
     }
 
     // Create new client after GC
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
     expect(client).toBeTruthy();
   });
 });
 
 describe('FFI Boundary - Event Loop Safety', () => {
   test('async operations do not block event loop', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     let otherTaskCompleted = false;
 
@@ -256,7 +264,7 @@ describe('FFI Boundary - Event Loop Safety', () => {
   });
 
   test('multiple concurrent async calls', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     const results = [];
 
@@ -282,7 +290,7 @@ describe('FFI Boundary - Event Loop Safety', () => {
   });
 
   test('WebSocket callbacks do not block event loop', (done) => {
-    const ws = new WebSocketClient('test-key');
+    const ws = new WebSocketClient({ apiKey: 'test-key' });
 
     let otherTaskCompleted = false;
 
@@ -319,7 +327,7 @@ describe('FFI Boundary - Event Loop Safety', () => {
   });
 
   test('promise resolution is asynchronous', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     let syncCheckpoint = false;
 
@@ -336,7 +344,7 @@ describe('FFI Boundary - Event Loop Safety', () => {
 
 describe('FFI Boundary - Type Safety', () => {
   test('returned data structures are valid JavaScript objects', async () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     try {
       const quote = await client.stock.intraday.quote('2330');
@@ -352,7 +360,7 @@ describe('FFI Boundary - Type Safety', () => {
   });
 
   test('method chaining works correctly', () => {
-    const client = new RestClient('test-key');
+    const client = new RestClient({ apiKey: 'test-key' });
 
     // Verify property access chain doesn't crash
     expect(client.stock).toBeTruthy();
@@ -362,7 +370,7 @@ describe('FFI Boundary - Type Safety', () => {
   });
 
   test('WebSocket client properties are accessible', () => {
-    const ws = new WebSocketClient('test-key');
+    const ws = new WebSocketClient({ apiKey: 'test-key' });
 
     expect(ws.stock).toBeTruthy();
     expect(ws.futopt).toBeTruthy();
