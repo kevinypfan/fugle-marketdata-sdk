@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 13 of 15 — Node.js Config Exposure
-Plan: 2/3 complete (13-01, 13-02 complete ✓)
-Status: Phases 8-12 complete ✓, Phase 13 in progress
-Last activity: 2026-02-06 - Completed 13-02-PLAN.md (REST/WebSocket constructors)
+Plan: 3/3 complete (13-01, 13-02, 13-03 complete ✓)
+Status: Phases 8-12 complete ✓, Phase 13 complete ✓
+Last activity: 2026-02-06 - Completed 13-03-PLAN.md (TypeScript types and config tests)
 
-Progress: [██████░░░░] 65% (Phases 8-12 complete, Phase 13 in progress, 6/8 v0.3.0 phases in progress)
+Progress: [███████░░░] 70% (Phases 8-13 complete, 7/8 v0.3.0 phases complete)
 
-**Note:** Phase 13-02 complete - RestClient and WebSocketClient constructors accept options objects with exactly-one-auth validation and config delegation to core.
+**Note:** Phase 13 complete - Node.js bindings expose config with TypeScript union types for compile-time auth enforcement.
 
 ## Milestone History
 
@@ -76,6 +76,13 @@ From Phase 13-02 execution:
 - WebSocketClient configs validated but stored as _ (ConnectionConfig doesn't accept them yet)
 - RestClient uses base_url() method (not with_base_url) per Phase 12-02 learning
 
+From Phase 13-03 execution:
+- TypeScript union types enforce exactly-one-auth at compile time using 'never' type
+- Union pattern: `{ apiKey: string; bearerToken?: never; ... }` prevents multiple auth
+- Config interfaces (ReconnectOptions, HealthCheckOptions) match Rust structs in camelCase
+- Comprehensive test suite validates both TypeScript types and JavaScript runtime behavior
+- Tests use @ts-expect-error to validate error messages for JavaScript users
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -118,6 +125,6 @@ None — Phases 8-11 complete. Phases 12, 13, 14 can run in parallel.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 13-02-PLAN.md (REST/WebSocket constructors)
+Stopped at: Completed 13-03-PLAN.md (TypeScript types and tests)
 Resume file: N/A
-Next: Phase 13-03 (TypeScript type generation) or continue Phase 13
+Next: Phase 13-UAT (User Acceptance Testing for Node.js config exposure)
