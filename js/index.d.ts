@@ -494,6 +494,52 @@ export interface WebSocketEventMap {
 export type WebSocketEvent = keyof WebSocketEventMap;
 
 // ============================================================================
+// Configuration Option Types (v0.3.0)
+// ============================================================================
+
+/** Reconnection options for WebSocket clients */
+export interface ReconnectOptions {
+  /** Maximum reconnection attempts (default: 5, min: 1) */
+  maxAttempts?: number;
+  /** Initial reconnection delay in milliseconds (default: 1000, min: 100) */
+  initialDelayMs?: number;
+  /** Maximum reconnection delay in milliseconds (default: 60000) */
+  maxDelayMs?: number;
+}
+
+/** Health check options for WebSocket connections */
+export interface HealthCheckOptions {
+  /** Whether health check is enabled (default: false) */
+  enabled?: boolean;
+  /** Interval between ping messages in milliseconds (default: 30000, min: 5000) */
+  intervalMs?: number;
+  /** Maximum missed pongs before disconnect (default: 2, min: 1) */
+  maxMissedPongs?: number;
+}
+
+/**
+ * REST client options with exactly-one-auth enforcement
+ *
+ * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+ * TypeScript enforces this at compile time via union types.
+ */
+export type RestClientOptions =
+  | { apiKey: string; bearerToken?: never; sdkToken?: never; baseUrl?: string }
+  | { apiKey?: never; bearerToken: string; sdkToken?: never; baseUrl?: string }
+  | { apiKey?: never; bearerToken?: never; sdkToken: string; baseUrl?: string };
+
+/**
+ * WebSocket client options with exactly-one-auth enforcement
+ *
+ * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+ * TypeScript enforces this at compile time via union types.
+ */
+export type WebSocketClientOptions =
+  | { apiKey: string; bearerToken?: never; sdkToken?: never; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions }
+  | { apiKey?: never; bearerToken: string; sdkToken?: never; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions }
+  | { apiKey?: never; bearerToken?: never; sdkToken: string; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions };
+
+// ============================================================================
 // REST Response Types - Stock Historical
 // ============================================================================
 
