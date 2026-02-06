@@ -4,6 +4,7 @@
 //! marketdata-core::RestClient for NAPI-RS bindings.
 
 use crate::errors::to_napi_error;
+use crate::websocket::RestClientOptions;
 use napi_derive::napi;
 use serde_json::Value;
 
@@ -32,15 +33,65 @@ pub struct RestClient {
 
 #[napi]
 impl RestClient {
-    /// Create a new REST client with API key authentication
+    /// Create a new REST client with options
     ///
-    /// @param apiKey - Your Fugle API key
+    /// @param options - Client configuration options
+    /// @throws {Error} If validation fails (zero or multiple auth methods)
+    ///
+    /// @example
+    /// ```javascript
+    /// const { RestClient } = require('@fugle/marketdata');
+    ///
+    /// // API key auth
+    /// const client = new RestClient({ apiKey: 'your-key' });
+    ///
+    /// // Bearer token auth with custom base URL
+    /// const client = new RestClient({
+    ///   bearerToken: 'token',
+    ///   baseUrl: 'https://custom.api'
+    /// });
+    /// ```
     #[napi(constructor)]
-    pub fn new(api_key: String) -> Self {
-        let auth = marketdata_core::rest::Auth::ApiKey(api_key);
-        Self {
-            inner: marketdata_core::RestClient::new(auth),
+    pub fn new(options: RestClientOptions) -> napi::Result<Self> {
+        // Validate exactly one auth method (fail fast per CONTEXT.md)
+        let auth_count = [
+            options.api_key.is_some(),
+            options.bearer_token.is_some(),
+            options.sdk_token.is_some(),
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+
+        if auth_count == 0 {
+            return Err(napi::Error::from_reason(
+                "Provide exactly one of: apiKey, bearerToken, sdkToken"
+            ));
         }
+
+        if auth_count > 1 {
+            return Err(napi::Error::from_reason(
+                "Provide exactly one of: apiKey, bearerToken, sdkToken"
+            ));
+        }
+
+        // Build auth (safe to unwrap after validation)
+        let auth = if let Some(key) = options.api_key {
+            marketdata_core::rest::Auth::ApiKey(key)
+        } else if let Some(token) = options.bearer_token {
+            marketdata_core::rest::Auth::BearerToken(token)
+        } else {
+            marketdata_core::rest::Auth::SdkToken(options.sdk_token.unwrap())
+        };
+
+        // Create client with optional base_url
+        let inner = if let Some(url) = options.base_url {
+            marketdata_core::RestClient::new(auth).base_url(&url)
+        } else {
+            marketdata_core::RestClient::new(auth)
+        };
+
+        Ok(Self { inner })
     }
 
     /// Get the stock client for accessing stock market data
