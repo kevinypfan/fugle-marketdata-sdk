@@ -54,6 +54,44 @@ pub struct HealthCheckOptions {
     pub max_missed_pongs: Option<f64>,
 }
 
+/// REST client options
+///
+/// Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+/// baseUrl is optional for custom endpoint override.
+#[napi(object)]
+#[derive(Debug, Clone, Default)]
+pub struct RestClientOptions {
+    /// API key for authentication
+    pub api_key: Option<String>,
+    /// Bearer token for authentication
+    pub bearer_token: Option<String>,
+    /// SDK token for authentication
+    pub sdk_token: Option<String>,
+    /// Override base URL (optional)
+    pub base_url: Option<String>,
+}
+
+/// WebSocket client options
+///
+/// Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+/// reconnect and healthCheck are optional configuration objects.
+#[napi(object)]
+#[derive(Debug, Clone, Default)]
+pub struct WebSocketClientOptions {
+    /// API key for authentication
+    pub api_key: Option<String>,
+    /// Bearer token for authentication
+    pub bearer_token: Option<String>,
+    /// SDK token for authentication
+    pub sdk_token: Option<String>,
+    /// Override base URL (optional)
+    pub base_url: Option<String>,
+    /// Reconnection configuration (optional)
+    pub reconnect: Option<ReconnectOptions>,
+    /// Health check configuration (optional)
+    pub health_check: Option<HealthCheckOptions>,
+}
+
 /// Command sent to WebSocket worker thread
 #[derive(Debug)]
 enum WsCommand {
