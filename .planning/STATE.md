@@ -9,14 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 ## Current Position
 
-Phase: 12 of 15 — Python Config Exposure
-Plan: 3/3 complete ✓ (Phase 12 complete)
-Status: Phases 8-12 complete ✓ (verified)
-Last activity: 2026-02-05 - Completed 12-03-PLAN.md (Config unit tests & type stubs)
+Phase: 13 of 15 — Node.js Config Exposure
+Plan: 1/4 complete (13-01 complete ✓)
+Status: Phases 8-12 complete ✓, Phase 13 in progress
+Last activity: 2026-02-06 - Completed 13-01-PLAN.md (Config option napi structs)
 
-Progress: [██████░░░░] 63% (Phases 8-12 complete, 5/8 v0.3.0 phases done)
+Progress: [██████░░░░] 64% (Phases 8-12 complete, Phase 13 started, 6/8 v0.3.0 phases in progress)
 
-**Note:** Phase 12 complete - Python SDK now has full v0.3.0 config exposure with kwargs constructors, comprehensive test coverage (32 tests), and accurate type stubs for IDE support.
+**Note:** Phase 13-01 complete - Four napi object structs defined for TypeScript config interfaces (ReconnectOptions, HealthCheckOptions, RestClientOptions, WebSocketClientOptions).
 
 ## Milestone History
 
@@ -64,6 +64,12 @@ From Phase 12-03 execution:
 - Type stub accuracy: field names and signatures match implementation exactly
 - Validation constraints documented in type stub docstrings for IDE hints
 
+From Phase 13-01 execution:
+- Use f64 (not u64) for millisecond fields - napi-rs doesn't support u64, f64 is JavaScript's number type
+- Use #[napi(object)] for plain TypeScript interfaces (not classes with constructors)
+- All config fields are Option<T> - TypeScript optional fields, runtime validation in constructors
+- RestClientOptions defined in websocket.rs for re-export (shared by REST and WebSocket clients)
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -79,6 +85,12 @@ From Phase 12-01 execution:
 - Core validation delegation: Python layer calls core::Config::new(), maps errors to PyValueError
 - FFI conversion: to_core() method converts validated Python config to core config
 - Millisecond FFI boundary: store ms as u64 in Python, convert to Duration for core
+
+From Phase 13-01 execution:
+- napi struct pattern: #[napi(object)] + #[derive(Debug, Clone, Default)] + Option<T> fields
+- snake_case Rust fields auto-convert to camelCase in TypeScript
+- f64 for millisecond fields (JavaScript number type compatibility)
+- Nested config types (reconnect, health_check) in WebSocketClientOptions
 
 ### Roadmap Evolution
 
@@ -99,7 +111,7 @@ None — Phases 8-11 complete. Phases 12, 13, 14 can run in parallel.
 
 ## Session Continuity
 
-Last session: 2026-02-05
-Stopped at: Completed 12-03-PLAN.md (Phase 12 complete ✓)
+Last session: 2026-02-06
+Stopped at: Completed 13-01-PLAN.md (napi config structs)
 Resume file: N/A
-Next: Phase 13 (Node.js config exposure) or Phase 14 (C# config exposure) - can run in parallel
+Next: Phase 13-02 (REST client constructor) or continue Phase 13
