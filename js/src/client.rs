@@ -1184,17 +1184,80 @@ impl FutOptHistoricalClient {
 mod tests {
     use super::*;
 
+    fn make_options(api_key: &str) -> RestClientOptions {
+        RestClientOptions {
+            api_key: Some(api_key.to_string()),
+            bearer_token: None,
+            sdk_token: None,
+            base_url: None,
+        }
+    }
+
     #[test]
-    fn test_rest_client_creation() {
-        let client = RestClient::new("test-api-key".to_string());
+    fn test_rest_client_creation_with_api_key() {
+        let client = RestClient::new(make_options("test-api-key")).unwrap();
         // Verify client was created (compilation success is the test)
         let _ = client.stock();
         let _ = client.futopt();
     }
 
     #[test]
+    fn test_rest_client_creation_with_bearer_token() {
+        let options = RestClientOptions {
+            api_key: None,
+            bearer_token: Some("test-token".to_string()),
+            sdk_token: None,
+            base_url: None,
+        };
+        let client = RestClient::new(options).unwrap();
+        let _ = client.stock();
+    }
+
+    #[test]
+    fn test_rest_client_creation_with_base_url() {
+        let options = RestClientOptions {
+            api_key: Some("test-key".to_string()),
+            bearer_token: None,
+            sdk_token: None,
+            base_url: Some("https://custom.api".to_string()),
+        };
+        let client = RestClient::new(options).unwrap();
+        let _ = client.stock();
+    }
+
+    #[test]
+    fn test_rest_client_no_auth_fails() {
+        let options = RestClientOptions {
+            api_key: None,
+            bearer_token: None,
+            sdk_token: None,
+            base_url: None,
+        };
+        let result = RestClient::new(options);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(err.reason.contains("exactly one"));
+        }
+    }
+
+    #[test]
+    fn test_rest_client_multiple_auth_fails() {
+        let options = RestClientOptions {
+            api_key: Some("key".to_string()),
+            bearer_token: Some("token".to_string()),
+            sdk_token: None,
+            base_url: None,
+        };
+        let result = RestClient::new(options);
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(err.reason.contains("exactly one"));
+        }
+    }
+
+    #[test]
     fn test_stock_client_chain() {
-        let client = RestClient::new("test-api-key".to_string());
+        let client = RestClient::new(make_options("test-api-key")).unwrap();
         let stock = client.stock();
         let _intraday = stock.intraday();
         let _historical = stock.historical();
@@ -1205,7 +1268,7 @@ mod tests {
 
     #[test]
     fn test_futopt_client_chain() {
-        let client = RestClient::new("test-api-key".to_string());
+        let client = RestClient::new(make_options("test-api-key")).unwrap();
         let futopt = client.futopt();
         let _intraday = futopt.intraday();
         let _historical = futopt.historical();
