@@ -1314,8 +1314,8 @@ export declare class FutOptWebSocketClient {
  * ```javascript
  * const { RestClient } = require('@fubon/marketdata-js');
  *
- * // Create client with API key
- * const client = new RestClient('your-api-key');
+ * // Create client with options object
+ * const client = new RestClient({ apiKey: 'your-api-key' });
  *
  * // Access stock market data
  * const quote = client.stock.intraday.quote('2330');
@@ -1328,11 +1328,24 @@ export declare class FutOptWebSocketClient {
  */
 export declare class RestClient {
   /**
-   * Create a new REST client with API key authentication
+   * Create a new REST client with options
    *
-   * @param apiKey - Your Fugle API key
+   * @param options - Client configuration options
+   * @throws {Error} If validation fails (zero or multiple auth methods)
+   *
+   * @example
+   * ```typescript
+   * // API key auth
+   * const client = new RestClient({ apiKey: 'your-key' });
+   *
+   * // Bearer token auth with custom base URL
+   * const client = new RestClient({
+   *   bearerToken: 'token',
+   *   baseUrl: 'https://custom.api'
+   * });
+   * ```
    */
-  constructor(apiKey: string)
+  constructor(options: RestClientOptions)
   /** Get the stock client for accessing stock market data */
   get stock(): StockClient
   /** Get the FutOpt client for accessing futures/options market data */
@@ -1624,8 +1637,8 @@ export declare class StockWebSocketClient {
  * ```javascript
  * const { WebSocketClient } = require('@fubon/marketdata-js');
  *
- * // Create client with API key
- * const ws = new WebSocketClient('your-api-key');
+ * // Create client with options
+ * const ws = new WebSocketClient({ apiKey: 'your-api-key' });
  *
  * // Register event handlers for stock data
  * ws.stock.on('message', (data) => console.log(JSON.parse(data)));
@@ -1639,11 +1652,30 @@ export declare class StockWebSocketClient {
  */
 export declare class WebSocketClient {
   /**
-   * Create a new WebSocket client with API key authentication
+   * Create a new WebSocket client with configuration
    *
-   * @param apiKey - Your Fugle API key
+   * @param options - Client configuration options
+   * @throws {Error} If validation fails (zero or multiple auth methods, invalid config values)
+   *
+   * @example
+   * ```typescript
+   * // Simple usage with defaults
+   * const ws = new WebSocketClient({ apiKey: 'your-key' });
+   *
+   * // Custom reconnection config
+   * const ws = new WebSocketClient({
+   *   apiKey: 'your-key',
+   *   reconnect: { maxAttempts: 10, initialDelayMs: 2000 }
+   * });
+   *
+   * // Enable health check
+   * const ws = new WebSocketClient({
+   *   apiKey: 'your-key',
+   *   healthCheck: { enabled: true, intervalMs: 20000 }
+   * });
+   * ```
    */
-  constructor(apiKey: string)
+  constructor(options: WebSocketClientOptions)
   /** Get the stock WebSocket client for real-time stock data */
   get stock(): StockWebSocketClient
   /** Get the FutOpt WebSocket client for real-time futures/options data */
