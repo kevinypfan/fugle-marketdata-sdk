@@ -109,6 +109,17 @@ None - no external service configuration required.
 - [ ] IDE provides correct autocomplete
 - [ ] Error messages clear and helpful
 
+## Self-Check: PASSED
+
+All files verified:
+- js/index.d.ts (modified)
+- js/tests/config.test.ts (created)
+
+All commits verified:
+- c699f6d
+- ce03a90
+- 12c1649
+
 ---
 *Phase: 13-nodejs-config-exposure*
 *Completed: 2026-02-06*
