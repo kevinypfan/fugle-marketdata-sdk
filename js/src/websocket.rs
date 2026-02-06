@@ -147,12 +147,102 @@ pub struct WebSocketClient {
 
 #[napi]
 impl WebSocketClient {
-    /// Create a new WebSocket client with API key authentication
+    /// Create a new WebSocket client with configuration
     ///
-    /// @param apiKey - Your Fugle API key
+    /// @param options - Client configuration options
+    /// @throws {Error} If validation fails (zero or multiple auth methods, invalid config values)
+    ///
+    /// @example
+    /// ```javascript
+    /// const { WebSocketClient } = require('@fugle/marketdata');
+    ///
+    /// // Simple usage with defaults
+    /// const ws = new WebSocketClient({ apiKey: 'your-key' });
+    ///
+    /// // Custom reconnection config
+    /// const ws = new WebSocketClient({
+    ///   apiKey: 'your-key',
+    ///   reconnect: { maxAttempts: 10, initialDelayMs: 2000 }
+    /// });
+    ///
+    /// // Enable health check
+    /// const ws = new WebSocketClient({
+    ///   apiKey: 'your-key',
+    ///   healthCheck: { enabled: true, intervalMs: 20000 }
+    /// });
+    /// ```
     #[napi(constructor)]
-    pub fn new(api_key: String) -> Self {
-        Self { api_key }
+    pub fn new(options: WebSocketClientOptions) -> napi::Result<Self> {
+        use marketdata_core::{
+            DEFAULT_MAX_ATTEMPTS, DEFAULT_INITIAL_DELAY_MS, DEFAULT_MAX_DELAY_MS,
+            DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEALTH_CHECK_INTERVAL_MS,
+            DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS,
+        };
+        use std::time::Duration;
+
+        // Validate exactly one auth method (fail fast per CONTEXT.md)
+        let auth_count = [
+            options.api_key.is_some(),
+            options.bearer_token.is_some(),
+            options.sdk_token.is_some(),
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+
+        if auth_count == 0 {
+            return Err(napi::Error::from_reason(
+                "Provide exactly one of: apiKey, bearerToken, sdkToken"
+            ));
+        }
+
+        if auth_count > 1 {
+            return Err(napi::Error::from_reason(
+                "Provide exactly one of: apiKey, bearerToken, sdkToken"
+            ));
+        }
+
+        // Extract the one provided auth method
+        let api_key = options.api_key
+            .or(options.bearer_token)
+            .or(options.sdk_token)
+            .unwrap();
+
+        // Build reconnection config with validation via core
+        let _reconnect_cfg = if let Some(r) = &options.reconnect {
+            let max = r.max_attempts.map(|v| v as u32).unwrap_or(DEFAULT_MAX_ATTEMPTS);
+            let initial = Duration::from_millis(
+                r.initial_delay_ms.map(|v| v as u64).unwrap_or(DEFAULT_INITIAL_DELAY_MS)
+            );
+            let max_delay = Duration::from_millis(
+                r.max_delay_ms.map(|v| v as u64).unwrap_or(DEFAULT_MAX_DELAY_MS)
+            );
+            marketdata_core::ReconnectionConfig::new(max, initial, max_delay)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?
+        } else {
+            marketdata_core::ReconnectionConfig::default()
+        };
+
+        // Build health check config with validation via core
+        let _health_check_cfg = if let Some(hc) = &options.health_check {
+            let enabled = hc.enabled.unwrap_or(DEFAULT_HEALTH_CHECK_ENABLED);
+            let interval = Duration::from_millis(
+                hc.interval_ms.map(|v| v as u64).unwrap_or(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
+            );
+            let max_missed = hc.max_missed_pongs
+                .map(|v| v as u64)
+                .unwrap_or(DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS);
+            marketdata_core::HealthCheckConfig::new(enabled, interval, max_missed)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?
+        } else {
+            marketdata_core::HealthCheckConfig::default()
+        };
+
+        // TODO: Store base_url and configs for propagation to child clients
+        // Currently configs are validated but not used - will be wired when
+        // ConnectionConfig accepts them
+
+        Ok(Self { api_key })
     }
 
     /// Get the stock WebSocket client for real-time stock data
