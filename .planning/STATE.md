@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 15 of 15 — Documentation & Migration
-Plan: 1/3 complete (15-01 complete ✓, 15-02 in progress)
+Plan: 1/3 complete (15-01 complete ✓)
 Status: Phases 8-14 complete ✓, Phase 15 in progress
-Last activity: 2026-02-15 - Phase 15 Plan 02 complete (migration guide and configuration reference)
+Last activity: 2026-02-16 - Phase 15 Plan 01 complete (READMEs and CHANGELOG.md)
 
-Progress: [█████████░] 91% (Phases 8-14 complete, Phase 15 in progress)
+Progress: [█████████░] 89% (Phases 8-14 complete, Phase 15-01 complete)
 
-**Note:** Phase 15-02 complete - MIGRATION.md with before/after examples for all 5 languages, docs/configuration.md with comprehensive config reference sourced from core constants.
+**Note:** Phase 15-01 complete - All language READMEs updated to v0.3.0 API, CHANGELOG.md created with v0.3.0 and v0.2.0 entries.
 
 ## Milestone History
 
@@ -106,12 +106,13 @@ From Phase 14-02 execution:
 - Build tag //go:build cgo for tests requiring native library
 - WebSocket only supports apiKey (bearerToken/sdkToken return descriptive TODO error)
 
-From Phase 15-02 execution:
-- Keep a Changelog format for migration documentation (semantic versioning integration)
-- Language-specific migration sections with before/after code examples
-- Configuration defaults sourced from core constants (single source of truth)
-- Validation error messages documented with causes and solutions
-- Reference table format for configuration options (type, default, min, max, description)
+From Phase 15-01 execution:
+- CHANGELOG format: Keep a Changelog v1.1.0 for maintainability and tool compatibility
+- UniFFI production status: removed experimental warnings for v0.3.0
+- Documentation date: v0.3.0 released 2026-02-16 (actual completion date)
+- All READMEs updated to show v0.3.0 constructor patterns (Python kwargs, Node.js options, Java builder, Go functional options, C# options)
+- Configuration sections added to Python, Node.js, Core, and UniFFI READMEs
+- Zero deprecated patterns remain in any README
 
 ### Patterns Established
 
@@ -150,11 +151,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phase 15-02 complete ✓ (2/2 tasks, all must-haves verified).
+None — Phase 15-01 complete ✓ (2/2 tasks, all verification passed).
 
 ## Session Continuity
 
-Last session: 2026-02-15
-Stopped at: Completed Phase 15-02 (migration guide and configuration reference)
+Last session: 2026-02-16
+Stopped at: Completed Phase 15-01 (READMEs and CHANGELOG.md)
 Resume file: N/A
-Next: Phase 15-03 (if planned) or Phase 15 wrap-up
+Next: Phase 15-02 (if planned) - migration guide
