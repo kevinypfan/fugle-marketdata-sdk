@@ -1,26 +1,27 @@
 # marketdata-uniffi
 
-**EXPERIMENTAL** UniFFI bindings for Fugle marketdata-core.
-
-> **Warning**: This module is in **alpha** status. The API may change without notice in future releases. Use at your own risk in production environments.
+UniFFI bindings for Fugle marketdata-core library providing multi-language support.
 
 ## Overview
 
 This crate provides FFI bindings for multiple programming languages using [UniFFI](https://mozilla.github.io/uniffi-rs/). Supported languages include:
 
-- C#
-- Go
-- C++
-- Swift (macOS/iOS)
-- Kotlin/Java (Android)
+- **Java** - Builder pattern with fluent API
+- **Go** - Functional options pattern
+- **C#** - Options classes pattern (via csbindgen)
+- C++ - Direct FFI bindings
+- Swift (macOS/iOS) - Native Swift API
+- Kotlin (Android) - Kotlin-friendly bindings
 
 ## Architecture
 
-All methods return **JSON strings** for maximum language compatibility. This design choice:
+All REST API methods return **JSON strings** for maximum language compatibility. This design choice:
 
 - Avoids complex type mapping across different languages
 - Allows parsing with native JSON libraries in each language
 - Maintains flexibility for future API changes
+
+WebSocket clients use native callback patterns in each language for optimal developer experience.
 
 ## Building
 
@@ -56,76 +57,283 @@ cargo run --bin uniffi-bindgen -- generate \
   --out-dir ./bindings/cpp/
 ```
 
+## Language-Specific Usage
+
+### Java (Builder Pattern)
+
+The Java binding uses the builder pattern for flexible configuration:
+
+```java
+import tw.com.fugle.marketdata.*;
+
+// Create client with API key
+FugleRestClient client = FugleRestClient.builder()
+    .apiKey("your-api-key")
+    .build();
+
+// Bearer token authentication
+FugleRestClient client = FugleRestClient.builder()
+    .bearerToken("your-bearer-token")
+    .build();
+
+// SDK token authentication
+FugleRestClient client = FugleRestClient.builder()
+    .sdkToken("your-sdk-token")
+    .build();
+
+// With custom base URL
+FugleRestClient client = FugleRestClient.builder()
+    .apiKey("your-key")
+    .baseUrl("https://custom.api")
+    .build();
+
+// Get stock quote (returns JSON string)
+String quoteJson = client.getStockQuote("2330");
+
+// WebSocket with configuration
+ReconnectOptions reconnect = ReconnectOptions.builder()
+    .maxAttempts(10)
+    .initialDelayMs(2000L)
+    .maxDelayMs(120000L)
+    .build();
+
+HealthCheckOptions healthCheck = HealthCheckOptions.builder()
+    .enabled(true)
+    .intervalMs(15000L)
+    .maxMissedPongs(3)
+    .build();
+
+FugleWebSocketClient ws = FugleWebSocketClient.builder()
+    .apiKey("your-key")
+    .reconnect(reconnect)
+    .healthCheck(healthCheck)
+    .build();
+```
+
+**Configuration Options:**
+
+`ReconnectOptions.builder()`:
+- `maxAttempts(Integer)` - Maximum reconnection attempts (default: 5, min: 1)
+- `initialDelayMs(Long)` - Initial delay for exponential backoff (default: 1000ms, min: 100ms)
+- `maxDelayMs(Long)` - Maximum delay cap (default: 60000ms)
+
+`HealthCheckOptions.builder()`:
+- `enabled(Boolean)` - Whether health check is enabled (default: false)
+- `intervalMs(Long)` - Ping interval in milliseconds (default: 30000ms, min: 5000ms)
+- `maxMissedPongs(Integer)` - Maximum missed pongs (default: 2, min: 1)
+
+### Go (Functional Options)
+
+The Go binding uses functional options for idiomatic Go configuration:
+
+```go
+import marketdata "github.com/user/fugle-marketdata-sdk/bindings/go/marketdata"
+
+// Create client with API key
+client, err := marketdata.NewFugleRestClient(
+    marketdata.WithApiKey("your-api-key"),
+)
+
+// Bearer token authentication
+client, err := marketdata.NewFugleRestClient(
+    marketdata.WithBearerToken("your-bearer-token"),
+)
+
+// SDK token authentication
+client, err := marketdata.NewFugleRestClient(
+    marketdata.WithSdkToken("your-sdk-token"),
+)
+
+// With custom base URL
+client, err := marketdata.NewFugleRestClient(
+    marketdata.WithApiKey("your-key"),
+    marketdata.WithBaseUrl("https://custom.api"),
+)
+
+// Get stock quote (returns JSON string)
+quoteJson, err := client.GetStockQuote("2330")
+
+// WebSocket with configuration
+reconnect := &marketdata.ReconnectOptions{
+    MaxAttempts:      10,
+    InitialDelayMs:   2000,
+    MaxDelayMs:       120000,
+}
+
+healthCheck := &marketdata.HealthCheckOptions{
+    Enabled:         true,
+    IntervalMs:      15000,
+    MaxMissedPongs:  3,
+}
+
+ws, err := marketdata.NewFugleWebSocketClient(
+    marketdata.WithApiKey("your-key"),
+    marketdata.WithReconnect(reconnect),
+    marketdata.WithHealthCheck(healthCheck),
+)
+```
+
+**Configuration Options:**
+
+`ReconnectOptions` struct:
+- `MaxAttempts int` - Maximum reconnection attempts (zero = use default 5)
+- `InitialDelayMs uint64` - Initial delay for exponential backoff (zero = use default 1000ms)
+- `MaxDelayMs uint64` - Maximum delay cap (zero = use default 60000ms)
+
+`HealthCheckOptions` struct:
+- `Enabled bool` - Whether health check is enabled
+- `IntervalMs uint64` - Ping interval in milliseconds (zero = use default 30000ms)
+- `MaxMissedPongs int` - Maximum missed pongs (zero = use default 2)
+
+### C# (Options Pattern)
+
+The C# binding uses .NET options pattern with nullable properties:
+
+```csharp
+using FugleMarketData;
+
+// Create client with API key
+var client = new RestClient(new RestClientOptions
+{
+    ApiKey = "your-api-key"
+});
+
+// Bearer token authentication
+var client = new RestClient(new RestClientOptions
+{
+    BearerToken = "your-bearer-token"
+});
+
+// SDK token authentication
+var client = new RestClient(new RestClientOptions
+{
+    SdkToken = "your-sdk-token"
+});
+
+// With custom base URL
+var client = new RestClient(new RestClientOptions
+{
+    ApiKey = "your-key",
+    BaseUrl = "https://custom.api"
+});
+
+// Get stock quote (returns JSON string)
+string quoteJson = client.GetStockQuote("2330");
+
+// WebSocket with configuration
+var reconnect = new ReconnectOptions
+{
+    MaxAttempts = 10,
+    InitialDelayMs = 2000,
+    MaxDelayMs = 120000
+};
+
+var healthCheck = new HealthCheckOptions
+{
+    Enabled = true,
+    IntervalMs = 15000,
+    MaxMissedPongs = 3
+};
+
+var ws = new WebSocketClient(new WebSocketClientOptions
+{
+    ApiKey = "your-key",
+    ReconnectOptions = reconnect,
+    HealthCheckOptions = healthCheck
+});
+```
+
+**Configuration Options:**
+
+`ReconnectOptions` class:
+- `MaxAttempts int?` - Maximum reconnection attempts (null = use default 5)
+- `InitialDelayMs ulong?` - Initial delay for exponential backoff (null = use default 1000ms)
+- `MaxDelayMs ulong?` - Maximum delay cap (null = use default 60000ms)
+
+`HealthCheckOptions` class:
+- `Enabled bool?` - Whether health check is enabled (null = use default false)
+- `IntervalMs ulong?` - Ping interval in milliseconds (null = use default 30000ms)
+- `MaxMissedPongs int?` - Maximum missed pongs (null = use default 2)
+
 ## API Reference
 
-### Creating a Client
+### REST API Methods
 
-```csharp
-// C# Example
-using MarketdataUniffi;
+All methods return JSON strings that can be parsed with your language's JSON library:
 
-// Create client with SDK token
-var client = MarketdataUniffi.NewRestClientWithSdkToken("your-sdk-token");
-
-// Or with API key
-var client = MarketdataUniffi.NewRestClientWithApiKey("your-api-key");
-
-// Or with bearer token
-var client = MarketdataUniffi.NewRestClientWithBearerToken("your-bearer-token");
+**Stock Market Data:**
+```
+getStockQuote(symbol)           # Get real-time quote
+getStockTicker(symbol)          # Get symbol information
+getStockCandles(symbol, timeframe)  # Get OHLCV candles
+getStockTrades(symbol)          # Get trade history
+getStockVolumes(symbol)         # Get volume by price
 ```
 
-### Stock Market Data
-
-```csharp
-// Get stock quote (returns JSON string)
-var stock = client.Stock();
-var intraday = stock.Intraday();
-
-string quoteJson = intraday.Quote("2330");  // TSMC
-string tickerJson = intraday.Ticker("2330");
-string candlesJson = intraday.Candles("2330", "5");  // 5-minute candles
-string tradesJson = intraday.Trades("2330");
-string volumesJson = intraday.Volumes("2330");
+**Futures and Options (FutOpt) Data:**
+```
+getFutOptQuote(symbol, afterHours)   # Get real-time quote
+getFutOptTicker(symbol)              # Get contract information
+getFutOptCandles(symbol, timeframe)  # Get OHLCV candles
+getFutOptTrades(symbol)              # Get trade history
+getFutOptVolumes(symbol)             # Get volume by price
+getFutOptProducts(type)              # Get product listing ("F" or "O")
 ```
 
-### Futures and Options (FutOpt) Data
+### WebSocket Methods
 
-```csharp
-// Get FutOpt quote
-var futopt = client.Futopt();
-var futoptIntraday = futopt.Intraday();
-
-// Regular hours
-string quoteJson = futoptIntraday.Quote("TXF202503", false);
-
-// After hours
-string quoteJson = futoptIntraday.Quote("TXF202503", true);
-
-// Get available products
-string futuresProducts = futoptIntraday.Products("F");  // Futures
-string optionsProducts = futoptIntraday.Products("O");  // Options
 ```
+connect()                       # Connect to WebSocket server
+disconnect()                    # Disconnect from server
+subscribe(channel, symbol)      # Subscribe to channel
+unsubscribe(subscriptionId)     # Unsubscribe by ID
+isConnected()                   # Check connection status
+isClosed()                      # Check if client is closed
+```
+
+**WebSocket Channels:**
+- `trades` - Real-time trade executions
+- `candles` - Real-time candlestick updates
+- `books` - Order book (5 levels bid/ask)
+- `aggregates` - Aggregated market data
+- `indices` - Index values (stock only)
 
 ### Error Handling
 
 Errors are thrown as exceptions in target languages:
 
+**Java:**
+```java
+try {
+    String quote = client.getStockQuote("INVALID");
+} catch (MarketDataException.InvalidSymbol e) {
+    System.out.println("Invalid symbol: " + e.getMessage());
+} catch (MarketDataException.AuthError e) {
+    System.out.println("Authentication failed: " + e.getMessage());
+}
+```
+
+**Go:**
+```go
+quote, err := client.GetStockQuote("INVALID")
+if err != nil {
+    log.Printf("Error: %v", err)
+}
+```
+
+**C#:**
 ```csharp
 try
 {
-    var quote = intraday.Quote("INVALID");
+    var quote = client.GetStockQuote("INVALID");
 }
-catch (MarketDataException.InvalidSymbol ex)
+catch (InvalidSymbolException ex)
 {
     Console.WriteLine($"Invalid symbol: {ex.Message}");
 }
-catch (MarketDataException.AuthError ex)
+catch (AuthErrorException ex)
 {
     Console.WriteLine($"Authentication failed: {ex.Message}");
-}
-catch (MarketDataException.ConnectionError ex)
-{
-    Console.WriteLine($"Connection error: {ex.Message}");
 }
 ```
 
@@ -146,7 +354,7 @@ catch (MarketDataException.ConnectionError ex)
 
 ## Response Format
 
-All methods return JSON strings. Example response:
+All REST methods return JSON strings. Example response:
 
 ```json
 {
@@ -160,6 +368,8 @@ All methods return JSON strings. Example response:
   "volume": 12345678
 }
 ```
+
+Parse with your language's JSON library (e.g., `Jackson` for Java, `encoding/json` for Go, `System.Text.Json` for C#).
 
 ## Dependencies
 

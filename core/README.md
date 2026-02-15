@@ -150,6 +150,73 @@ let auth = AuthRequest::with_token("your-bearer-token");
 let auth = AuthRequest::with_sdk_token("your-sdk-token");
 ```
 
+## Configuration
+
+### ReconnectionConfig
+
+Control WebSocket automatic reconnection behavior with exponential backoff:
+
+```rust
+use marketdata_core::websocket::ReconnectionConfig;
+
+let reconnect = ReconnectionConfig::new(
+    10,      // max_attempts (min: 1)
+    2000,    // initial_delay_ms (min: 100ms)
+    120000   // max_delay_ms
+)?;
+```
+
+**Parameters:**
+- `max_attempts` (usize): Maximum reconnection attempts (default: 5, range: 1+)
+- `initial_delay` (u64): Initial delay for exponential backoff in milliseconds (default: 1000ms, min: 100ms)
+- `max_delay` (u64): Maximum delay cap in milliseconds (default: 60000ms)
+
+**Validation:**
+- `max_attempts` must be >= 1
+- `initial_delay` must be >= 100ms (prevents connection storms)
+- `max_delay` must be >= `initial_delay` (logical constraint)
+
+### HealthCheckConfig
+
+Control WebSocket health check (ping-pong) behavior to detect stale connections:
+
+```rust
+use marketdata_core::websocket::HealthCheckConfig;
+
+let health = HealthCheckConfig::new(
+    true,    // enabled (default: false)
+    15000,   // interval_ms (min: 5000ms)
+    3        // max_missed_pongs (min: 1)
+)?;
+```
+
+**Parameters:**
+- `enabled` (bool): Whether health check is enabled (default: false, aligned with official SDKs)
+- `interval` (u64): Ping interval in milliseconds (default: 30000ms, min: 5000ms)
+- `max_missed_pongs` (usize): Maximum missed pongs before considering connection stale (default: 2, min: 1)
+
+**Validation:**
+- `interval` must be >= 5000ms (prevents excessive overhead)
+- `max_missed_pongs` must be >= 1
+
+### Config Constants
+
+All configuration constants are exported from `lib.rs` for use in binding layers:
+
+```rust
+// Reconnection defaults
+pub const DEFAULT_MAX_RECONNECT_ATTEMPTS: usize = 5;
+pub const DEFAULT_INITIAL_RECONNECT_DELAY_MS: u64 = 1000;
+pub const DEFAULT_MAX_RECONNECT_DELAY_MS: u64 = 60000;
+pub const MIN_INITIAL_DELAY_MS: u64 = 100;
+
+// Health check defaults
+pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = false;
+pub const DEFAULT_HEALTH_CHECK_INTERVAL_MS: u64 = 30000;
+pub const DEFAULT_MAX_MISSED_PONGS: usize = 2;
+pub const MIN_HEALTH_CHECK_INTERVAL_MS: u64 = 5000;
+```
+
 ## Error Handling
 
 All operations return `Result<T, MarketDataError>`:
