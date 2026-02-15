@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 15 of 15 — Documentation & Migration
-Plan: 1/3 complete (15-01 complete ✓)
-Status: Phases 8-14 complete ✓, Phase 15 in progress
-Last activity: 2026-02-16 - Phase 15 Plan 01 complete (READMEs and CHANGELOG.md)
+Plan: 3/3 complete (15-01 ✓, 15-02 ✓, 15-03 ✓)
+Status: Phase 15 complete ✓
+Last activity: 2026-02-16 - Phase 15 Plan 03 complete (migration tooling and CI validation)
 
-Progress: [█████████░] 89% (Phases 8-14 complete, Phase 15-01 complete)
+Progress: [██████████] 100% (All phases complete - v0.3.0 milestone achieved)
 
-**Note:** Phase 15-01 complete - All language READMEs updated to v0.3.0 API, CHANGELOG.md created with v0.3.0 and v0.2.0 entries.
+**Note:** Phase 15 complete - All documentation updated to v0.3.0, migration guide created, automated migration scripts and CI validation in place.
 
 ## Milestone History
 
@@ -114,6 +114,13 @@ From Phase 15-01 execution:
 - Configuration sections added to Python, Node.js, Core, and UniFFI READMEs
 - Zero deprecated patterns remain in any README
 
+From Phase 15-03 execution:
+- libCST chosen for Python codemod (lossless transformation over lib2to3/regex)
+- jscodeshift transform module pattern (standard pattern, not standalone CLI)
+- Validation script skips MIGRATION.md (expected to contain deprecated patterns in Before examples)
+- CI workflow triggers on doc-related paths only (*.md, migration/**, examples/**)
+- markdownlint configured for SDK docs (MD013:false for code blocks, MD033:false for badges)
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -151,11 +158,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phase 15-01 complete ✓ (2/2 tasks, all verification passed).
+None — Phase 15 complete ✓ (all plans executed successfully). v0.3.0 milestone achieved.
 
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed Phase 15-01 (READMEs and CHANGELOG.md)
+Stopped at: Completed Phase 15-03 (migration tooling and CI validation)
 Resume file: N/A
-Next: Phase 15-02 (if planned) - migration guide
+Next: v0.3.0 complete - all phases delivered. Future work: v0.4.0 planning or post-release maintenance.
