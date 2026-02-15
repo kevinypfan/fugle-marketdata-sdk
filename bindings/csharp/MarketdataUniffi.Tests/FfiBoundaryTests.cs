@@ -156,7 +156,7 @@ public class FfiBoundaryTests
         // Null should be caught at C# validation level
         Assert.ThrowsException<ArgumentNullException>(() =>
         {
-            new FugleMarketData.RestClient(null!);
+            new FugleMarketData.RestClient((string)null!);
         });
     }
 

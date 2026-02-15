@@ -145,7 +145,7 @@ public class RestClientTests
     public void CreateRestClient_WithNullApiKey_ThrowsArgumentNullException()
     {
         Assert.ThrowsException<ArgumentNullException>(() =>
-            new FugleMarketData.RestClient(null!)
+            new FugleMarketData.RestClient((string)null!)
         );
     }
 
