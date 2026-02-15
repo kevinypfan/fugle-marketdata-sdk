@@ -9,14 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 ## Current Position
 
-Phase: 14 of 15 — Java & Go Bindings
-Plan: 3/3 complete (14-01, 14-02, 14-03 complete ✓)
-Status: Phases 8-14 complete ✓, Phase 14 verified (passed)
-Last activity: 2026-02-15 - Phase 14 complete and verified (21/21 must-haves)
+Phase: 15 of 15 — Documentation & Migration
+Plan: 1/3 complete (15-01 complete ✓, 15-02 in progress)
+Status: Phases 8-14 complete ✓, Phase 15 in progress
+Last activity: 2026-02-15 - Phase 15 Plan 02 complete (migration guide and configuration reference)
 
-Progress: [█████████░] 88% (Phases 8-14 complete, 8/8 v0.3.0 phases complete)
+Progress: [█████████░] 91% (Phases 8-14 complete, Phase 15 in progress)
 
-**Note:** Phase 14 complete - Java (builder), Go (functional options), C# (options classes) all expose config with exactly-one-auth validation. 41 total tests.
+**Note:** Phase 15-02 complete - MIGRATION.md with before/after examples for all 5 languages, docs/configuration.md with comprehensive config reference sourced from core constants.
 
 ## Milestone History
 
@@ -106,6 +106,13 @@ From Phase 14-02 execution:
 - Build tag //go:build cgo for tests requiring native library
 - WebSocket only supports apiKey (bearerToken/sdkToken return descriptive TODO error)
 
+From Phase 15-02 execution:
+- Keep a Changelog format for migration documentation (semantic versioning integration)
+- Language-specific migration sections with before/after code examples
+- Configuration defaults sourced from core constants (single source of truth)
+- Validation error messages documented with causes and solutions
+- Reference table format for configuration options (type, default, min, max, description)
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -143,11 +150,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phase 14 complete ✓ (verified, 21/21 must-haves). Phase 15 (Docs & Migration) is next.
+None — Phase 15-02 complete ✓ (2/2 tasks, all must-haves verified).
 
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Phase 14 complete and verified (passed)
+Stopped at: Completed Phase 15-02 (migration guide and configuration reference)
 Resume file: N/A
-Next: Phase 15 (Documentation & Migration)
+Next: Phase 15-03 (if planned) or Phase 15 wrap-up
