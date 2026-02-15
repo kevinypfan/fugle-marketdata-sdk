@@ -35,6 +35,60 @@ namespace FugleMarketData
             _inner = uniffi.marketdata_uniffi.MarketdataUniffiMethods.NewRestClientWithApiKey(apiKey);
         }
 
+        /// <summary>
+        /// Create a new REST client with configuration options.
+        /// Exactly one authentication method must be provided in the options.
+        /// </summary>
+        /// <param name="options">Configuration options including authentication</param>
+        /// <exception cref="ArgumentNullException">If options is null</exception>
+        /// <exception cref="ArgumentException">If zero or multiple authentication methods are provided</exception>
+        public RestClient(RestClientOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            // Count non-null/non-empty auth properties
+            int authCount = 0;
+            if (!string.IsNullOrEmpty(options.ApiKey)) authCount++;
+            if (!string.IsNullOrEmpty(options.BearerToken)) authCount++;
+            if (!string.IsNullOrEmpty(options.SdkToken)) authCount++;
+
+            // Validate exactly-one-auth
+            if (authCount == 0)
+                throw new ArgumentException("Provide exactly one of: ApiKey, BearerToken, SdkToken", nameof(options));
+            if (authCount > 1)
+                throw new ArgumentException("Provide exactly one of: ApiKey, BearerToken, SdkToken", nameof(options));
+
+            // Dispatch to correct UniFFI constructor based on which auth is set
+            try
+            {
+                if (!string.IsNullOrEmpty(options.ApiKey))
+                {
+                    _inner = uniffi.marketdata_uniffi.MarketdataUniffiMethods.NewRestClientWithApiKey(options.ApiKey);
+                }
+                else if (!string.IsNullOrEmpty(options.BearerToken))
+                {
+                    _inner = uniffi.marketdata_uniffi.MarketdataUniffiMethods.NewRestClientWithBearerToken(options.BearerToken);
+                }
+                else // SdkToken
+                {
+                    _inner = uniffi.marketdata_uniffi.MarketdataUniffiMethods.NewRestClientWithSdkToken(options.SdkToken!);
+                }
+
+                // TODO: Apply BaseUrl when UniFFI RestClient exposes base_url() setter
+                // Currently storing for future use but not applied
+                if (!string.IsNullOrEmpty(options.BaseUrl))
+                {
+                    // BaseUrl configuration will be implemented when core library supports it
+                }
+            }
+            catch (uniffi.marketdata_uniffi.MarketDataException ex)
+            {
+                // Wrap UniFFI exceptions in a general .NET exception
+                throw new InvalidOperationException($"Failed to create REST client: {ex.Message}", ex);
+            }
+        }
+
         // Private constructor for factory methods
         private RestClient(uniffi.marketdata_uniffi.RestClient inner)
         {

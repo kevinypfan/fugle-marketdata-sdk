@@ -92,6 +92,8 @@ namespace FugleMarketData
     {
         private readonly uniffi.marketdata_uniffi.WebSocketClient _inner;
         private bool _disposed;
+        private readonly ReconnectOptions? _reconnectOptions;
+        private readonly HealthCheckOptions? _healthCheckOptions;
 
         /// <summary>
         /// Create a WebSocket client for stock market data streaming.
@@ -108,6 +110,8 @@ namespace FugleMarketData
 
             var adapter = new WebSocketListenerAdapter(listener);
             _inner = new uniffi.marketdata_uniffi.WebSocketClient(apiKey, adapter);
+            _reconnectOptions = null;
+            _healthCheckOptions = null;
         }
 
         /// <summary>
@@ -133,6 +137,85 @@ namespace FugleMarketData
             };
 
             _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithEndpoint(apiKey, adapter, uniffiEndpoint);
+            _reconnectOptions = null;
+            _healthCheckOptions = null;
+        }
+
+        /// <summary>
+        /// Create a WebSocket client with configuration options.
+        /// Exactly one authentication method must be provided in the options.
+        /// </summary>
+        /// <param name="options">Configuration options including authentication and connection settings</param>
+        /// <param name="listener">Listener to receive WebSocket events</param>
+        /// <exception cref="ArgumentNullException">If options or listener is null</exception>
+        /// <exception cref="ArgumentException">If zero or multiple authentication methods are provided</exception>
+        public WebSocketClient(WebSocketClientOptions options, IWebSocketListener listener)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+            if (listener == null)
+                throw new ArgumentNullException(nameof(listener));
+
+            // Count non-null/non-empty auth properties
+            int authCount = 0;
+            if (!string.IsNullOrEmpty(options.ApiKey)) authCount++;
+            if (!string.IsNullOrEmpty(options.BearerToken)) authCount++;
+            if (!string.IsNullOrEmpty(options.SdkToken)) authCount++;
+
+            // Validate exactly-one-auth
+            if (authCount == 0)
+                throw new ArgumentException("Provide exactly one of: ApiKey, BearerToken, SdkToken", nameof(options));
+            if (authCount > 1)
+                throw new ArgumentException("Provide exactly one of: ApiKey, BearerToken, SdkToken", nameof(options));
+
+            // Create adapter
+            var adapter = new WebSocketListenerAdapter(listener);
+
+            // Convert endpoint
+            var uniffiEndpoint = options.Endpoint switch
+            {
+                WebSocketEndpoint.Stock => uniffi.marketdata_uniffi.WebSocketEndpoint.Stock,
+                WebSocketEndpoint.FutOpt => uniffi.marketdata_uniffi.WebSocketEndpoint.FutOpt,
+                _ => throw new ArgumentOutOfRangeException(nameof(options.Endpoint))
+            };
+
+            // TODO: Current UniFFI WebSocketClient constructors only support API key authentication
+            // BearerToken and SdkToken support will be added when UniFFI layer is updated
+            try
+            {
+                if (!string.IsNullOrEmpty(options.ApiKey))
+                {
+                    _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithEndpoint(
+                        options.ApiKey,
+                        adapter,
+                        uniffiEndpoint
+                    );
+                }
+                else
+                {
+                    // For now, only ApiKey is supported in UniFFI WebSocketClient constructors
+                    // BearerToken and SdkToken will require UniFFI layer updates
+                    throw new NotSupportedException(
+                        "WebSocketClient currently only supports ApiKey authentication. " +
+                        "BearerToken and SdkToken support will be added in a future update."
+                    );
+                }
+
+                // Store config options for future propagation to ConnectionConfig
+                // TODO: Apply these when ConnectionConfig is exposed in WebSocketClient
+                _reconnectOptions = options.Reconnect;
+                _healthCheckOptions = options.HealthCheck;
+
+                // TODO: Apply BaseUrl when UniFFI WebSocketClient exposes base_url() setter
+                if (!string.IsNullOrEmpty(options.BaseUrl))
+                {
+                    // BaseUrl configuration will be implemented when core library supports it
+                }
+            }
+            catch (uniffi.marketdata_uniffi.MarketDataException ex)
+            {
+                throw new InvalidOperationException($"Failed to create WebSocket client: {ex.Message}", ex);
+            }
         }
 
         /// <summary>
