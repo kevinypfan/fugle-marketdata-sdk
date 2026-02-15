@@ -9,14 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 ## Current Position
 
-Phase: 13 of 15 — Node.js Config Exposure
-Plan: 3/3 complete (13-01, 13-02, 13-03 complete ✓)
-Status: Phases 8-12 complete ✓, Phase 13 complete ✓
-Last activity: 2026-02-06 - Completed 13-03-PLAN.md (TypeScript types and config tests)
+Phase: 14 of 15 — Java & Go Bindings
+Plan: 1/5 complete (14-03 complete ✓)
+Status: Phases 8-13 complete ✓, Phase 14 in progress
+Last activity: 2026-02-15 - Completed 14-03-PLAN.md (C# config options and tests)
 
-Progress: [███████░░░] 70% (Phases 8-13 complete, 7/8 v0.3.0 phases complete)
+Progress: [████████░░] 75% (Phases 8-13 complete, Phase 14 started)
 
-**Note:** Phase 13 complete - Node.js bindings expose config with TypeScript union types for compile-time auth enforcement.
+**Note:** Phase 14 started - C# bindings now expose config with .NET options pattern and exactly-one-auth validation.
 
 ## Milestone History
 
@@ -83,6 +83,13 @@ From Phase 13-03 execution:
 - Comprehensive test suite validates both TypeScript types and JavaScript runtime behavior
 - Tests use @ts-expect-error to validate error messages for JavaScript users
 
+From Phase 14-03 execution:
+- C# nullable properties for optional config (null = use default from core constants)
+- .NET options pattern: separate options classes passed to constructors
+- Exactly-one-auth validation: count non-null auth properties, throw ArgumentException if 0 or >1
+- WebSocketClient stores ReconnectOptions/HealthCheckOptions but doesn't apply (no UniFFI setter)
+- Ambiguous constructor fix: cast null to (string)null! when passing to overloaded constructors
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -120,11 +127,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phases 8-13 complete ✓ (verified). Phase 14 (Java/Go/C# config) can proceed.
+None — Phase 14-03 complete ✓. Phase 14 continuing with additional language bindings.
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Completed Phase 13 (Node.js Config Exposure ✓ verified)
+Last session: 2026-02-15
+Stopped at: Completed 14-03-PLAN.md (C# config options ✓ verified)
 Resume file: N/A
-Next: Phase 14 (Java & Go Bindings with config exposure)
+Next: Continue Phase 14 (Java/Go config exposure if applicable)
