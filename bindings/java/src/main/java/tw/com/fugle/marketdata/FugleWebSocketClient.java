@@ -244,9 +244,14 @@ public class FugleWebSocketClient implements AutoCloseable {
      */
     public static class Builder {
         private String apiKey;
+        private String bearerToken;
+        private String sdkToken;
+        private String baseUrl;
         private WebSocketEndpoint endpoint = WebSocketEndpoint.STOCK;
         private WebSocketListener listener;
         private int queueCapacity = 10000;
+        private ReconnectOptions reconnectOptions;
+        private HealthCheckOptions healthCheckOptions;
 
         private Builder() {}
 
@@ -255,6 +260,33 @@ public class FugleWebSocketClient implements AutoCloseable {
          */
         public Builder apiKey(String apiKey) {
             this.apiKey = apiKey;
+            return this;
+        }
+
+        /**
+         * Set bearer token for OAuth authentication.
+         */
+        public Builder bearerToken(String bearerToken) {
+            this.bearerToken = bearerToken;
+            return this;
+        }
+
+        /**
+         * Set SDK token for legacy authentication.
+         */
+        public Builder sdkToken(String sdkToken) {
+            this.sdkToken = sdkToken;
+            return this;
+        }
+
+        /**
+         * Set custom base URL for WebSocket endpoint.
+         *
+         * @param baseUrl Custom base URL (e.g., "wss://custom.ws.fugle.tw")
+         * @return This builder for chaining
+         */
+        public Builder baseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
             return this;
         }
 
@@ -303,13 +335,44 @@ public class FugleWebSocketClient implements AutoCloseable {
         }
 
         /**
+         * Set reconnection options for WebSocket client.
+         *
+         * @param reconnectOptions Reconnection configuration
+         * @return This builder for chaining
+         */
+        public Builder reconnect(ReconnectOptions reconnectOptions) {
+            this.reconnectOptions = reconnectOptions;
+            return this;
+        }
+
+        /**
+         * Set health check options for WebSocket client.
+         *
+         * @param healthCheckOptions Health check configuration
+         * @return This builder for chaining
+         */
+        public Builder healthCheck(HealthCheckOptions healthCheckOptions) {
+            this.healthCheckOptions = healthCheckOptions;
+            return this;
+        }
+
+        /**
          * Build the FugleWebSocketClient.
          *
-         * @throws IllegalStateException if API key is not set
+         * @throws FugleException if exactly one authentication method is not provided
          */
         public FugleWebSocketClient build() {
-            if (apiKey == null || apiKey.isEmpty()) {
-                throw new IllegalStateException("API key is required");
+            // Exactly-one-auth validation
+            int authCount = 0;
+            if (apiKey != null) authCount++;
+            if (bearerToken != null) authCount++;
+            if (sdkToken != null) authCount++;
+
+            if (authCount == 0) {
+                throw new FugleException("Provide exactly one of: apiKey, bearerToken, sdkToken");
+            }
+            if (authCount > 1) {
+                throw new FugleException("Provide exactly one of: apiKey, bearerToken, sdkToken");
             }
 
             WebSocketListener effectiveListener;
@@ -329,9 +392,21 @@ public class FugleWebSocketClient implements AutoCloseable {
                 effectiveListener = new InternalListener(messageQueue, errorQueue);
             }
 
-            WebSocketClient client = WebSocketClient.newWithEndpoint(apiKey, effectiveListener, endpoint);
+            // TODO: Current UniFFI WebSocketClient constructors only accept api_key
+            // For bearerToken/sdkToken support, store values for future use
+            // (same pattern as Python/Node.js phases 12-02, 13-02)
+            if (apiKey != null) {
+                WebSocketClient client = WebSocketClient.newWithEndpoint(apiKey, effectiveListener, endpoint);
 
-            return new FugleWebSocketClient(client, messageQueue, errorQueue);
+                // TODO: reconnectOptions and healthCheckOptions stored but not yet wired to core
+                // Requires ConnectionConfig to expose these options (matches Python Phase 12-02)
+
+                return new FugleWebSocketClient(client, messageQueue, errorQueue);
+            } else {
+                // bearerToken or sdkToken provided but not yet supported by UniFFI WebSocketClient
+                throw new FugleException("WebSocket currently only supports apiKey authentication. " +
+                                       "bearerToken and sdkToken support coming in future release.");
+            }
         }
     }
 

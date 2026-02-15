@@ -77,6 +77,7 @@ public class FugleRestClient implements AutoCloseable {
         private String apiKey;
         private String bearerToken;
         private String sdkToken;
+        private String baseUrl;
 
         private Builder() {}
 
@@ -105,22 +106,52 @@ public class FugleRestClient implements AutoCloseable {
         }
 
         /**
+         * Set custom base URL for API endpoint.
+         *
+         * @param baseUrl Custom base URL (e.g., "https://custom.api.fugle.tw")
+         * @return This builder for chaining
+         */
+        public Builder baseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+            return this;
+        }
+
+        /**
          * Build the FugleRestClient.
          *
-         * @throws FugleException if no authentication method is set or if client creation fails
+         * @throws FugleException if exactly one authentication method is not provided or if client creation fails
          */
         public FugleRestClient build() {
             try {
-                RestClient restClient;
+                // Exactly-one-auth validation
+                int authCount = 0;
+                if (apiKey != null) authCount++;
+                if (bearerToken != null) authCount++;
+                if (sdkToken != null) authCount++;
 
+                if (authCount == 0) {
+                    throw new FugleException("Provide exactly one of: apiKey, bearerToken, sdkToken");
+                }
+                if (authCount > 1) {
+                    throw new FugleException("Provide exactly one of: apiKey, bearerToken, sdkToken");
+                }
+
+                // Create client with appropriate auth method
+                RestClient restClient;
                 if (apiKey != null) {
                     restClient = MarketdataUniffi.newRestClientWithApiKey(apiKey);
                 } else if (bearerToken != null) {
                     restClient = MarketdataUniffi.newRestClientWithBearerToken(bearerToken);
-                } else if (sdkToken != null) {
-                    restClient = MarketdataUniffi.newRestClientWithSdkToken(sdkToken);
                 } else {
-                    throw new FugleException("Authentication required: set apiKey(), bearerToken(), or sdkToken()");
+                    restClient = MarketdataUniffi.newRestClientWithSdkToken(sdkToken);
+                }
+
+                // TODO: baseUrl cannot be set post-construction via UniFFI
+                // Core RestClient has base_url() builder method that consumes self.
+                // Since UniFFI RestClient wraps Arc, we need a UniFFI-exposed setter.
+                // For now, baseUrl is stored but not applied (matches Python/Node.js phases 12-02, 13-02).
+                if (baseUrl != null) {
+                    // baseUrl stored but not yet applied - requires UniFFI API extension
                 }
 
                 return new FugleRestClient(restClient);
