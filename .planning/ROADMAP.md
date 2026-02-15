@@ -136,9 +136,10 @@ Plans:
 - [x] 13-02-PLAN.md — Client constructors (RestClient/WebSocketClient options acceptance)
 - [x] 13-03-PLAN.md — TypeScript definitions and tests
 
-### Phase 14: Java & Go Bindings
+### Phase 14: Java & Go Bindings ✓
 
 **Goal**: Add config exposure to Java, Go, and C# bindings with idiomatic patterns
+**Status**: Complete (2026-02-15)
 **Depends on**: Phase 8 (core validation), Phase 11 (C# foundation)
 **Plans:** 3 plans
 
@@ -146,14 +147,14 @@ Plans:
 - Java binding with builder pattern for configs
 - Go binding with functional options pattern
 - C# config exposure (extend Phase 11 work)
-- Tests for all three languages
+- Tests for all three languages (41 total: 14 Java + 13 Go + 14 C#)
 
 **Requirements addressed:** API-01 to API-05, WS-01 to WS-06, CON-01, TEST-01, TEST-02
 
 Plans:
-- [ ] 14-01-PLAN.md — Java builder pattern with config classes and tests
-- [ ] 14-02-PLAN.md — Go functional options with config structs and tests
-- [ ] 14-03-PLAN.md — C# options classes with config and tests
+- [x] 14-01-PLAN.md — Java builder pattern with config classes and tests
+- [x] 14-02-PLAN.md — Go functional options with config structs and tests
+- [x] 14-03-PLAN.md — C# options classes with config and tests
 
 ### Phase 15: Documentation & Migration
 
@@ -205,5 +206,5 @@ Phases 12, 13, and 14 can run in parallel after their dependencies complete.
 
 ---
 *Created: 2026-02-01*
-*Updated: 2026-02-15 — Phase 14 planned (3 plans)*
+*Updated: 2026-02-15 — Phase 14 complete (3 plans, 41 tests, 10 commits)*
 *Research basis: .planning/research/v0.3.0-SUMMARY.md*
