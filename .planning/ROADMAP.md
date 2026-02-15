@@ -160,7 +160,7 @@ Plans:
 
 **Goal**: Update all documentation and provide migration tooling
 **Depends on**: Phases 12, 13, 14
-**Plans:** (created by /gsd:plan-phase)
+**Plans:** 3 plans
 
 **Delivers:**
 - Updated README examples with options object pattern
@@ -170,6 +170,11 @@ Plans:
 - CI check for outdated patterns in examples
 
 **Requirements addressed:** DOC-01, DOC-02, DOC-03
+
+Plans:
+- [ ] 15-01-PLAN.md — Update all language READMEs and create CHANGELOG.md
+- [ ] 15-02-PLAN.md — Migration guide and configuration reference docs
+- [ ] 15-03-PLAN.md — Migration scripts (Python codemod, JS codemod) and CI validation
 
 ---
 
@@ -200,11 +205,11 @@ Phases 12, 13, and 14 can run in parallel after their dependencies complete.
 
 ## Out of Scope
 
-- WebSocket `subscribe()` signature change (dict vs positional) — v0.4.0
-- REST client timeout configuration — v0.3.1
-- Removal of deprecated string constructors — v0.4.0+
+- WebSocket `subscribe()` signature change (dict vs positional) -- v0.4.0
+- REST client timeout configuration -- v0.3.1
+- Removal of deprecated string constructors -- v0.4.0+
 
 ---
 *Created: 2026-02-01*
-*Updated: 2026-02-15 — Phase 14 complete (3 plans, 41 tests, 10 commits)*
+*Updated: 2026-02-16 -- Phase 15 planned (3 plans, 2 waves)*
 *Research basis: .planning/research/v0.3.0-SUMMARY.md*
