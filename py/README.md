@@ -34,7 +34,7 @@ pip install target/wheels/marketdata_py-*.whl
 from marketdata_py import RestClient, MarketDataError
 
 # Create client with API key
-client = RestClient("your-api-key")
+client = RestClient(api_key="your-api-key")
 
 # Get stock quote
 quote = client.stock.intraday.quote("2330")
@@ -68,7 +68,7 @@ from marketdata_py import WebSocketClient
 import time
 
 # Create WebSocket client
-ws = WebSocketClient("your-api-key")
+ws = WebSocketClient(api_key="your-api-key")
 
 # --- Callback Mode ---
 
@@ -109,7 +109,7 @@ stock.disconnect()
 
 # --- Iterator Mode ---
 
-ws2 = WebSocketClient("your-api-key")
+ws2 = WebSocketClient(api_key="your-api-key")
 stock2 = ws2.stock
 stock2.connect()
 stock2.subscribe("trades", "2330")
@@ -128,13 +128,76 @@ Three authentication methods are supported:
 from marketdata_py import RestClient
 
 # 1. API Key (most common)
-client = RestClient("your-api-key")
+client = RestClient(api_key="your-api-key")
 
 # 2. Bearer Token
-client = RestClient.with_bearer_token("your-bearer-token")
+client = RestClient(bearer_token="your-bearer-token")
 
 # 3. SDK Token
-client = RestClient.with_sdk_token("your-sdk-token")
+client = RestClient(sdk_token="your-sdk-token")
+```
+
+## Configuration
+
+### Reconnection Config
+
+Control WebSocket automatic reconnection behavior:
+
+```python
+from marketdata_py import WebSocketClient, ReconnectConfig
+
+# Create custom reconnect configuration
+reconnect = ReconnectConfig(
+    enabled=True,
+    max_attempts=10,
+    initial_delay_ms=2000,
+    max_delay_ms=120000
+)
+
+ws = WebSocketClient(api_key="your-key", reconnect=reconnect)
+```
+
+**ReconnectConfig Options:**
+- `enabled` (bool): Whether auto-reconnect is enabled (default: True)
+- `max_attempts` (int): Maximum reconnection attempts (default: 5, min: 1)
+- `initial_delay_ms` (int): Initial delay for exponential backoff (default: 1000ms, min: 100ms)
+- `max_delay_ms` (int): Maximum delay cap (default: 60000ms)
+
+### Health Check Config
+
+Control WebSocket health check (ping-pong) behavior:
+
+```python
+from marketdata_py import WebSocketClient, HealthCheckConfig
+
+# Create custom health check configuration
+health_check = HealthCheckConfig(
+    enabled=True,
+    interval_ms=15000,
+    max_missed_pongs=3
+)
+
+ws = WebSocketClient(api_key="your-key", health_check=health_check)
+```
+
+**HealthCheckConfig Options:**
+- `enabled` (bool): Whether health check is enabled (default: False)
+- `interval_ms` (int): Ping interval in milliseconds (default: 30000ms, min: 5000ms)
+- `max_missed_pongs` (int): Maximum missed pongs before considering connection stale (default: 2, min: 1)
+
+### Combined Configuration
+
+```python
+from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+
+reconnect = ReconnectConfig(max_attempts=10, initial_delay_ms=2000)
+health_check = HealthCheckConfig(enabled=True, interval_ms=15000)
+
+ws = WebSocketClient(
+    api_key="your-key",
+    reconnect=reconnect,
+    health_check=health_check
+)
 ```
 
 ## API Reference
@@ -231,7 +294,7 @@ All API errors raise `MarketDataError`:
 ```python
 from marketdata_py import RestClient, MarketDataError
 
-client = RestClient("invalid-key")
+client = RestClient(api_key="invalid-key")
 
 try:
     quote = client.stock.intraday.quote("2330")
@@ -271,7 +334,7 @@ def main():
         print("Set FUGLE_API_KEY environment variable")
         return
 
-    client = RestClient(api_key)
+    client = RestClient(api_key=api_key)
 
     try:
         # Stock data
@@ -310,7 +373,7 @@ def main():
         print("Set FUGLE_API_KEY environment variable")
         return
 
-    ws = WebSocketClient(api_key)
+    ws = WebSocketClient(api_key=api_key)
     stock = ws.stock
 
     message_count = 0

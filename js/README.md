@@ -21,7 +21,7 @@ npm run build
 const { RestClient } = require('@fubon/marketdata-js');
 
 // Create client with API key
-const client = new RestClient('your-api-key');
+const client = new RestClient({ apiKey: 'your-api-key' });
 
 // Get stock quote
 const quote = client.stock.intraday.quote('2330');
@@ -38,7 +38,7 @@ console.log('TXF Price:', futoptQuote.closePrice);
 const { WebSocketClient } = require('@fubon/marketdata-js');
 
 // Create client
-const ws = new WebSocketClient('your-api-key');
+const ws = new WebSocketClient({ apiKey: 'your-api-key' });
 
 // Register handlers
 ws.stock.on('message', (data) => {
@@ -73,9 +73,84 @@ setTimeout(() => {
 ```typescript
 import { RestClient, WebSocketClient } from '@fubon/marketdata-js';
 
-const client = new RestClient('your-api-key');
+const client = new RestClient({ apiKey: 'your-api-key' });
 const quote = client.stock.intraday.quote('2330');
 // quote is typed as Record<string, any>
+```
+
+## Authentication
+
+Three authentication methods are supported:
+
+```javascript
+const { RestClient } = require('@fubon/marketdata-js');
+
+// 1. API Key (most common)
+const client = new RestClient({ apiKey: 'your-api-key' });
+
+// 2. Bearer Token
+const client = new RestClient({ bearerToken: 'your-bearer-token' });
+
+// 3. SDK Token
+const client = new RestClient({ sdkToken: 'your-sdk-token' });
+```
+
+## Configuration
+
+### Reconnection Options
+
+Control WebSocket automatic reconnection behavior:
+
+```javascript
+const { WebSocketClient } = require('@fubon/marketdata-js');
+
+const ws = new WebSocketClient({
+  apiKey: 'your-key',
+  reconnect: {
+    maxAttempts: 10,
+    initialDelayMs: 2000,
+    maxDelayMs: 120000
+  }
+});
+```
+
+**ReconnectOptions:**
+- `maxAttempts` (number): Maximum reconnection attempts (default: 5, min: 1)
+- `initialDelayMs` (number): Initial delay for exponential backoff (default: 1000, min: 100)
+- `maxDelayMs` (number): Maximum delay cap (default: 60000)
+
+### Health Check Options
+
+Control WebSocket health check (ping-pong) behavior:
+
+```javascript
+const { WebSocketClient } = require('@fubon/marketdata-js');
+
+const ws = new WebSocketClient({
+  apiKey: 'your-key',
+  healthCheck: {
+    enabled: true,
+    intervalMs: 15000,
+    maxMissedPongs: 3
+  }
+});
+```
+
+**HealthCheckOptions:**
+- `enabled` (boolean): Whether health check is enabled (default: false)
+- `intervalMs` (number): Ping interval in milliseconds (default: 30000, min: 5000)
+- `maxMissedPongs` (number): Maximum missed pongs before considering connection stale (default: 2, min: 1)
+
+### Combined Configuration
+
+```javascript
+const { WebSocketClient } = require('@fubon/marketdata-js');
+
+const ws = new WebSocketClient({
+  apiKey: 'your-key',
+  reconnect: { maxAttempts: 10, initialDelayMs: 2000 },
+  healthCheck: { enabled: true, intervalMs: 15000 }
+});
 ```
 
 ## API Reference
@@ -84,7 +159,7 @@ const quote = client.stock.intraday.quote('2330');
 
 ```typescript
 class RestClient {
-  constructor(apiKey: string);
+  constructor(options: RestClientOptions);
 
   stock: {
     intraday: {
@@ -109,11 +184,24 @@ class RestClient {
 }
 ```
 
+**RestClientOptions:**
+
+```typescript
+interface RestClientOptions {
+  apiKey?: string;        // API key for authentication
+  bearerToken?: string;   // Bearer token for authentication
+  sdkToken?: string;      // SDK token for authentication
+  baseUrl?: string;       // Override base URL (optional)
+}
+```
+
+Exactly one of `apiKey`, `bearerToken`, or `sdkToken` must be provided.
+
 ### WebSocketClient
 
 ```typescript
 class WebSocketClient {
-  constructor(apiKey: string);
+  constructor(options: WebSocketClientOptions);
 
   stock: StockWebSocketClient;
   futopt: FutOptWebSocketClient;
@@ -132,12 +220,25 @@ class StockWebSocketClient {
 // FutOptWebSocketClient has the same API
 ```
 
+**WebSocketClientOptions:**
+
+```typescript
+interface WebSocketClientOptions {
+  apiKey?: string;                     // API key for authentication
+  bearerToken?: string;                // Bearer token for authentication
+  sdkToken?: string;                   // SDK token for authentication
+  baseUrl?: string;                    // Override base URL (optional)
+  reconnect?: ReconnectOptions;        // Reconnection configuration (optional)
+  healthCheck?: HealthCheckOptions;    // Health check configuration (optional)
+}
+```
+
 ## Error Handling
 
 ```javascript
 const { RestClient } = require('@fubon/marketdata-js');
 
-const client = new RestClient('your-api-key');
+const client = new RestClient({ apiKey: 'your-api-key' });
 
 try {
   const quote = client.stock.intraday.quote('INVALID');
