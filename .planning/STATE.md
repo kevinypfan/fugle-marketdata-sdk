@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 14 of 15 — Java & Go Bindings
-Plan: 1/5 complete (14-03 complete ✓)
+Plan: 2/5 complete (14-01, 14-03 complete ✓)
 Status: Phases 8-13 complete ✓, Phase 14 in progress
-Last activity: 2026-02-15 - Completed 14-03-PLAN.md (C# config options and tests)
+Last activity: 2026-02-15 - Completed 14-01-PLAN.md (Java config options and tests)
 
-Progress: [████████░░] 75% (Phases 8-13 complete, Phase 14 started)
+Progress: [████████░░] 76% (Phases 8-13 complete, 14-01, 14-03 complete)
 
-**Note:** Phase 14 started - C# bindings now expose config with .NET options pattern and exactly-one-auth validation.
+**Note:** Phase 14 progressing - Java and C# bindings now expose config with idiomatic patterns and exactly-one-auth validation.
 
 ## Milestone History
 
@@ -83,6 +83,14 @@ From Phase 13-03 execution:
 - Comprehensive test suite validates both TypeScript types and JavaScript runtime behavior
 - Tests use @ts-expect-error to validate error messages for JavaScript users
 
+From Phase 14-01 execution:
+- Java builder pattern for config classes (ReconnectOptions, HealthCheckOptions)
+- Nullable config fields (null = use default) with no validation at config level
+- Exactly-one-auth validation in client builders: count non-null auth fields, throw FugleException
+- Error message format: "Provide exactly one of: apiKey, bearerToken, sdkToken"
+- baseUrl stored but not applied (Core RestClient.base_url() consumes self, needs UniFFI setter)
+- WebSocket apiKey-only for now (bearerToken/sdkToken throw descriptive error)
+
 From Phase 14-03 execution:
 - C# nullable properties for optional config (null = use default from core constants)
 - .NET options pattern: separate options classes passed to constructors
@@ -127,11 +135,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phase 14-03 complete ✓. Phase 14 continuing with additional language bindings.
+None — Phase 14-01 and 14-03 complete ✓. Phase 14 continuing with Go bindings (14-02) and remaining plans.
 
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Completed 14-03-PLAN.md (C# config options ✓ verified)
+Stopped at: Completed 14-01-PLAN.md (Java config options ✓ verified)
 Resume file: N/A
-Next: Continue Phase 14 (Java/Go config exposure if applicable)
+Next: Continue Phase 14 (14-02 Go config, 14-04 integration tests, 14-05 verification)
