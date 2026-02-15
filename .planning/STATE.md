@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 ## Current Position
 
 Phase: 14 of 15 — Java & Go Bindings
-Plan: 2/5 complete (14-01, 14-03 complete ✓)
+Plan: 3/5 complete (14-01, 14-02, 14-03 complete ✓)
 Status: Phases 8-13 complete ✓, Phase 14 in progress
-Last activity: 2026-02-15 - Completed 14-01-PLAN.md (Java config options and tests)
+Last activity: 2026-02-15 - Completed 14-02-PLAN.md (Go functional options and config)
 
-Progress: [████████░░] 76% (Phases 8-13 complete, 14-01, 14-03 complete)
+Progress: [████████░░] 78% (Phases 8-13 complete, 14-01, 14-02, 14-03 complete)
 
-**Note:** Phase 14 progressing - Java and C# bindings now expose config with idiomatic patterns and exactly-one-auth validation.
+**Note:** Phase 14 progressing - Java, C#, and Go bindings now expose config with idiomatic patterns and exactly-one-auth validation.
 
 ## Milestone History
 
@@ -98,6 +98,14 @@ From Phase 14-03 execution:
 - WebSocketClient stores ReconnectOptions/HealthCheckOptions but doesn't apply (no UniFFI setter)
 - Ambiguous constructor fix: cast null to (string)null! when passing to overloaded constructors
 
+From Phase 14-02 execution:
+- Go functional options pattern: single Option type for both REST and WebSocket clients
+- Empty auth string validation in With* functions (fail-fast at option level)
+- Zero-value struct fields mean "use core defaults" (no validation at struct level)
+- Exactly-one-auth validation: count non-empty auth fields in constructors
+- Build tag //go:build cgo for tests requiring native library
+- WebSocket only supports apiKey (bearerToken/sdkToken return descriptive TODO error)
+
 ### Patterns Established
 
 From Phase 8-11 execution:
@@ -135,11 +143,11 @@ From Phase 13-01 execution:
 
 ### Blockers/Concerns
 
-None — Phase 14-01 and 14-03 complete ✓. Phase 14 continuing with Go bindings (14-02) and remaining plans.
+None — Phase 14-01, 14-02, and 14-03 complete ✓. Phase 14 continuing with integration tests (14-04) and verification (14-05).
 
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Completed 14-01-PLAN.md (Java config options ✓ verified)
+Stopped at: Completed 14-02-PLAN.md (Go functional options ✓ verified)
 Resume file: N/A
-Next: Continue Phase 14 (14-02 Go config, 14-04 integration tests, 14-05 verification)
+Next: Continue Phase 14 (14-04 integration tests, 14-05 verification)
