@@ -318,6 +318,20 @@ impl<'a> IntradayClient<'a> {
         crate::rest::stock::intraday::TickerRequestBuilder::new(self.client)
     }
 
+    /// Get intraday tickers (batch list) for a security type
+    ///
+    /// # Example
+    /// ```no_run
+    /// use marketdata_core::{RestClient, Auth};
+    ///
+    /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
+    /// let tickers = client.stock().intraday().tickers().typ("EQUITY").send()?;
+    /// # Ok::<(), marketdata_core::MarketDataError>(())
+    /// ```
+    pub fn tickers(&self) -> crate::rest::stock::intraday::TickersRequestBuilder {
+        crate::rest::stock::intraday::TickersRequestBuilder::new(self.client)
+    }
+
     /// Get intraday candles for a symbol
     ///
     /// # Example

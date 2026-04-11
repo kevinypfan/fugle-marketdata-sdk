@@ -61,6 +61,11 @@ class WebSocketError(MarketDataError):
     """
     ...
 
+# Backward-compat alias for the old `fugle-marketdata` SDK.
+# Aliased to MarketDataError so `except FugleAPIError:` keeps catching every
+# variant raised by this binding.
+FugleAPIError = MarketDataError
+
 # REST Client
 class RestClient:
     """REST client for Fugle market data API.
@@ -302,6 +307,31 @@ class StockIntradayClient:
 
         Returns:
             Volume data by price level
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def tickers(
+        self,
+        type: str,
+        exchange: str | None = None,
+        market: str | None = None,
+        industry: str | None = None,
+        is_normal: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get batch ticker list for a security type.
+
+        Args:
+            type: Security type (e.g., "EQUITY", "INDEX", "ETF")
+            exchange: Exchange filter (e.g., "TWSE", "TPEx")
+            market: Market filter (e.g., "TSE", "OTC")
+            industry: Industry code filter
+            is_normal: Filter to normal-status tickers only
+
+        Returns:
+            List of ticker info dicts
 
         Raises:
             MarketDataError: If the request fails
@@ -758,6 +788,48 @@ class FutOptIntradayClient:
         """
         ...
 
+    async def tickers(
+        self,
+        type: str,
+        exchange: str | None = None,
+        after_hours: bool = False,
+        contract_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get batch ticker list for a FutOpt contract type.
+
+        Args:
+            type: Contract type ("FUTURE" or "OPTION")
+            exchange: Exchange filter (e.g., "TAIFEX")
+            after_hours: Query after-hours session data
+            contract_type: Contract type code ("I", "R", "B", "C", "S", "E")
+
+        Returns:
+            List of FutOpt ticker info dicts
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
+    async def products(
+        self,
+        type: str,
+        contract_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get available FutOpt products list.
+
+        Args:
+            type: Contract type ("FUTURE" or "OPTION")
+            contract_type: Contract type code ("I", "R", "B", "C", "S", "E")
+
+        Returns:
+            List of product info dicts
+
+        Raises:
+            MarketDataError: If the request fails
+        """
+        ...
+
 
 class FutOptHistoricalClient:
     """FutOpt historical data endpoints client.
@@ -849,7 +921,7 @@ class HealthCheckConfig:
 
         config = HealthCheckConfig(
             enabled=True,
-            interval_ms=15000,
+            ping_interval=15000,
             max_missed_pongs=3
         )
         ws = WebSocketClient(api_key="key", health_check=config)
@@ -859,8 +931,8 @@ class HealthCheckConfig:
     enabled: bool
     """Whether health check is enabled."""
 
-    interval_ms: int
-    """Ping interval in milliseconds."""
+    ping_interval: int
+    """Ping interval in milliseconds (named to match the old `fugle-marketdata` SDK)."""
 
     max_missed_pongs: int
     """Maximum missed pongs before considering connection stale."""
@@ -869,18 +941,18 @@ class HealthCheckConfig:
         self,
         *,
         enabled: bool = False,
-        interval_ms: int = 30000,
+        ping_interval: int = 30000,
         max_missed_pongs: int = 2,
     ) -> None:
         """Create a new health check configuration.
 
         Args:
             enabled: Whether health check is enabled (default: False)
-            interval_ms: Ping interval in milliseconds (default: 30000ms = 30s, min: 5000ms)
+            ping_interval: Ping interval in milliseconds (default: 30000ms = 30s, min: 5000ms)
             max_missed_pongs: Maximum missed pongs (default: 2, min: 1)
 
         Raises:
-            ValueError: If interval_ms < 5000 or max_missed_pongs < 1
+            ValueError: If ping_interval < 5000 or max_missed_pongs < 1
         """
         ...
 
@@ -967,7 +1039,7 @@ class WebSocketClient:
         ws = WebSocketClient(api_key="key", reconnect=rc)
 
         # With health check enabled
-        hc = HealthCheckConfig(enabled=True, interval_ms=15000)
+        hc = HealthCheckConfig(enabled=True, ping_interval=15000)
         ws = WebSocketClient(api_key="key", health_check=hc)
 
         # Callback mode
@@ -1122,17 +1194,28 @@ class StockWebSocketClient:
         """
         ...
 
-    def subscribe(self, channel: str, symbol: str, *, odd_lot: bool = False) -> None:
-        """Subscribe to a channel for a symbol (blocking).
+    def subscribe(
+        self,
+        channel: str,
+        symbol: str | None = None,
+        *,
+        symbols: list[str] | None = None,
+        odd_lot: bool = False,
+    ) -> None:
+        """Subscribe to a channel for one or more symbols (blocking).
+
+        Provide either ``symbol`` (single) or ``symbols`` (batch list) — exactly one
+        is required, mirroring the old fugle-marketdata SDK shape.
 
         Args:
             channel: Channel name (trades, candles, books, aggregates, indices)
             symbol: Stock symbol (e.g., "2330")
+            symbols: Multiple stock symbols (e.g., ["2330", "2317"])
             odd_lot: Whether to subscribe to odd lot data (default: False)
 
         Raises:
             RuntimeError: If not connected
-            ValueError: If channel is invalid
+            ValueError: If channel is invalid, both/neither symbol args supplied
         """
         ...
 
@@ -1150,19 +1233,51 @@ class StockWebSocketClient:
         """
         ...
 
-    def unsubscribe(self, subscription_id: str) -> None:
-        """Unsubscribe from a channel by subscription ID.
+    def unsubscribe(
+        self,
+        subscription_id: str | None = None,
+        *,
+        ids: list[str] | None = None,
+    ) -> None:
+        """Unsubscribe from a channel by subscription id or batch of ids.
+
+        Provide either ``subscription_id`` (single) or ``ids`` (batch list) — exactly
+        one is required, mirroring the old fugle-marketdata Node SDK shape.
 
         Args:
             subscription_id: The subscription ID returned from subscribe
+            ids: A list of subscription IDs to unsubscribe
         """
         ...
 
-    def subscriptions(self) -> List[str]:
-        """Get list of active subscription keys.
+    def local_subscriptions(self) -> List[str]:
+        """Return the locally cached list of active subscription keys.
 
-        Returns:
-            List of active subscription keys
+        This is the in-process cache maintained by core's SubscriptionManager.
+        Use ``subscriptions()`` to query the server for the authoritative list.
+        """
+        ...
+
+    def subscriptions(self) -> None:
+        """Ask the server for its current subscription list.
+
+        Sends ``{"event": "subscriptions"}`` to the server. The reply is delivered
+        asynchronously via the ``message`` callback, matching the old
+        ``fugle-marketdata`` SDK semantics.
+
+        Raises:
+            RuntimeError: If not connected
+        """
+        ...
+
+    def ping(self, state: str | None = None) -> None:
+        """Send a ``ping`` frame to the server.
+
+        Args:
+            state: Optional state string echoed back in the server's pong reply
+
+        Raises:
+            RuntimeError: If not connected
         """
         ...
 
@@ -1171,7 +1286,9 @@ class StockWebSocketClient:
 
         Supported events:
           - "message" / "data": Called with message dict when data received
-          - "connect" / "connected": Called when connection established
+          - "connect" / "connected": Called when TCP/WebSocket connection established
+          - "authenticated": Called (no args) when server accepts credentials
+          - "unauthenticated": Called with rejection message when server refuses credentials
           - "disconnect" / "disconnected" / "close": Called when connection closed
           - "reconnect" / "reconnecting": Called when reconnecting
           - "error": Called with (message, code) when error occurs
@@ -1254,33 +1371,73 @@ class FutOptWebSocketClient:
         """
         ...
 
-    def subscribe(self, channel: str, symbol: str, *, after_hours: bool = False) -> None:
-        """Subscribe to a channel for a FutOpt symbol (blocking).
+    def subscribe(
+        self,
+        channel: str,
+        symbol: str | None = None,
+        *,
+        symbols: list[str] | None = None,
+        after_hours: bool = False,
+    ) -> None:
+        """Subscribe to a channel for one or more FutOpt symbols (blocking).
+
+        Provide either ``symbol`` (single) or ``symbols`` (batch list) — exactly one
+        is required, mirroring the old fugle-marketdata Node SDK shape.
 
         Args:
             channel: Channel name (trades, candles, books, aggregates)
             symbol: FutOpt contract symbol (e.g., "TXFC4", "TXF202502")
+            symbols: Multiple FutOpt symbols
             after_hours: Whether to subscribe to after-hours session (default: False)
 
         Raises:
             RuntimeError: If not connected
-            ValueError: If channel is invalid
+            ValueError: If channel is invalid, both/neither symbol args supplied
         """
         ...
 
-    def unsubscribe(self, subscription_id: str) -> None:
-        """Unsubscribe from a channel by subscription ID.
+    def unsubscribe(
+        self,
+        subscription_id: str | None = None,
+        *,
+        ids: list[str] | None = None,
+    ) -> None:
+        """Unsubscribe from a channel by subscription id or batch of ids.
 
         Args:
             subscription_id: The subscription ID returned from subscribe
+            ids: A list of subscription IDs to unsubscribe
         """
         ...
 
-    def subscriptions(self) -> List[str]:
-        """Get list of active subscription keys.
+    def local_subscriptions(self) -> List[str]:
+        """Return the locally cached list of active subscription keys.
 
-        Returns:
-            List of active subscription keys
+        This is the in-process cache maintained by core's SubscriptionManager.
+        Use ``subscriptions()`` to query the server for the authoritative list.
+        """
+        ...
+
+    def subscriptions(self) -> None:
+        """Ask the server for its current subscription list.
+
+        Sends ``{"event": "subscriptions"}`` to the server. The reply is delivered
+        asynchronously via the ``message`` callback, matching the old
+        ``fugle-marketdata`` SDK semantics.
+
+        Raises:
+            RuntimeError: If not connected
+        """
+        ...
+
+    def ping(self, state: str | None = None) -> None:
+        """Send a ``ping`` frame to the server.
+
+        Args:
+            state: Optional state string echoed back in the server's pong reply
+
+        Raises:
+            RuntimeError: If not connected
         """
         ...
 

@@ -396,10 +396,28 @@ public class FugleWebSocketClient implements AutoCloseable {
             // For bearerToken/sdkToken support, store values for future use
             // (same pattern as Python/Node.js phases 12-02, 13-02)
             if (apiKey != null) {
-                WebSocketClient client = WebSocketClient.newWithEndpoint(apiKey, effectiveListener, endpoint);
+                // Convert config options to UniFFI record types
+                ReconnectConfigRecord reconnectRecord = null;
+                if (reconnectOptions != null) {
+                    reconnectRecord = new ReconnectConfigRecord(
+                        reconnectOptions.getMaxAttempts() != null ? reconnectOptions.getMaxAttempts() : 0,
+                        reconnectOptions.getInitialDelayMs() != null ? reconnectOptions.getInitialDelayMs() : 0L,
+                        reconnectOptions.getMaxDelayMs() != null ? reconnectOptions.getMaxDelayMs() : 0L
+                    );
+                }
 
-                // TODO: reconnectOptions and healthCheckOptions stored but not yet wired to core
-                // Requires ConnectionConfig to expose these options (matches Python Phase 12-02)
+                HealthCheckConfigRecord healthCheckRecord = null;
+                if (healthCheckOptions != null) {
+                    healthCheckRecord = new HealthCheckConfigRecord(
+                        healthCheckOptions.getEnabled() != null ? healthCheckOptions.getEnabled() : false,
+                        healthCheckOptions.getIntervalMs() != null ? healthCheckOptions.getIntervalMs() : 0L,
+                        healthCheckOptions.getMaxMissedPongs() != null ? healthCheckOptions.getMaxMissedPongs() : 0L
+                    );
+                }
+
+                WebSocketClient client = WebSocketClient.newWithConfig(
+                    apiKey, effectiveListener, endpoint, reconnectRecord, healthCheckRecord
+                );
 
                 return new FugleWebSocketClient(client, messageQueue, errorQueue);
             } else {
@@ -443,6 +461,16 @@ public class FugleWebSocketClient implements AutoCloseable {
         public void onError(String errorMessage) {
             // Offer to error queue
             errorQueue.offer(errorMessage);
+        }
+
+        @Override
+        public void onReconnecting(int attempt) {
+            // No action needed in pull mode
+        }
+
+        @Override
+        public void onReconnectFailed(int attempts) {
+            errorQueue.offer("All " + attempts + " reconnection attempts exhausted");
         }
     }
 }

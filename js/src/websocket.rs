@@ -41,15 +41,17 @@ pub struct ReconnectOptions {
 ///
 /// All fields are optional - defaults are applied when not specified:
 /// - enabled: false
-/// - intervalMs: 30000
+/// - pingInterval: 30000
 /// - maxMissedPongs: 2
+///
+/// Note: `pingInterval` is named to match the official `@fugle/marketdata` SDK.
 #[napi(object)]
 #[derive(Debug, Clone, Default)]
 pub struct HealthCheckOptions {
     /// Whether health check is enabled (default: false)
     pub enabled: Option<bool>,
     /// Interval between ping messages in milliseconds (default: 30000, min: 5000)
-    pub interval_ms: Option<f64>,
+    pub ping_interval: Option<f64>,
     /// Maximum missed pongs before disconnect (default: 2, min: 1)
     pub max_missed_pongs: Option<f64>,
 }
@@ -97,6 +99,10 @@ pub struct WebSocketClientOptions {
 enum WsCommand {
     Subscribe { channel: String, symbol: String, extra: Option<bool> },
     Unsubscribe { id: String },
+    /// Send a `ping` frame (mirrors old fugle-marketdata SDK's `ping()`)
+    Ping { state: Option<String> },
+    /// Ask the server for its current subscription list (response arrives via `message`)
+    QuerySubscriptions,
     Disconnect,
 }
 
@@ -107,6 +113,8 @@ struct EventCallbacks {
     disconnect: Option<JsCallback>,
     reconnect: Option<JsCallback>,
     error: Option<JsCallback>,
+    authenticated: Option<JsCallback>,
+    unauthenticated: Option<JsCallback>,
 }
 
 impl Default for EventCallbacks {
@@ -117,6 +125,8 @@ impl Default for EventCallbacks {
             disconnect: None,
             reconnect: None,
             error: None,
+            authenticated: None,
+            unauthenticated: None,
         }
     }
 }
@@ -143,6 +153,8 @@ impl Default for EventCallbacks {
 #[napi]
 pub struct WebSocketClient {
     api_key: String,
+    reconnect_config: marketdata_core::ReconnectionConfig,
+    health_check_config: marketdata_core::HealthCheckConfig,
 }
 
 #[napi]
@@ -168,7 +180,7 @@ impl WebSocketClient {
     /// // Enable health check
     /// const ws = new WebSocketClient({
     ///   apiKey: 'your-key',
-    ///   healthCheck: { enabled: true, intervalMs: 20000 }
+    ///   healthCheck: { enabled: true, pingInterval: 20000 }
     /// });
     /// ```
     #[napi(constructor)]
@@ -209,7 +221,7 @@ impl WebSocketClient {
             .unwrap();
 
         // Build reconnection config with validation via core
-        let _reconnect_cfg = if let Some(r) = &options.reconnect {
+        let reconnect_cfg = if let Some(r) = &options.reconnect {
             let max = r.max_attempts.map(|v| v as u32).unwrap_or(DEFAULT_MAX_ATTEMPTS);
             let initial = Duration::from_millis(
                 r.initial_delay_ms.map(|v| v as u64).unwrap_or(DEFAULT_INITIAL_DELAY_MS)
@@ -224,10 +236,10 @@ impl WebSocketClient {
         };
 
         // Build health check config with validation via core
-        let _health_check_cfg = if let Some(hc) = &options.health_check {
+        let health_check_cfg = if let Some(hc) = &options.health_check {
             let enabled = hc.enabled.unwrap_or(DEFAULT_HEALTH_CHECK_ENABLED);
             let interval = Duration::from_millis(
-                hc.interval_ms.map(|v| v as u64).unwrap_or(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
+                hc.ping_interval.map(|v| v as u64).unwrap_or(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
             );
             let max_missed = hc.max_missed_pongs
                 .map(|v| v as u64)
@@ -238,23 +250,31 @@ impl WebSocketClient {
             marketdata_core::HealthCheckConfig::default()
         };
 
-        // TODO: Store base_url and configs for propagation to child clients
-        // Currently configs are validated but not used - will be wired when
-        // ConnectionConfig accepts them
-
-        Ok(Self { api_key })
+        Ok(Self {
+            api_key,
+            reconnect_config: reconnect_cfg,
+            health_check_config: health_check_cfg,
+        })
     }
 
     /// Get the stock WebSocket client for real-time stock data
     #[napi(getter)]
     pub fn stock(&self) -> StockWebSocketClient {
-        StockWebSocketClient::new(self.api_key.clone())
+        StockWebSocketClient::new(
+            self.api_key.clone(),
+            self.reconnect_config.clone(),
+            self.health_check_config.clone(),
+        )
     }
 
     /// Get the FutOpt WebSocket client for real-time futures/options data
     #[napi(getter)]
     pub fn futopt(&self) -> FutOptWebSocketClient {
-        FutOptWebSocketClient::new(self.api_key.clone())
+        FutOptWebSocketClient::new(
+            self.api_key.clone(),
+            self.reconnect_config.clone(),
+            self.health_check_config.clone(),
+        )
     }
 }
 
@@ -283,6 +303,8 @@ impl WebSocketClient {
 #[napi]
 pub struct StockWebSocketClient {
     api_key: String,
+    reconnect_config: marketdata_core::ReconnectionConfig,
+    health_check_config: marketdata_core::HealthCheckConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
     connected: Arc<AtomicBool>,
     closed: Arc<AtomicBool>,
@@ -292,9 +314,15 @@ pub struct StockWebSocketClient {
 #[napi]
 impl StockWebSocketClient {
     /// Create a new stock WebSocket client (internal use)
-    fn new(api_key: String) -> Self {
+    fn new(
+        api_key: String,
+        reconnect_config: marketdata_core::ReconnectionConfig,
+        health_check_config: marketdata_core::HealthCheckConfig,
+    ) -> Self {
         Self {
             api_key,
+            reconnect_config,
+            health_check_config,
             callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
             connected: Arc::new(AtomicBool::new(false)),
             closed: Arc::new(AtomicBool::new(false)),
@@ -329,9 +357,11 @@ impl StockWebSocketClient {
             "disconnect" => callbacks.disconnect = Some(arc_callback),
             "reconnect" => callbacks.reconnect = Some(arc_callback),
             "error" => callbacks.error = Some(arc_callback),
+            "authenticated" => callbacks.authenticated = Some(arc_callback),
+            "unauthenticated" => callbacks.unauthenticated = Some(arc_callback),
             _ => {
                 return Err(napi::Error::from_reason(format!(
-                    "Unknown event type: {}. Valid events: message, connect, disconnect, reconnect, error",
+                    "Unknown event type: {}. Valid events: message, connect, disconnect, reconnect, error, authenticated, unauthenticated",
                     event
                 )))
             }
@@ -358,6 +388,8 @@ impl StockWebSocketClient {
 
         // Clone data for the worker thread
         let api_key = self.api_key.clone();
+        let reconnect_config = self.reconnect_config.clone();
+        let health_check_config = self.health_check_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
         let connected = Arc::clone(&self.connected);
         let closed = Arc::clone(&self.closed);
@@ -383,9 +415,9 @@ impl StockWebSocketClient {
                     }
                 };
 
-                // Create WebSocket client with stock endpoint
+                // Create WebSocket client with stock endpoint and full config
                 let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(&api_key));
-                let client = CoreClient::new(config);
+                let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 // Connect
                 let connect_result = rt.block_on(async {
@@ -400,6 +432,45 @@ impl StockWebSocketClient {
                 // Mark as connected
                 connected.store(true, Ordering::SeqCst);
                 fire_callback(&callbacks, "connect", "connected".to_string());
+
+                // Monitor state events for reconnect/error callbacks
+                let events = Arc::clone(client.state_events());
+                let callbacks_for_events = Arc::clone(&callbacks);
+                std::thread::spawn(move || {
+                    loop {
+                        let event = {
+                            let rx = events.blocking_lock();
+                            rx.recv()
+                        };
+                        match event {
+                            Ok(event) => {
+                                use marketdata_core::websocket::ConnectionEvent;
+                                match event {
+                                    ConnectionEvent::Reconnecting { attempt } => {
+                                        fire_callback(&callbacks_for_events, "reconnect", format!("{{\"attempt\":{}}}", attempt));
+                                    }
+                                    ConnectionEvent::Error { message, code } => {
+                                        fire_callback(&callbacks_for_events, "error", format!("[{}] {}", code, message));
+                                    }
+                                    ConnectionEvent::Disconnected { code, reason } => {
+                                        fire_callback(&callbacks_for_events, "disconnect", format!("{{\"code\":{},\"reason\":\"{}\"}}", code.unwrap_or(0), reason));
+                                    }
+                                    ConnectionEvent::ReconnectFailed { attempts } => {
+                                        fire_callback(&callbacks_for_events, "error", format!("Reconnection failed after {} attempts", attempts));
+                                    }
+                                    ConnectionEvent::Authenticated => {
+                                        fire_callback(&callbacks_for_events, "authenticated", "authenticated".to_string());
+                                    }
+                                    ConnectionEvent::Unauthenticated { message } => {
+                                        fire_callback(&callbacks_for_events, "unauthenticated", message);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                });
 
                 // Get message receiver
                 let receiver = client.messages();
@@ -423,6 +494,14 @@ impl StockWebSocketClient {
                         }
                         Ok(WsCommand::Unsubscribe { id }) => {
                             let _ = rt.block_on(client.unsubscribe_by_id(&id));
+                        }
+                        Ok(WsCommand::Ping { state }) => {
+                            let request = marketdata_core::WebSocketRequest::ping(state);
+                            let _ = rt.block_on(client.send(request));
+                        }
+                        Ok(WsCommand::QuerySubscriptions) => {
+                            let request = marketdata_core::WebSocketRequest::subscriptions();
+                            let _ = rt.block_on(client.send(request));
                         }
                         Ok(WsCommand::Disconnect) => {
                             let _ = rt.block_on(client.disconnect());
@@ -468,7 +547,10 @@ impl StockWebSocketClient {
 
     /// Subscribe to a channel
     ///
-    /// @param options - Subscription options: { channel: string, symbol: string, intradayOddLot?: boolean }
+    /// @param options - Subscription options. Provide either `symbol` (single)
+    ///                  or `symbols` (batch list) — exactly one is required, matching
+    ///                  the old `@fugle/marketdata` shape.
+    ///                  Shape: `{ channel, symbol?, symbols?, intradayOddLot? }`
     #[napi(ts_args_type = "options: StockSubscribeOptions")]
     pub fn subscribe(&self, options: serde_json::Value) -> napi::Result<()> {
         let channel_str = options
@@ -476,49 +558,153 @@ impl StockWebSocketClient {
             .and_then(|v| v.as_str())
             .ok_or_else(|| napi::Error::from_reason("Missing 'channel' field"))?;
 
-        let symbol = options
-            .get("symbol")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| napi::Error::from_reason("Missing 'symbol' field"))?;
+        let single_symbol = options.get("symbol").and_then(|v| v.as_str()).map(String::from);
+        let batch_symbols = options
+            .get("symbols")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            });
 
-        let odd_lot = options
-            .get("intradayOddLot")
-            .and_then(|v| v.as_bool());
+        let target_symbols: Vec<String> = match (single_symbol, batch_symbols) {
+            (Some(s), None) => vec![s],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe({symbols:[]}) is empty - provide at least one symbol",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe() accepts either 'symbol' or 'symbols', not both",
+                ));
+            }
+            (None, None) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe() requires 'symbol' or 'symbols'",
+                ));
+            }
+        };
 
-        // Send command to worker thread
+        let odd_lot = options.get("intradayOddLot").and_then(|v| v.as_bool());
+
         let tx_guard = self.command_tx.lock().map_err(|e| {
             napi::Error::from_reason(format!("Lock error: {}", e))
         })?;
 
-        if let Some(ref tx) = *tx_guard {
+        let tx = tx_guard.as_ref().ok_or_else(|| {
+            napi::Error::from_reason("Not connected. Call connect() first.")
+        })?;
+
+        for sym in target_symbols {
             tx.send(WsCommand::Subscribe {
                 channel: channel_str.to_string(),
-                symbol: symbol.to_string(),
+                symbol: sym,
                 extra: odd_lot,
-            }).map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
-        } else {
-            return Err(napi::Error::from_reason("Not connected. Call connect() first."));
+            })
+            .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
         }
 
         Ok(())
     }
 
-    /// Unsubscribe from a channel by subscription ID
+    /// Unsubscribe from a channel
     ///
-    /// @param subscriptionId - The subscription ID returned from subscribed event
-    #[napi]
-    pub fn unsubscribe(&self, subscription_id: String) -> napi::Result<()> {
+    /// Accepts either `{ id: "..." }` (single) or `{ ids: ["...", "..."] }` (batch).
+    /// Mirrors the old `@fugle/marketdata` Node SDK shape.
+    #[napi(ts_args_type = "options: string | UnsubscribeOptions")]
+    pub fn unsubscribe(&self, options: serde_json::Value) -> napi::Result<()> {
+        // Accept legacy positional string for backward compat with the previous
+        // `unsubscribe(id: string)` signature.
+        let target_ids: Vec<String> = if let Some(s) = options.as_str() {
+            vec![s.to_string()]
+        } else {
+            let single = options.get("id").and_then(|v| v.as_str()).map(String::from);
+            let batch = options
+                .get("ids")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<_>>()
+                });
+
+            match (single, batch) {
+                (Some(id), None) => vec![id],
+                (None, Some(list)) if !list.is_empty() => list,
+                (None, Some(_)) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe({ids:[]}) is empty - provide at least one id",
+                    ));
+                }
+                (Some(_), Some(_)) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe() accepts either 'id' or 'ids', not both",
+                    ));
+                }
+                (None, None) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe() requires 'id' or 'ids'",
+                    ));
+                }
+            }
+        };
+
         let tx_guard = self.command_tx.lock().map_err(|e| {
             napi::Error::from_reason(format!("Lock error: {}", e))
         })?;
 
-        if let Some(ref tx) = *tx_guard {
-            tx.send(WsCommand::Unsubscribe { id: subscription_id })
+        let tx = tx_guard.as_ref().ok_or_else(|| {
+            napi::Error::from_reason("Not connected. Call connect() first.")
+        })?;
+
+        for id in target_ids {
+            tx.send(WsCommand::Unsubscribe { id })
                 .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
-        } else {
-            return Err(napi::Error::from_reason("Not connected. Call connect() first."));
         }
 
+        Ok(())
+    }
+
+    /// Send a `ping` frame to the server.
+    ///
+    /// Mirrors the old `@fugle/marketdata` Node SDK. The server's `pong` reply
+    /// is delivered via the `message` callback (or processed internally by the
+    /// health check, if enabled).
+    ///
+    /// @param state - Optional state string echoed back in the server's pong reply
+    #[napi]
+    pub fn ping(&self, state: Option<String>) -> napi::Result<()> {
+        let tx_guard = self
+            .command_tx
+            .lock()
+            .map_err(|e| napi::Error::from_reason(format!("Lock error: {}", e)))?;
+        let tx = tx_guard
+            .as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Not connected. Call connect() first."))?;
+        tx.send(WsCommand::Ping { state })
+            .map_err(|_| napi::Error::from_reason("Failed to send ping command"))?;
+        Ok(())
+    }
+
+    /// Ask the server for its current subscription list.
+    ///
+    /// Sends `{ event: "subscriptions" }` to the server. The reply is delivered
+    /// asynchronously via the `message` callback, matching the old
+    /// `@fugle/marketdata` Node SDK semantics.
+    #[napi]
+    pub fn subscriptions(&self) -> napi::Result<()> {
+        let tx_guard = self
+            .command_tx
+            .lock()
+            .map_err(|e| napi::Error::from_reason(format!("Lock error: {}", e)))?;
+        let tx = tx_guard
+            .as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Not connected. Call connect() first."))?;
+        tx.send(WsCommand::QuerySubscriptions)
+            .map_err(|_| napi::Error::from_reason("Failed to send subscriptions command"))?;
         Ok(())
     }
 
@@ -574,6 +760,8 @@ impl StockWebSocketClient {
 #[napi]
 pub struct FutOptWebSocketClient {
     api_key: String,
+    reconnect_config: marketdata_core::ReconnectionConfig,
+    health_check_config: marketdata_core::HealthCheckConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
     connected: Arc<AtomicBool>,
     closed: Arc<AtomicBool>,
@@ -583,9 +771,15 @@ pub struct FutOptWebSocketClient {
 #[napi]
 impl FutOptWebSocketClient {
     /// Create a new FutOpt WebSocket client (internal use)
-    fn new(api_key: String) -> Self {
+    fn new(
+        api_key: String,
+        reconnect_config: marketdata_core::ReconnectionConfig,
+        health_check_config: marketdata_core::HealthCheckConfig,
+    ) -> Self {
         Self {
             api_key,
+            reconnect_config,
+            health_check_config,
             callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
             connected: Arc::new(AtomicBool::new(false)),
             closed: Arc::new(AtomicBool::new(false)),
@@ -613,9 +807,11 @@ impl FutOptWebSocketClient {
             "disconnect" => callbacks.disconnect = Some(arc_callback),
             "reconnect" => callbacks.reconnect = Some(arc_callback),
             "error" => callbacks.error = Some(arc_callback),
+            "authenticated" => callbacks.authenticated = Some(arc_callback),
+            "unauthenticated" => callbacks.unauthenticated = Some(arc_callback),
             _ => {
                 return Err(napi::Error::from_reason(format!(
-                    "Unknown event type: {}. Valid events: message, connect, disconnect, reconnect, error",
+                    "Unknown event type: {}. Valid events: message, connect, disconnect, reconnect, error, authenticated, unauthenticated",
                     event
                 )))
             }
@@ -642,6 +838,8 @@ impl FutOptWebSocketClient {
 
         // Clone data for the worker thread
         let api_key = self.api_key.clone();
+        let reconnect_config = self.reconnect_config.clone();
+        let health_check_config = self.health_check_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
         let connected = Arc::clone(&self.connected);
         let closed = Arc::clone(&self.closed);
@@ -667,9 +865,9 @@ impl FutOptWebSocketClient {
                     }
                 };
 
-                // Create WebSocket client with FutOpt endpoint
+                // Create WebSocket client with FutOpt endpoint and full config
                 let config = ConnectionConfig::fugle_futopt(AuthRequest::with_api_key(&api_key));
-                let client = CoreClient::new(config);
+                let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 // Connect
                 let connect_result = rt.block_on(async {
@@ -684,6 +882,45 @@ impl FutOptWebSocketClient {
                 // Mark as connected
                 connected.store(true, Ordering::SeqCst);
                 fire_callback(&callbacks, "connect", "connected".to_string());
+
+                // Monitor state events for reconnect/error callbacks
+                let events = Arc::clone(client.state_events());
+                let callbacks_for_events = Arc::clone(&callbacks);
+                std::thread::spawn(move || {
+                    loop {
+                        let event = {
+                            let rx = events.blocking_lock();
+                            rx.recv()
+                        };
+                        match event {
+                            Ok(event) => {
+                                use marketdata_core::websocket::ConnectionEvent;
+                                match event {
+                                    ConnectionEvent::Reconnecting { attempt } => {
+                                        fire_callback(&callbacks_for_events, "reconnect", format!("{{\"attempt\":{}}}", attempt));
+                                    }
+                                    ConnectionEvent::Error { message, code } => {
+                                        fire_callback(&callbacks_for_events, "error", format!("[{}] {}", code, message));
+                                    }
+                                    ConnectionEvent::Disconnected { code, reason } => {
+                                        fire_callback(&callbacks_for_events, "disconnect", format!("{{\"code\":{},\"reason\":\"{}\"}}", code.unwrap_or(0), reason));
+                                    }
+                                    ConnectionEvent::ReconnectFailed { attempts } => {
+                                        fire_callback(&callbacks_for_events, "error", format!("Reconnection failed after {} attempts", attempts));
+                                    }
+                                    ConnectionEvent::Authenticated => {
+                                        fire_callback(&callbacks_for_events, "authenticated", "authenticated".to_string());
+                                    }
+                                    ConnectionEvent::Unauthenticated { message } => {
+                                        fire_callback(&callbacks_for_events, "unauthenticated", message);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                });
 
                 // Get message receiver
                 let receiver = client.messages();
@@ -713,6 +950,14 @@ impl FutOptWebSocketClient {
                         }
                         Ok(WsCommand::Unsubscribe { id }) => {
                             let _ = rt.block_on(client.unsubscribe_by_id(&id));
+                        }
+                        Ok(WsCommand::Ping { state }) => {
+                            let request = marketdata_core::WebSocketRequest::ping(state);
+                            let _ = rt.block_on(client.send(request));
+                        }
+                        Ok(WsCommand::QuerySubscriptions) => {
+                            let request = marketdata_core::WebSocketRequest::subscriptions();
+                            let _ = rt.block_on(client.send(request));
                         }
                         Ok(WsCommand::Disconnect) => {
                             let _ = rt.block_on(client.disconnect());
@@ -758,7 +1003,9 @@ impl FutOptWebSocketClient {
 
     /// Subscribe to a channel
     ///
-    /// @param options - Subscription options: { channel: string, symbol: string, afterHours?: boolean }
+    /// @param options - Subscription options. Provide either `symbol` (single)
+    ///                  or `symbols` (batch list) — exactly one is required.
+    ///                  Shape: `{ channel, symbol?, symbols?, afterHours? }`
     #[napi(ts_args_type = "options: FutOptSubscribeOptions")]
     pub fn subscribe(&self, options: serde_json::Value) -> napi::Result<()> {
         let channel_str = options
@@ -766,49 +1013,150 @@ impl FutOptWebSocketClient {
             .and_then(|v| v.as_str())
             .ok_or_else(|| napi::Error::from_reason("Missing 'channel' field"))?;
 
-        let symbol = options
-            .get("symbol")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| napi::Error::from_reason("Missing 'symbol' field"))?;
+        let single_symbol = options.get("symbol").and_then(|v| v.as_str()).map(String::from);
+        let batch_symbols = options
+            .get("symbols")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            });
 
-        let after_hours = options
-            .get("afterHours")
-            .and_then(|v| v.as_bool());
+        let target_symbols: Vec<String> = match (single_symbol, batch_symbols) {
+            (Some(s), None) => vec![s],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe({symbols:[]}) is empty - provide at least one symbol",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe() accepts either 'symbol' or 'symbols', not both",
+                ));
+            }
+            (None, None) => {
+                return Err(napi::Error::from_reason(
+                    "subscribe() requires 'symbol' or 'symbols'",
+                ));
+            }
+        };
 
-        // Send command to worker thread
+        let after_hours = options.get("afterHours").and_then(|v| v.as_bool());
+
         let tx_guard = self.command_tx.lock().map_err(|e| {
             napi::Error::from_reason(format!("Lock error: {}", e))
         })?;
 
-        if let Some(ref tx) = *tx_guard {
+        let tx = tx_guard.as_ref().ok_or_else(|| {
+            napi::Error::from_reason("Not connected. Call connect() first.")
+        })?;
+
+        for sym in target_symbols {
             tx.send(WsCommand::Subscribe {
                 channel: channel_str.to_string(),
-                symbol: symbol.to_string(),
+                symbol: sym,
                 extra: after_hours,
-            }).map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
-        } else {
-            return Err(napi::Error::from_reason("Not connected. Call connect() first."));
+            })
+            .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
         }
 
         Ok(())
     }
 
-    /// Unsubscribe from a channel by subscription ID
+    /// Unsubscribe from a channel
     ///
-    /// @param subscriptionId - The subscription ID returned from subscribed event
-    #[napi]
-    pub fn unsubscribe(&self, subscription_id: String) -> napi::Result<()> {
+    /// Accepts either `{ id: "..." }` (single) or `{ ids: ["...", "..."] }` (batch).
+    #[napi(ts_args_type = "options: string | UnsubscribeOptions")]
+    pub fn unsubscribe(&self, options: serde_json::Value) -> napi::Result<()> {
+        let target_ids: Vec<String> = if let Some(s) = options.as_str() {
+            vec![s.to_string()]
+        } else {
+            let single = options.get("id").and_then(|v| v.as_str()).map(String::from);
+            let batch = options
+                .get("ids")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<_>>()
+                });
+
+            match (single, batch) {
+                (Some(id), None) => vec![id],
+                (None, Some(list)) if !list.is_empty() => list,
+                (None, Some(_)) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe({ids:[]}) is empty - provide at least one id",
+                    ));
+                }
+                (Some(_), Some(_)) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe() accepts either 'id' or 'ids', not both",
+                    ));
+                }
+                (None, None) => {
+                    return Err(napi::Error::from_reason(
+                        "unsubscribe() requires 'id' or 'ids'",
+                    ));
+                }
+            }
+        };
+
         let tx_guard = self.command_tx.lock().map_err(|e| {
             napi::Error::from_reason(format!("Lock error: {}", e))
         })?;
 
-        if let Some(ref tx) = *tx_guard {
-            tx.send(WsCommand::Unsubscribe { id: subscription_id })
+        let tx = tx_guard.as_ref().ok_or_else(|| {
+            napi::Error::from_reason("Not connected. Call connect() first.")
+        })?;
+
+        for id in target_ids {
+            tx.send(WsCommand::Unsubscribe { id })
                 .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
-        } else {
-            return Err(napi::Error::from_reason("Not connected. Call connect() first."));
         }
 
+        Ok(())
+    }
+
+    /// Send a `ping` frame to the server.
+    ///
+    /// Mirrors the old `@fugle/marketdata` Node SDK. The server's `pong` reply
+    /// is delivered via the `message` callback (or processed internally by the
+    /// health check, if enabled).
+    ///
+    /// @param state - Optional state string echoed back in the server's pong reply
+    #[napi]
+    pub fn ping(&self, state: Option<String>) -> napi::Result<()> {
+        let tx_guard = self
+            .command_tx
+            .lock()
+            .map_err(|e| napi::Error::from_reason(format!("Lock error: {}", e)))?;
+        let tx = tx_guard
+            .as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Not connected. Call connect() first."))?;
+        tx.send(WsCommand::Ping { state })
+            .map_err(|_| napi::Error::from_reason("Failed to send ping command"))?;
+        Ok(())
+    }
+
+    /// Ask the server for its current subscription list.
+    ///
+    /// Sends `{ event: "subscriptions" }` to the server. The reply is delivered
+    /// asynchronously via the `message` callback, matching the old
+    /// `@fugle/marketdata` Node SDK semantics.
+    #[napi]
+    pub fn subscriptions(&self) -> napi::Result<()> {
+        let tx_guard = self
+            .command_tx
+            .lock()
+            .map_err(|e| napi::Error::from_reason(format!("Lock error: {}", e)))?;
+        let tx = tx_guard
+            .as_ref()
+            .ok_or_else(|| napi::Error::from_reason("Not connected. Call connect() first."))?;
+        tx.send(WsCommand::QuerySubscriptions)
+            .map_err(|_| napi::Error::from_reason("Failed to send subscriptions command"))?;
         Ok(())
     }
 
@@ -855,6 +1203,8 @@ fn fire_callback(callbacks: &Arc<Mutex<EventCallbacks>>, event: &str, data: Stri
             "disconnect" => cb.disconnect.as_ref(),
             "reconnect" => cb.reconnect.as_ref(),
             "error" => cb.error.as_ref(),
+            "authenticated" => cb.authenticated.as_ref(),
+            "unauthenticated" => cb.unauthenticated.as_ref(),
             _ => None,
         };
 

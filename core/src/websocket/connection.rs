@@ -47,6 +47,8 @@ pub enum ConnectionEvent {
     Connected,
     /// Authentication successful
     Authenticated,
+    /// Authentication rejected by the server (parallels old SDKs' `unauthenticated` event)
+    Unauthenticated { message: String },
     /// Connection closed
     Disconnected { code: Option<u16>, reason: String },
     /// Reconnection attempt started
@@ -425,10 +427,19 @@ impl WebSocketClient {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Disconnected;
                 }
-                let _ = self.event_tx.send(ConnectionEvent::Error {
-                    message: e.to_string(),
-                    code: e.to_error_code(),
-                });
+                // Server-rejected credentials → emit Unauthenticated so old SDK
+                // listeners on `unauthenticated` keep working. Other failures
+                // (network, parse, etc.) still go through the generic Error event.
+                if let MarketDataError::AuthError { msg } = &e {
+                    let _ = self.event_tx.send(ConnectionEvent::Unauthenticated {
+                        message: msg.clone(),
+                    });
+                } else {
+                    let _ = self.event_tx.send(ConnectionEvent::Error {
+                        message: e.to_string(),
+                        code: e.to_error_code(),
+                    });
+                }
                 Err(e)
             }
             Err(_) => {
@@ -876,6 +887,8 @@ impl WebSocketClient {
     /// Internal: Spawn message dispatch task
     ///
     /// Takes ownership of the read half of the WebSocket stream for message dispatch.
+    /// When the connection drops, triggers auto-reconnect if configured. Uses a loop
+    /// (not recursion) to handle repeated reconnections within a single spawned task.
     async fn spawn_dispatch_task(&self, ws_read: WsStream) {
         use crate::websocket::message::dispatch_messages;
 
@@ -883,13 +896,53 @@ impl WebSocketClient {
         let event_tx = self.event_tx.clone();
         let health_check = Arc::clone(&self.health_check);
 
-        let handle = tokio::spawn(async move {
-            let close_code = dispatch_messages(ws_read, message_tx, event_tx, health_check).await;
+        // Clone Arcs needed for auto-reconnect inside spawned task
+        let reconnection = Arc::clone(&self.reconnection);
+        let config = self.config.clone();
+        let state = Arc::clone(&self.state);
+        let ws_sink = Arc::clone(&self.ws_sink);
+        let subscriptions = Arc::clone(&self.subscriptions);
+        let health_check_handle = Arc::clone(&self.health_check_handle);
 
-            // For now, just report disconnection
-            // Full auto-reconnect will be implemented when needed
-            // (requires refactoring to avoid Send/Sync issues with MessageReceiver)
-            let _ = close_code;
+        let handle = tokio::spawn(async move {
+            // Dispatch → reconnect → dispatch loop (avoids recursive async which breaks Send)
+            let mut current_ws_read = ws_read;
+            loop {
+                let close_code = dispatch_messages(
+                    current_ws_read,
+                    message_tx.clone(),
+                    event_tx.clone(),
+                    Arc::clone(&health_check),
+                )
+                .await;
+
+                // Attempt auto-reconnect; returns new streams on success.
+                // Pass cloned owned values (not references) because mpsc::Sender is !Sync
+                // and &mpsc::Sender across await points would make the future !Send.
+                match try_reconnect(
+                    close_code,
+                    Arc::clone(&reconnection),
+                    config.clone(),
+                    Arc::clone(&state),
+                    event_tx.clone(),
+                    Arc::clone(&ws_sink),
+                    Arc::clone(&subscriptions),
+                    Arc::clone(&health_check),
+                    Arc::clone(&health_check_handle),
+                    message_tx.clone(),
+                )
+                .await
+                {
+                    Some(ws_read) => {
+                        current_ws_read = ws_read;
+                        // Loop back to dispatch with the new connection
+                    }
+                    None => {
+                        // Reconnection failed or not configured — exit task
+                        break;
+                    }
+                }
+            }
         });
 
         let mut dispatch_handle_guard = self.dispatch_handle.lock().await;
@@ -898,14 +951,13 @@ impl WebSocketClient {
 
     /// Internal: Start health check monitoring
     fn start_health_check(&self) {
-        let (ping_tx, _ping_rx) = mpsc::channel();
+        let (ping_tx, mut ping_rx) = tokio::sync::mpsc::channel(1);
         let event_tx = self.event_tx.clone();
 
         // Spawn health check thread
         let handle = self.health_check.spawn_check_task(ping_tx, event_tx);
 
-        // Store handle (note: ping_rx would be used to send pings via WebSocket)
-        // For now, health check just monitors timeouts without sending actual pings
+        // Store handle
         let health_check_handle = Arc::clone(&self.health_check_handle);
         tokio::spawn(async move {
             let mut guard = health_check_handle.lock().await;
@@ -914,13 +966,30 @@ impl WebSocketClient {
 
         // Resume health check (was paused during connect)
         self.health_check.resume();
+
+        // Spawn JSON ping sender task: reads from ping_rx and sends {"event":"ping"} via ws_sink
+        let ws_sink = Arc::clone(&self.ws_sink);
+        tokio::spawn(async move {
+            while ping_rx.recv().await.is_some() {
+                let ping_msg = WebSocketRequest::ping(None);
+                if let Ok(json) = serde_json::to_string(&ping_msg) {
+                    let mut sink_guard = ws_sink.lock().await;
+                    if let Some(ref mut sink) = *sink_guard {
+                        if sink.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
     }
 
-    /// Internal: Automatic reconnection flow
+    /// Internal: Automatic reconnection flow (&self version)
     ///
-    /// Called when connection drops unexpectedly. Implements exponential
-    /// backoff retry logic with subscription restoration.
-    #[allow(dead_code)] // Will be used when full auto-reconnect is integrated
+    /// Implements exponential backoff retry logic with subscription restoration.
+    /// Note: The dispatch loop uses the standalone `try_reconnect` function instead,
+    /// which operates on owned Arcs for Send compatibility with tokio::spawn.
+    #[allow(dead_code)]
     async fn auto_reconnect(&self, close_code: Option<u16>) -> Result<(), MarketDataError> {
         let should_reconnect = {
             let reconnection = self.reconnection.lock().await;
@@ -1024,6 +1093,294 @@ impl WebSocketClient {
     }
 }
 
+/// Attempt auto-reconnection after a disconnect.
+///
+/// Called from within the dispatch loop's spawned task. Takes owned values
+/// (cloned from the spawned task) because `mpsc::Sender` is `!Sync` and
+/// holding `&mpsc::Sender` across await points would make the future `!Send`.
+/// Returns `Some(ws_read)` on successful reconnect, `None` if reconnect is not
+/// configured or all attempts are exhausted.
+async fn try_reconnect(
+    close_code: Option<u16>,
+    reconnection: Arc<Mutex<ReconnectionManager>>,
+    config: ConnectionConfig,
+    state: Arc<RwLock<ConnectionState>>,
+    event_tx: mpsc::Sender<ConnectionEvent>,
+    ws_sink: Arc<Mutex<Option<WsSink>>>,
+    subscriptions: Arc<SubscriptionManager>,
+    health_check: Arc<HealthCheck>,
+    health_check_handle: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
+    message_tx: mpsc::Sender<WebSocketMessage>,
+) -> Option<WsStream> {
+    // Check if we should attempt reconnection
+    let should_reconnect = {
+        let reconnection = reconnection.lock().await;
+        reconnection.should_reconnect(close_code)
+    };
+
+    if !should_reconnect {
+        // Not retriable - update state and send event
+        {
+            let mut st = state.write().await;
+            *st = ConnectionState::Closed {
+                code: close_code,
+                reason: "Non-retriable error".to_string(),
+            };
+        }
+
+        let attempts = {
+            let reconnection = reconnection.lock().await;
+            reconnection.current_attempt()
+        };
+
+        let _ = event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+        return None;
+    }
+
+    // Pause health check during reconnection
+    health_check.pause();
+
+    // Attempt reconnection with exponential backoff
+    loop {
+        let delay = {
+            let mut reconnection = reconnection.lock().await;
+            reconnection.next_delay()
+        };
+
+        match delay {
+            Some(d) => {
+                let attempt = {
+                    let reconnection = reconnection.lock().await;
+                    reconnection.current_attempt()
+                };
+
+                // Update state to Reconnecting
+                {
+                    let mut st = state.write().await;
+                    *st = ConnectionState::Reconnecting { attempt };
+                }
+                let _ = event_tx.send(ConnectionEvent::Reconnecting { attempt });
+
+                // Wait before reconnecting
+                sleep(d).await;
+
+                // Try to connect and authenticate
+                match try_connect(
+                    config.clone(),
+                    Arc::clone(&state),
+                    event_tx.clone(),
+                    message_tx.clone(),
+                )
+                .await
+                {
+                    Ok((new_sink, ws_read)) => {
+                        // Store the new write half
+                        {
+                            let mut sink_guard = ws_sink.lock().await;
+                            *sink_guard = Some(new_sink);
+                        }
+
+                        // Reset reconnection manager on success
+                        {
+                            let mut reconnection = reconnection.lock().await;
+                            reconnection.reset();
+                        }
+
+                        // Resubscribe all stored subscriptions
+                        let subs = subscriptions.get_all();
+                        for req in subs {
+                            let sub_msg = WebSocketRequest::subscribe(req);
+                            if let Ok(sub_json) = serde_json::to_string(&sub_msg) {
+                                let mut sink_guard = ws_sink.lock().await;
+                                if let Some(ref mut sink) = *sink_guard {
+                                    let _ = sink.send(Message::Text(sub_json.into())).await;
+                                }
+                            }
+                        }
+
+                        // Start health check for the new connection
+                        let (ping_tx, mut ping_rx) = tokio::sync::mpsc::channel(1);
+                        let hc_handle =
+                            health_check.spawn_check_task(ping_tx, event_tx.clone());
+                        {
+                            let mut hch = health_check_handle.lock().await;
+                            *hch = Some(hc_handle);
+                        }
+                        health_check.resume();
+
+                        // Spawn JSON ping sender for reconnected connection
+                        let ws_sink_for_ping = Arc::clone(&ws_sink);
+                        tokio::spawn(async move {
+                            while ping_rx.recv().await.is_some() {
+                                let ping_msg = WebSocketRequest::ping(None);
+                                if let Ok(json) = serde_json::to_string(&ping_msg) {
+                                    let mut sink_guard = ws_sink_for_ping.lock().await;
+                                    if let Some(ref mut sink) = *sink_guard {
+                                        if sink.send(Message::Text(json.into())).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        return Some(ws_read);
+                    }
+                    Err(_) => {
+                        // Continue loop to next attempt
+                        continue;
+                    }
+                }
+            }
+            None => {
+                // Max attempts reached
+                {
+                    let mut st = state.write().await;
+                    *st = ConnectionState::Closed {
+                        code: close_code,
+                        reason: "Max reconnection attempts reached".to_string(),
+                    };
+                }
+
+                let attempts = {
+                    let reconnection = reconnection.lock().await;
+                    reconnection.current_attempt()
+                };
+
+                let _ = event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+
+                return None;
+            }
+        }
+    }
+}
+
+/// Attempt a fresh connection: connect to WebSocket and authenticate.
+///
+/// On success, returns the write sink and read stream. The caller is responsible
+/// for storing the sink and setting up dispatch. Takes owned values for Send safety.
+async fn try_connect(
+    config: ConnectionConfig,
+    state: Arc<RwLock<ConnectionState>>,
+    event_tx: mpsc::Sender<ConnectionEvent>,
+    message_tx: mpsc::Sender<WebSocketMessage>,
+) -> Result<(WsSink, WsStream), MarketDataError> {
+    // Update state to Connecting
+    {
+        let mut st = state.write().await;
+        *st = ConnectionState::Connecting;
+    }
+    let _ = event_tx.send(ConnectionEvent::Connecting);
+
+    // Connect to WebSocket
+    let connect_result = timeout(config.connect_timeout, connect_async(&config.url)).await;
+
+    let (ws_stream, _response) = match connect_result {
+        Ok(Ok((stream, response))) => (stream, response),
+        Ok(Err(e)) => {
+            let err: MarketDataError = e.into();
+            {
+                let mut st = state.write().await;
+                *st = ConnectionState::Disconnected;
+            }
+            return Err(err);
+        }
+        Err(_) => {
+            {
+                let mut st = state.write().await;
+                *st = ConnectionState::Disconnected;
+            }
+            return Err(MarketDataError::TimeoutError {
+                operation: "WebSocket connect".to_string(),
+            });
+        }
+    };
+
+    // Split the stream
+    let (mut new_ws_sink, mut ws_read) = ws_stream.split();
+
+    let _ = event_tx.send(ConnectionEvent::Connected);
+
+    // Authenticate
+    {
+        let mut st = state.write().await;
+        *st = ConnectionState::Authenticating;
+    }
+
+    let auth_msg = WebSocketRequest::auth(config.auth.clone());
+    let auth_json = serde_json::to_string(&auth_msg)
+        .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+
+    new_ws_sink
+        .send(Message::Text(auth_json.into()))
+        .await
+        .map_err(MarketDataError::from)?;
+
+    // Wait for auth response (same pattern as WebSocketClient::connect)
+    let msg_tx = message_tx.clone();
+    let auth_timeout = Duration::from_secs(10);
+    let auth_result = timeout(auth_timeout, async {
+        while let Some(msg_result) = ws_read.next().await {
+            match msg_result {
+                Ok(Message::Text(text)) => {
+                    if let Ok(ws_msg) = serde_json::from_str::<WebSocketMessage>(&text) {
+                        let _ = msg_tx.send(ws_msg.clone());
+                        if ws_msg.is_authenticated() {
+                            return Ok(());
+                        }
+                        if ws_msg.is_error() {
+                            return Err(MarketDataError::AuthError {
+                                msg: ws_msg
+                                    .error_message()
+                                    .unwrap_or_else(|| "Unknown error".to_string()),
+                            });
+                        }
+                    }
+                }
+                Err(e) => return Err(MarketDataError::from(e)),
+                _ => {}
+            }
+        }
+        Err(MarketDataError::ConnectionError {
+            msg: "Stream closed during authentication".to_string(),
+        })
+    })
+    .await;
+
+    match auth_result {
+        Ok(Ok(())) => {
+            {
+                let mut st = state.write().await;
+                *st = ConnectionState::Connected;
+            }
+            let _ = event_tx.send(ConnectionEvent::Authenticated);
+            Ok((new_ws_sink, ws_read))
+        }
+        Ok(Err(e)) => {
+            {
+                let mut st = state.write().await;
+                *st = ConnectionState::Disconnected;
+            }
+            // Same auth-vs-other split as the primary connect() flow
+            if let MarketDataError::AuthError { msg } = &e {
+                let _ = event_tx.send(ConnectionEvent::Unauthenticated {
+                    message: msg.clone(),
+                });
+            }
+            Err(e)
+        }
+        Err(_) => {
+            {
+                let mut st = state.write().await;
+                *st = ConnectionState::Disconnected;
+            }
+            Err(MarketDataError::TimeoutError {
+                operation: "WebSocket authentication".to_string(),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1049,6 +1406,9 @@ mod tests {
         let _connecting = ConnectionEvent::Connecting;
         let _connected = ConnectionEvent::Connected;
         let _authenticated = ConnectionEvent::Authenticated;
+        let _unauthenticated = ConnectionEvent::Unauthenticated {
+            message: "Invalid credentials".to_string(),
+        };
         let _disconnected = ConnectionEvent::Disconnected {
             code: Some(1000),
             reason: "Normal closure".to_string(),

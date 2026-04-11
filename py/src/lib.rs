@@ -132,5 +132,10 @@ fn marketdata_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("TimeoutError", m.py().get_type::<errors::TimeoutError>())?;
     m.add("WebSocketError", m.py().get_type::<errors::WebSocketError>())?;
 
+    // Backward-compat alias: old fugle-marketdata SDK exposed a single `FugleAPIError`.
+    // Aliasing it to MarketDataError lets `except FugleAPIError:` catch every variant
+    // raised by this binding so legacy try/except blocks keep working.
+    m.add("FugleAPIError", m.py().get_type::<errors::MarketDataError>())?;
+
     Ok(())
 }

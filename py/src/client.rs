@@ -395,6 +395,65 @@ impl StockIntradayClient {
             }
         })
     }
+
+    /// Get batch ticker list for a security type
+    ///
+    /// Args:
+    ///     type: Security type (e.g., "EQUITY", "INDEX", "ETF")
+    ///     exchange: Exchange filter (e.g., "TWSE", "TPEx")
+    ///     market: Market filter (e.g., "TSE", "OTC")
+    ///     industry: Industry code filter
+    ///     is_normal: Filter to normal-status tickers only
+    ///
+    /// Returns:
+    ///     Awaitable[list[dict]]: List of ticker info dicts
+    ///
+    /// Example:
+    ///     ```python
+    ///     tickers = await client.stock.intraday.tickers(type="EQUITY")
+    ///     ```
+    #[pyo3(signature = (r#type, exchange=None, market=None, industry=None, is_normal=None))]
+    pub fn tickers<'py>(
+        &self,
+        py: Python<'py>,
+        r#type: String,
+        exchange: Option<String>,
+        market: Option<String>,
+        industry: Option<String>,
+        is_normal: Option<bool>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let stock = client.stock();
+                let intraday = stock.intraday();
+                let mut builder = intraday.tickers().typ(&r#type);
+                if let Some(e) = &exchange {
+                    builder = builder.exchange(e);
+                }
+                if let Some(m) = &market {
+                    builder = builder.market(m);
+                }
+                if let Some(i) = &industry {
+                    builder = builder.industry(i);
+                }
+                if let Some(n) = is_normal {
+                    builder = builder.is_normal(n);
+                }
+                builder.send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(tickers) => Python::attach(|py| {
+                    let json_val = serde_json::to_value(&tickers)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                    types::json_value_to_py(py, &json_val)
+                }),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
 }
 
 /// Stock historical data endpoints client
@@ -1178,6 +1237,142 @@ impl FutOptIntradayClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Get batch ticker list for a FutOpt contract type
+    ///
+    /// Args:
+    ///     type: Contract type ("FUTURE" or "OPTION")
+    ///     exchange: Exchange filter (e.g., "TAIFEX")
+    ///     after_hours: Query after-hours session data
+    ///     contract_type: Contract type code ("I", "R", "B", "C", "S", "E")
+    ///
+    /// Returns:
+    ///     Awaitable[list[dict]]: List of FutOpt ticker info dicts
+    ///
+    /// Example:
+    ///     ```python
+    ///     tickers = await client.futopt.intraday.tickers(type="FUTURE")
+    ///     ```
+    #[pyo3(signature = (r#type, exchange=None, after_hours=false, contract_type=None))]
+    pub fn tickers<'py>(
+        &self,
+        py: Python<'py>,
+        r#type: String,
+        exchange: Option<String>,
+        after_hours: bool,
+        contract_type: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let typ = parse_futopt_type(&r#type)?;
+            let ct = match contract_type.as_deref() {
+                Some(s) => Some(parse_contract_type(s)?),
+                None => None,
+            };
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.tickers().typ(typ);
+                if let Some(e) = &exchange {
+                    builder = builder.exchange(e);
+                }
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                if let Some(c) = ct {
+                    builder = builder.contract_type(c);
+                }
+                builder.send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(tickers) => Python::attach(|py| {
+                    let json_val = serde_json::to_value(&tickers)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                    types::json_value_to_py(py, &json_val)
+                }),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Get available FutOpt products list
+    ///
+    /// Args:
+    ///     type: Contract type ("FUTURE" or "OPTION")
+    ///     contract_type: Contract type code ("I", "R", "B", "C", "S", "E")
+    ///
+    /// Returns:
+    ///     Awaitable[list[dict]]: List of product info dicts
+    ///
+    /// Example:
+    ///     ```python
+    ///     products = await client.futopt.intraday.products(type="FUTURE")
+    ///     ```
+    #[pyo3(signature = (r#type, contract_type=None))]
+    pub fn products<'py>(
+        &self,
+        py: Python<'py>,
+        r#type: String,
+        contract_type: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let typ = parse_futopt_type(&r#type)?;
+            let ct = match contract_type.as_deref() {
+                Some(s) => Some(parse_contract_type(s)?),
+                None => None,
+            };
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.products().typ(typ);
+                if let Some(c) = ct {
+                    builder = builder.contract_type(c);
+                }
+                builder.send()
+            }).await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(products) => Python::attach(|py| {
+                    let json_val = serde_json::to_value(&products)
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                    types::json_value_to_py(py, &json_val)
+                }),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+}
+
+fn parse_futopt_type(s: &str) -> PyResult<marketdata_core::models::futopt::FutOptType> {
+    use marketdata_core::models::futopt::FutOptType;
+    match s.to_ascii_uppercase().as_str() {
+        "FUTURE" | "FUTURES" => Ok(FutOptType::Future),
+        "OPTION" | "OPTIONS" => Ok(FutOptType::Option),
+        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "type must be 'FUTURE' or 'OPTION', got '{}'",
+            other
+        ))),
+    }
+}
+
+fn parse_contract_type(s: &str) -> PyResult<marketdata_core::models::futopt::ContractType> {
+    use marketdata_core::models::futopt::ContractType;
+    match s.to_ascii_uppercase().as_str() {
+        "I" | "INDEX" => Ok(ContractType::Index),
+        "R" | "RATE" => Ok(ContractType::Rate),
+        "B" | "BOND" => Ok(ContractType::Bond),
+        "C" | "CURRENCY" => Ok(ContractType::Currency),
+        "S" | "STOCK" => Ok(ContractType::Stock),
+        "E" | "ETF" => Ok(ContractType::Etf),
+        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "contract_type must be one of I/R/B/C/S/E, got '{}'",
+            other
+        ))),
     }
 }
 

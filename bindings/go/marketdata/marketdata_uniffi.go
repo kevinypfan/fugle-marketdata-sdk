@@ -3584,6 +3584,10 @@ type WebSocketListener interface {
 	OnMessage(message StreamMessage)
 	// Called when an error occurs
 	OnError(errorMessage string)
+	// Called when a reconnection attempt starts
+	OnReconnecting(attempt uint32)
+	// Called when all reconnection attempts are exhausted
+	OnReconnectFailed(attempts uint32)
 }
 
 // Callback interface for WebSocket events

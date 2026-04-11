@@ -171,23 +171,28 @@ impl StockIntradayClient {
     /// Get intraday quote for a stock symbol
     ///
     /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
+    /// @param oddLot - Query odd-lot data instead of regular round-lot data
     /// @returns Promise resolving to Quote object with current price and volume data
     ///
     /// @example
     /// ```javascript
-    /// const client = new RestClient('your-api-key');
+    /// const client = new RestClient({ apiKey: 'your-api-key' });
     /// const quote = await client.stock.intraday.quote('2330');
-    /// console.log(quote.lastPrice);  // 580.0
-    /// console.log(quote.symbol);     // "2330"
-    /// console.log(quote.bids);       // [{price: 579.0, size: 100}, ...]
+    /// const oddLotQuote = await client.stock.intraday.quote('2330', true);
     /// ```
     #[napi(ts_return_type = "Promise<QuoteResponse>")]
-    pub async fn quote(&self, symbol: String) -> napi::Result<Value> {
+    pub async fn quote(&self, symbol: String, odd_lot: Option<bool>) -> napi::Result<Value> {
         let inner = self.inner.clone();
 
         // Use spawn_blocking since core uses synchronous HTTP (ureq)
         let result = tokio::task::spawn_blocking(move || {
-            inner.stock().intraday().quote().symbol(&symbol).send()
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            let mut builder = intraday.quote().symbol(&symbol);
+            if let Some(ol) = odd_lot {
+                builder = builder.odd_lot(ol);
+            }
+            builder.send()
         })
         .await
         .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
@@ -285,6 +290,53 @@ impl StockIntradayClient {
 
         match result {
             Ok(volumes) => serde_json::to_value(&volumes)
+                .map_err(|e| napi::Error::from_reason(e.to_string())),
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get batch ticker list for a security type
+    ///
+    /// @param type - Security type ("EQUITY", "INDEX", "ETF", ...)
+    /// @param exchange - Optional exchange filter (e.g., "TWSE", "TPEx")
+    /// @param market - Optional market filter (e.g., "TSE", "OTC")
+    /// @param industry - Optional industry code filter
+    /// @param isNormal - Filter to normal-status tickers only
+    /// @returns Promise resolving to an array of ticker info objects
+    #[napi(ts_return_type = "Promise<TickerResponse[]>")]
+    pub async fn tickers(
+        &self,
+        #[napi(ts_arg_type = "string")] r#type: String,
+        exchange: Option<String>,
+        market: Option<String>,
+        industry: Option<String>,
+        is_normal: Option<bool>,
+    ) -> napi::Result<Value> {
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            let mut builder = intraday.tickers().typ(&r#type);
+            if let Some(e) = &exchange {
+                builder = builder.exchange(e);
+            }
+            if let Some(m) = &market {
+                builder = builder.market(m);
+            }
+            if let Some(i) = &industry {
+                builder = builder.industry(i);
+            }
+            if let Some(n) = is_normal {
+                builder = builder.is_normal(n);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(tickers) => serde_json::to_value(&tickers)
                 .map_err(|e| napi::Error::from_reason(e.to_string())),
             Err(e) => Err(to_napi_error(e)),
         }
@@ -1014,6 +1066,80 @@ impl FutOptIntradayClient {
 
         match result {
             Ok(volumes) => serde_json::to_value(&volumes)
+                .map_err(|e| napi::Error::from_reason(e.to_string())),
+            Err(e) => Err(to_napi_error(e)),
+        }
+    }
+
+    /// Get batch ticker list for a FutOpt contract type
+    ///
+    /// @param type - Contract type: "FUTURE" or "OPTION"
+    /// @param exchange - Optional exchange filter (e.g., "TAIFEX")
+    /// @param afterHours - Query after-hours session data
+    /// @param contractType - Optional contract type code: "I" / "R" / "B" / "C" / "S" / "E"
+    /// @returns Promise resolving to an array of FutOpt ticker info objects
+    #[napi(ts_return_type = "Promise<FutOptTickerResponse[]>", ts_args_type = "type: FutOptType, exchange?: string, afterHours?: boolean, contractType?: ContractType")]
+    pub async fn tickers(
+        &self,
+        typ: String,
+        exchange: Option<String>,
+        after_hours: Option<bool>,
+        contract_type: Option<String>,
+    ) -> napi::Result<Value> {
+        use marketdata_core::models::futopt::{ContractType, FutOptType};
+
+        let fut_opt_type = match typ.to_uppercase().as_str() {
+            "FUTURE" => FutOptType::Future,
+            "OPTION" => FutOptType::Option,
+            _ => {
+                return Err(napi::Error::from_reason(format!(
+                    "Invalid type '{}': must be 'FUTURE' or 'OPTION'",
+                    typ
+                )))
+            }
+        };
+
+        let ct_enum = if let Some(ct) = contract_type {
+            Some(match ct.to_uppercase().as_str() {
+                "I" | "INDEX" => ContractType::Index,
+                "R" | "RATE" => ContractType::Rate,
+                "B" | "BOND" => ContractType::Bond,
+                "C" | "CURRENCY" => ContractType::Currency,
+                "S" | "STOCK" => ContractType::Stock,
+                "E" | "ETF" => ContractType::Etf,
+                _ => {
+                    return Err(napi::Error::from_reason(format!(
+                        "Invalid contractType '{}': must be I/R/B/C/S/E",
+                        ct
+                    )))
+                }
+            })
+        } else {
+            None
+        };
+
+        let inner = self.inner.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.tickers().typ(fut_opt_type);
+            if let Some(e) = &exchange {
+                builder = builder.exchange(e);
+            }
+            if after_hours.unwrap_or(false) {
+                builder = builder.after_hours();
+            }
+            if let Some(ct) = ct_enum {
+                builder = builder.contract_type(ct);
+            }
+            builder.send()
+        })
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("Task error: {}", e)))?;
+
+        match result {
+            Ok(tickers) => serde_json::to_value(&tickers)
                 .map_err(|e| napi::Error::from_reason(e.to_string())),
             Err(e) => Err(to_napi_error(e)),
         }

@@ -124,7 +124,7 @@ describe('WebSocketClient constructor', () => {
         apiKey: 'test-key',
         healthCheck: {
           enabled: true,
-          intervalMs: 20000,
+          pingInterval: 20000,
           maxMissedPongs: 3
         }
       });
@@ -139,11 +139,11 @@ describe('WebSocketClient constructor', () => {
       expect(ws).toBeDefined();
     });
 
-    it('throws error for invalid intervalMs', () => {
+    it('throws error for invalid pingInterval', () => {
       expect(() => {
         new WebSocketClient({
           apiKey: 'test-key',
-          healthCheck: { intervalMs: 1000 } // Below 5000ms minimum
+          healthCheck: { pingInterval: 1000 } // Below 5000ms minimum
         });
       }).toThrow();
     });
@@ -154,7 +154,7 @@ describe('WebSocketClient constructor', () => {
       const ws = new WebSocketClient({
         apiKey: 'test-key',
         reconnect: { maxAttempts: 10 },
-        healthCheck: { enabled: true, intervalMs: 15000 }
+        healthCheck: { enabled: true, pingInterval: 15000 }
       });
       expect(ws).toBeDefined();
     });

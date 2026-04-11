@@ -7367,6 +7367,16 @@ internal interface WebSocketListener
     /// Called when an error occurs
     /// </summary>
     void OnError(string @errorMessage);
+
+    /// <summary>
+    /// Called when a reconnection attempt starts
+    /// </summary>
+    void OnReconnecting(uint @attempt);
+
+    /// <summary>
+    /// Called when all reconnection attempts are exhausted
+    /// </summary>
+    void OnReconnectFailed(uint @attempts);
 }
 
 /// <summary>

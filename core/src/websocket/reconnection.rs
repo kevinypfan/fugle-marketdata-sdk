@@ -19,9 +19,16 @@ pub const MIN_INITIAL_DELAY_MS: u64 = 100;
 /// Reconnection configuration
 ///
 /// Controls automatic reconnection behavior after connection drops.
-/// Defaults based on CONTEXT.md decisions.
+///
+/// `enabled` defaults to `false` so the binding layer matches the historical
+/// `fugle-marketdata-{python,node}` SDKs (no auto-reconnect unless the caller
+/// asks for it). Explicitly constructing via [`ReconnectionConfig::new`] sets
+/// `enabled: true` because the caller has expressed intent.
 #[derive(Debug, Clone)]
 pub struct ReconnectionConfig {
+    /// Whether auto-reconnect is active. When `false`, [`ReconnectionManager::should_reconnect`]
+    /// always returns `false` regardless of the close code.
+    pub enabled: bool,
     /// Maximum reconnection attempts before giving up
     pub max_attempts: u32,
     /// Initial delay before first reconnection attempt
@@ -33,6 +40,10 @@ pub struct ReconnectionConfig {
 impl Default for ReconnectionConfig {
     fn default() -> Self {
         Self {
+            // Off by default — matches old fugle-marketdata SDKs that have no
+            // auto-reconnect at all. Bindings flip this on when the user
+            // explicitly passes a `reconnect:` option block.
+            enabled: false,
             max_attempts: DEFAULT_MAX_ATTEMPTS,
             initial_delay: Duration::from_millis(DEFAULT_INITIAL_DELAY_MS),
             max_delay: Duration::from_millis(DEFAULT_MAX_DELAY_MS),
@@ -48,6 +59,11 @@ impl ReconnectionConfig {
     /// - `max_attempts` is 0 (must be >= 1)
     /// - `initial_delay` is less than 100ms
     /// - `max_delay` is less than `initial_delay`
+    ///
+    /// Constructing via `new()` is treated as explicit opt-in, so the
+    /// returned config has `enabled: true`. To get a disabled config (e.g.
+    /// to fall back to "no reconnect at all") use [`ReconnectionConfig::disabled`]
+    /// or `ReconnectionConfig::default()`.
     pub fn new(
         max_attempts: u32,
         initial_delay: Duration,
@@ -76,10 +92,21 @@ impl ReconnectionConfig {
         }
 
         Ok(Self {
+            enabled: true,
             max_attempts,
             initial_delay,
             max_delay,
         })
+    }
+
+    /// Build an explicitly disabled reconnection config
+    ///
+    /// `should_reconnect()` will always return `false` regardless of close code.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default()
+        }
     }
 
     /// Builder: set max attempts with validation
@@ -158,7 +185,13 @@ impl ReconnectionManager {
     /// - 4000-4999 (Application errors) → don't reconnect
     /// - 1000 (Normal closure) → don't reconnect
     /// - Others → reconnect by default
+    ///
+    /// Always returns `false` if the underlying [`ReconnectionConfig::enabled`]
+    /// flag is `false` (the default — matches old `fugle-marketdata` SDKs).
     pub fn should_reconnect(&self, close_code: Option<u16>) -> bool {
+        if !self.config.enabled {
+            return false;
+        }
         match close_code {
             Some(1000) => false, // Normal closure
             Some(1001) => true,  // Going away
@@ -219,12 +252,44 @@ impl ReconnectionManager {
 mod tests {
     use super::*;
 
+    /// Helper: build an explicitly enabled config for the close-code tests.
+    /// `default()` is now disabled (matches old fugle-marketdata SDKs), so
+    /// any test that exercises the close-code logic must opt in.
+    fn enabled_config() -> ReconnectionConfig {
+        ReconnectionConfig::new(5, Duration::from_secs(1), Duration::from_secs(60))
+            .expect("test config is valid")
+    }
+
     #[test]
     fn test_reconnection_config_default() {
         let config = ReconnectionConfig::default();
+        assert!(!config.enabled, "default must be disabled to match old SDK behaviour");
         assert_eq!(config.max_attempts, 5);
         assert_eq!(config.initial_delay, Duration::from_secs(1));
         assert_eq!(config.max_delay, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn test_reconnection_config_new_is_enabled() {
+        // Explicit construction means the caller wants reconnect on
+        let config = enabled_config();
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_reconnection_config_disabled_constructor() {
+        let config = ReconnectionConfig::disabled();
+        assert!(!config.enabled);
+    }
+
+    #[test]
+    fn test_default_config_never_reconnects() {
+        // The default config must short-circuit `should_reconnect` even on
+        // codes the close-code logic considers retriable (1006, 1001, …).
+        let manager = ReconnectionManager::new(ReconnectionConfig::default());
+        assert!(!manager.should_reconnect(Some(1006)));
+        assert!(!manager.should_reconnect(Some(1001)));
+        assert!(!manager.should_reconnect(None));
     }
 
     #[test]
@@ -244,8 +309,7 @@ mod tests {
 
     #[test]
     fn test_should_reconnect_on_1006() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // 1006 (Abnormal closure) should reconnect
         assert!(manager.should_reconnect(Some(1006)));
@@ -253,8 +317,7 @@ mod tests {
 
     #[test]
     fn test_should_reconnect_on_1001() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // 1001 (Going away) should reconnect
         assert!(manager.should_reconnect(Some(1001)));
@@ -262,8 +325,7 @@ mod tests {
 
     #[test]
     fn test_should_not_reconnect_on_4001() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // 4001 (Auth failure) should not reconnect
         assert!(!manager.should_reconnect(Some(4001)));
@@ -271,8 +333,7 @@ mod tests {
 
     #[test]
     fn test_should_not_reconnect_on_1000() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // 1000 (Normal closure) should not reconnect
         assert!(!manager.should_reconnect(Some(1000)));
@@ -280,8 +341,7 @@ mod tests {
 
     #[test]
     fn test_should_not_reconnect_on_4xxx() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // Application errors (4000-4999) should not reconnect
         assert!(!manager.should_reconnect(Some(4000)));
@@ -291,8 +351,7 @@ mod tests {
 
     #[test]
     fn test_should_reconnect_on_unknown() {
-        let config = ReconnectionConfig::default();
-        let manager = ReconnectionManager::new(config);
+        let manager = ReconnectionManager::new(enabled_config());
 
         // Unknown errors should reconnect by default
         assert!(manager.should_reconnect(Some(1002)));

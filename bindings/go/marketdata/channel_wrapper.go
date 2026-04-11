@@ -104,6 +104,19 @@ func (l *channelListener) OnError(errorMessage string) {
 	}
 }
 
+// OnReconnecting implements WebSocketListener
+func (l *channelListener) OnReconnecting(attempt uint32) {
+	// Could send reconnecting event on error channel
+}
+
+// OnReconnectFailed implements WebSocketListener
+func (l *channelListener) OnReconnectFailed(attempts uint32) {
+	select {
+	case l.ch.errors <- fmt.Errorf("all %d reconnection attempts exhausted", attempts):
+	case <-l.ch.done:
+	}
+}
+
 // StreamingClient wraps WebSocketClient with channel-based API
 //
 // This provides an idiomatic Go interface for consuming WebSocket messages

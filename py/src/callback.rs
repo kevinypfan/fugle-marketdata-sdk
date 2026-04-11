@@ -29,6 +29,10 @@ pub enum EventType {
     Reconnect,
     /// Error occurred
     Error,
+    /// Authentication accepted by server
+    Authenticated,
+    /// Authentication rejected by server
+    Unauthenticated,
 }
 
 impl EventType {
@@ -40,6 +44,8 @@ impl EventType {
             "disconnect" | "disconnected" | "close" | "closed" => Some(EventType::Disconnect),
             "reconnect" | "reconnecting" => Some(EventType::Reconnect),
             "error" => Some(EventType::Error),
+            "authenticated" => Some(EventType::Authenticated),
+            "unauthenticated" => Some(EventType::Unauthenticated),
             _ => None,
         }
     }
@@ -76,7 +82,7 @@ impl CallbackRegistry {
     pub fn register(&self, event: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         let event_type = EventType::from_str(event).ok_or_else(|| {
             pyo3::exceptions::PyValueError::new_err(format!(
-                "Invalid event type: '{}'. Valid types: message, connect, disconnect, reconnect, error",
+                "Invalid event type: '{}'. Valid types: message, connect, disconnect, reconnect, error, authenticated, unauthenticated",
                 event
             ))
         })?;
@@ -187,7 +193,6 @@ impl CallbackRegistry {
     }
 
     /// Invoke reconnect callbacks with attempt number
-    #[allow(dead_code)]
     pub fn invoke_reconnect(&self, py: Python<'_>, attempt: u32) {
         use pyo3::IntoPyObject;
         let attempt_obj: Py<PyAny> = attempt.into_pyobject(py).expect("Failed to convert attempt").unbind().into_any();
@@ -196,13 +201,26 @@ impl CallbackRegistry {
     }
 
     /// Invoke error callbacks with message and code
-    #[allow(dead_code)]
     pub fn invoke_error(&self, py: Python<'_>, message: &str, code: i32) {
         use pyo3::IntoPyObject;
         let msg_obj: Py<PyAny> = message.into_pyobject(py).expect("Failed to convert message").unbind().into_any();
         let code_obj: Py<PyAny> = code.into_pyobject(py).expect("Failed to convert code").unbind().into_any();
         let args = pyo3::types::PyTuple::new(py, [msg_obj, code_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Error, &args);
+    }
+
+    /// Invoke authenticated callbacks (no args, parallels old SDK's `authenticated` event)
+    pub fn invoke_authenticated(&self, py: Python<'_>) {
+        let args = pyo3::types::PyTuple::empty(py);
+        self.invoke(py, EventType::Authenticated, &args);
+    }
+
+    /// Invoke unauthenticated callbacks with the rejection message
+    pub fn invoke_unauthenticated(&self, py: Python<'_>, message: &str) {
+        use pyo3::IntoPyObject;
+        let msg_obj: Py<PyAny> = message.into_pyobject(py).expect("Failed to convert message").unbind().into_any();
+        let args = pyo3::types::PyTuple::new(py, [msg_obj]).expect("Failed to create tuple");
+        self.invoke(py, EventType::Unauthenticated, &args);
     }
 }
 

@@ -163,7 +163,7 @@ impl Default for ReconnectConfig {
 /// # Custom health check
 /// health_check = HealthCheckConfig(
 ///     enabled=True,
-///     interval_ms=15000,  # 15 seconds
+///     ping_interval=15000,  # 15 seconds
 ///     max_missed_pongs=3
 /// )
 ///
@@ -178,9 +178,9 @@ pub struct HealthCheckConfig {
     /// Whether health check is enabled
     #[pyo3(get)]
     pub enabled: bool,
-    /// Interval between ping messages in milliseconds
+    /// Interval between ping messages in milliseconds (named to match the old `fugle-marketdata` SDK)
     #[pyo3(get)]
-    pub interval_ms: u64,
+    pub ping_interval: u64,
     /// Maximum missed pongs before disconnect
     #[pyo3(get)]
     pub max_missed_pongs: u64,
@@ -192,7 +192,7 @@ impl HealthCheckConfig {
     ///
     /// Args:
     ///     enabled: Whether health check is enabled (default: False)
-    ///     interval_ms: Interval between pings in milliseconds (default: 30000, min: 5000)
+    ///     ping_interval: Interval between pings in milliseconds (default: 30000, min: 5000)
     ///     max_missed_pongs: Max missed pongs before disconnect (default: 2, min: 1)
     ///
     /// Raises:
@@ -204,19 +204,19 @@ impl HealthCheckConfig {
     ///     config = HealthCheckConfig()
     ///
     ///     # Enabled with custom settings
-    ///     config = HealthCheckConfig(enabled=True, interval_ms=15000, max_missed_pongs=3)
+    ///     config = HealthCheckConfig(enabled=True, ping_interval=15000, max_missed_pongs=3)
     ///     ```
     #[new]
-    #[pyo3(signature = (*, enabled=false, interval_ms=30000, max_missed_pongs=2))]
-    pub fn new(enabled: bool, interval_ms: u64, max_missed_pongs: u64) -> PyResult<Self> {
+    #[pyo3(signature = (*, enabled=false, ping_interval=30000, max_missed_pongs=2))]
+    pub fn new(enabled: bool, ping_interval: u64, max_missed_pongs: u64) -> PyResult<Self> {
         // Validate using core's validation logic (fail fast)
-        let duration = Duration::from_millis(interval_ms);
+        let duration = Duration::from_millis(ping_interval);
         let _ = marketdata_core::HealthCheckConfig::new(enabled, duration, max_missed_pongs)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(Self {
             enabled,
-            interval_ms,
+            ping_interval,
             max_missed_pongs,
         })
     }
@@ -229,7 +229,7 @@ impl HealthCheckConfig {
     pub fn to_core(&self) -> marketdata_core::HealthCheckConfig {
         marketdata_core::HealthCheckConfig::new(
             self.enabled,
-            Duration::from_millis(self.interval_ms),
+            Duration::from_millis(self.ping_interval),
             self.max_missed_pongs,
         )
         .expect("Config already validated in constructor")
@@ -240,7 +240,7 @@ impl Default for HealthCheckConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            interval_ms: 30000,
+            ping_interval: 30000,
             max_missed_pongs: 2,
         }
     }
@@ -357,9 +357,11 @@ impl WebSocketClient {
     ///     StockWebSocketClient for stock streaming with inherited config
     #[getter]
     pub fn stock(&self) -> StockWebSocketClient {
-        StockWebSocketClient::new(self.api_key.clone())
-        // TODO: Pass reconnect_config and health_check_config to child client
-        // when core WebSocket supports runtime configuration
+        StockWebSocketClient::new(
+            self.api_key.clone(),
+            self.reconnect_config.clone(),
+            self.health_check_config.clone(),
+        )
     }
 
     /// Access futures and options WebSocket streaming
@@ -368,9 +370,11 @@ impl WebSocketClient {
     ///     FutOptWebSocketClient for FutOpt streaming with inherited config
     #[getter]
     pub fn futopt(&self) -> FutOptWebSocketClient {
-        FutOptWebSocketClient::new(self.api_key.clone())
-        // TODO: Pass reconnect_config and health_check_config to child client
-        // when core WebSocket supports runtime configuration
+        FutOptWebSocketClient::new(
+            self.api_key.clone(),
+            self.reconnect_config.clone(),
+            self.health_check_config.clone(),
+        )
     }
 }
 
@@ -393,6 +397,8 @@ struct WebSocketState {
 #[pyclass]
 pub struct StockWebSocketClient {
     api_key: String,
+    reconnect_config: ReconnectConfig,
+    health_check_config: HealthCheckConfig,
     callbacks: Arc<CallbackRegistry>,
     // State is wrapped in Mutex<Option<>> for thread-safety
     state: Arc<Mutex<Option<WebSocketState>>>,
@@ -403,9 +409,15 @@ pub struct StockWebSocketClient {
 }
 
 impl StockWebSocketClient {
-    fn new(api_key: String) -> Self {
+    fn new(
+        api_key: String,
+        reconnect_config: ReconnectConfig,
+        health_check_config: HealthCheckConfig,
+    ) -> Self {
         Self {
             api_key,
+            reconnect_config,
+            health_check_config,
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
@@ -534,13 +546,20 @@ impl StockWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err(e)
         })?;
 
-        // Create WebSocket client
+        // Create WebSocket client with full config
         let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
         let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
-        let ws_client = marketdata_core::WebSocketClient::new(config);
+        let ws_client = marketdata_core::WebSocketClient::with_full_config(
+            config,
+            self.reconnect_config.to_core(),
+            self.health_check_config.to_core(),
+        );
 
         // Get message receiver before connect
         let receiver = ws_client.messages();
+
+        // Get event channel reference before ws_client is moved into Arc
+        let events = Arc::clone(ws_client.state_events());
 
         // Clone callbacks for event dispatch
         let callbacks = Arc::clone(&self.callbacks);
@@ -579,6 +598,60 @@ impl StockWebSocketClient {
                 if self.has_message_callbacks() {
                     self.start_message_thread(receiver_for_thread);
                 }
+
+                // Spawn event listener thread for connection events
+                let callbacks_for_events = Arc::clone(&self.callbacks);
+                std::thread::Builder::new()
+                    .name("stock_ws_events".to_string())
+                    .spawn(move || {
+                        loop {
+                            let event = {
+                                let rx = events.blocking_lock();
+                                rx.recv()
+                            };
+                            match event {
+                                Ok(event) => {
+                                    Python::attach(|py| {
+                                        use marketdata_core::websocket::ConnectionEvent;
+                                        match event {
+                                            ConnectionEvent::Reconnecting { attempt } => {
+                                                callbacks_for_events.invoke_reconnect(py, attempt);
+                                            }
+                                            ConnectionEvent::Error { message, code } => {
+                                                callbacks_for_events.invoke_error(py, &message, code);
+                                            }
+                                            ConnectionEvent::Disconnected { code, reason } => {
+                                                callbacks_for_events.invoke_disconnect(py, code, &reason);
+                                            }
+                                            ConnectionEvent::ReconnectFailed { attempts } => {
+                                                callbacks_for_events.invoke_error(
+                                                    py,
+                                                    &format!("Reconnection failed after {} attempts", attempts),
+                                                    -1,
+                                                );
+                                            }
+                                            ConnectionEvent::PongMissed => {
+                                                callbacks_for_events.invoke_error(
+                                                    py,
+                                                    "Health check: pong missed",
+                                                    -2,
+                                                );
+                                            }
+                                            ConnectionEvent::Authenticated => {
+                                                callbacks_for_events.invoke_authenticated(py);
+                                            }
+                                            ConnectionEvent::Unauthenticated { message } => {
+                                                callbacks_for_events.invoke_unauthenticated(py, &message);
+                                            }
+                                            _ => {} // Connecting, Connected handled elsewhere
+                                        }
+                                    });
+                                }
+                                Err(_) => break, // Channel closed
+                            }
+                        }
+                    })
+                    .ok();
 
                 // Invoke connect callbacks
                 callbacks.invoke_connect(py);
@@ -686,13 +759,37 @@ impl StockWebSocketClient {
     ///     ws.stock.subscribe("trades", "2330")
     ///     ws.stock.subscribe("candles", "2330", odd_lot=True)
     ///     ```
-    #[pyo3(signature = (channel, symbol, odd_lot=false))]
+    #[pyo3(signature = (channel, symbol=None, *, symbols=None, odd_lot=false))]
     pub fn subscribe(
         &self,
         channel: &str,
-        symbol: &str,
+        symbol: Option<&str>,
+        symbols: Option<Vec<String>>,
         odd_lot: bool,
     ) -> PyResult<()> {
+        // Old SDK accepts either `symbol` (single) or `symbols` (batch). Exactly one
+        // must be provided. We loop internally to keep core's wire protocol simple
+        // (one subscribe message per symbol).
+        let target_symbols: Vec<String> = match (symbol, symbols) {
+            (Some(s), None) => vec![s.to_string()],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe(symbols=[]) is empty - provide at least one symbol",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe() accepts either `symbol` or `symbols`, not both",
+                ));
+            }
+            (None, None) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe() requires either `symbol` or `symbols`",
+                ));
+            }
+        };
+
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -716,9 +813,6 @@ impl StockWebSocketClient {
             }
         };
 
-        // Create subscription
-        let sub = marketdata_core::StockSubscription::new(ch, symbol).with_odd_lot(odd_lot);
-
         let runtime_guard = self.runtime.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -727,19 +821,49 @@ impl StockWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        let result = runtime.block_on(async {
-            state.inner.subscribe_channel(sub).await
-        });
+        for sym in target_symbols {
+            let sub = marketdata_core::StockSubscription::new(ch, &sym).with_odd_lot(odd_lot);
+            let result = runtime.block_on(async { state.inner.subscribe_channel(sub).await });
+            result.map_err(errors::to_py_err)?;
+        }
 
-        result.map_err(errors::to_py_err)
+        Ok(())
     }
 
-    /// Unsubscribe from a channel by subscription ID
+    /// Unsubscribe from a channel
+    ///
+    /// Accepts either `subscription_id` (single) or `ids` (batch list) to match the
+    /// old fugle-marketdata Node SDK shape. Exactly one must be provided.
     ///
     /// Args:
-    ///     subscription_id: The subscription ID returned from subscribe
-    #[pyo3(signature = (subscription_id))]
-    pub fn unsubscribe(&self, subscription_id: &str) -> PyResult<()> {
+    ///     subscription_id: The subscription ID returned from subscribe (single)
+    ///     ids: A list of subscription IDs to unsubscribe (batch)
+    #[pyo3(signature = (subscription_id=None, *, ids=None))]
+    pub fn unsubscribe(
+        &self,
+        subscription_id: Option<&str>,
+        ids: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        let target_ids: Vec<String> = match (subscription_id, ids) {
+            (Some(id), None) => vec![id.to_string()],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe(ids=[]) is empty - provide at least one id",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe() accepts either `subscription_id` or `ids`, not both",
+                ));
+            }
+            (None, None) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe() requires either `subscription_id` or `ids`",
+                ));
+            }
+        };
+
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -756,12 +880,12 @@ impl StockWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        let id = subscription_id.to_string();
-        let result = runtime.block_on(async {
-            state.inner.unsubscribe_by_id(&id).await
-        });
+        for id in target_ids {
+            let result = runtime.block_on(async { state.inner.unsubscribe_by_id(&id).await });
+            result.map_err(errors::to_py_err)?;
+        }
 
-        result.map_err(errors::to_py_err)
+        Ok(())
     }
 
     /// Get message iterator for consuming streaming data
@@ -793,9 +917,14 @@ impl StockWebSocketClient {
         Ok(crate::iterator::MessageIterator::new(receiver, timeout))
     }
 
-    /// Get list of active subscription keys
+    /// Get the locally cached list of active subscription keys.
+    ///
+    /// Note: this is the *local* cache maintained by core's SubscriptionManager.
+    /// To request the authoritative list from the server (matches the old
+    /// fugle-marketdata SDK), call `subscriptions()` instead — the server's
+    /// response will arrive via the registered `message` callback.
     #[pyo3(signature = ())]
-    pub fn subscriptions(&self) -> Vec<String> {
+    pub fn local_subscriptions(&self) -> Vec<String> {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
             Err(_) => return vec![],
@@ -805,6 +934,63 @@ impl StockWebSocketClient {
             .as_ref()
             .map(|s| s.inner.subscription_keys())
             .unwrap_or_default()
+    }
+
+    /// Ask the server for its current subscription list.
+    ///
+    /// Sends `{"event": "subscriptions"}` to the server. The server replies
+    /// asynchronously and the response is delivered via the `message` callback,
+    /// matching the old `fugle-marketdata` SDK's `subscriptions()` semantics.
+    ///
+    /// Raises:
+    ///     RuntimeError: If not connected
+    #[pyo3(signature = ())]
+    pub fn subscriptions(&self) -> PyResult<()> {
+        let state_guard = self.state.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let state = state_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first.")
+        })?;
+        let runtime_guard = self.runtime.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let runtime = runtime_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
+        })?;
+
+        let request = marketdata_core::WebSocketRequest::subscriptions();
+        runtime
+            .block_on(async { state.inner.send(request).await })
+            .map_err(errors::to_py_err)
+    }
+
+    /// Send a `ping` frame to the server (matches the old fugle-marketdata SDK).
+    ///
+    /// Args:
+    ///     state: Optional state string echoed back in the server's `pong` reply
+    ///
+    /// Raises:
+    ///     RuntimeError: If not connected
+    #[pyo3(signature = (state=None))]
+    pub fn ping(&self, state: Option<String>) -> PyResult<()> {
+        let state_guard = self.state.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let st = state_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first.")
+        })?;
+        let runtime_guard = self.runtime.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let runtime = runtime_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
+        })?;
+
+        let request = marketdata_core::WebSocketRequest::ping(state);
+        runtime
+            .block_on(async { st.inner.send(request).await })
+            .map_err(errors::to_py_err)
     }
 
     /// Connect to WebSocket server (async version)
@@ -826,6 +1012,8 @@ impl StockWebSocketClient {
         })?;
 
         let api_key = self.api_key.clone();
+        let reconnect_config = self.reconnect_config.to_core();
+        let health_check_config = self.health_check_config.to_core();
         let callbacks = Arc::clone(&self.callbacks);
         let state_arc = Arc::clone(&self.state);
         let has_message_callbacks = self.has_message_callbacks();
@@ -833,10 +1021,14 @@ impl StockWebSocketClient {
         let message_thread_handle = Arc::clone(&self.message_thread_handle);
 
         future_into_py(py, async move {
-            // Create WebSocket client
+            // Create WebSocket client with full config
             let auth = marketdata_core::AuthRequest::with_api_key(&api_key);
             let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
-            let ws_client = marketdata_core::WebSocketClient::new(config);
+            let ws_client = marketdata_core::WebSocketClient::with_full_config(
+                config,
+                reconnect_config,
+                health_check_config,
+            );
 
             // Get message receiver before connect
             let receiver = ws_client.messages();
@@ -1030,15 +1222,23 @@ impl StockWebSocketClient {
 #[pyclass(unsendable)]
 pub struct FutOptWebSocketClient {
     api_key: String,
+    reconnect_config: ReconnectConfig,
+    health_check_config: HealthCheckConfig,
     callbacks: Arc<CallbackRegistry>,
     state: Arc<Mutex<Option<WebSocketState>>>,
     runtime: Arc<Mutex<Option<tokio::runtime::Runtime>>>,
 }
 
 impl FutOptWebSocketClient {
-    fn new(api_key: String) -> Self {
+    fn new(
+        api_key: String,
+        reconnect_config: ReconnectConfig,
+        health_check_config: HealthCheckConfig,
+    ) -> Self {
         Self {
             api_key,
+            reconnect_config,
+            health_check_config,
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
@@ -1095,13 +1295,20 @@ impl FutOptWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err(e)
         })?;
 
-        // Create WebSocket client for FutOpt endpoint
+        // Create WebSocket client for FutOpt endpoint with full config
         let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
         let config = marketdata_core::ConnectionConfig::fugle_futopt(auth);
-        let ws_client = marketdata_core::WebSocketClient::new(config);
+        let ws_client = marketdata_core::WebSocketClient::with_full_config(
+            config,
+            self.reconnect_config.to_core(),
+            self.health_check_config.to_core(),
+        );
 
         // Get message receiver before connect
         let receiver = ws_client.messages();
+
+        // Get event channel reference before ws_client is moved into Arc
+        let events = Arc::clone(ws_client.state_events());
 
         // Clone callbacks for event dispatch
         let callbacks = Arc::clone(&self.callbacks);
@@ -1129,6 +1336,60 @@ impl FutOptWebSocketClient {
                     pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
                 })?;
                 *state_guard = Some(state);
+
+                // Spawn event listener thread for connection events
+                let callbacks_for_events = Arc::clone(&self.callbacks);
+                std::thread::Builder::new()
+                    .name("futopt_ws_events".to_string())
+                    .spawn(move || {
+                        loop {
+                            let event = {
+                                let rx = events.blocking_lock();
+                                rx.recv()
+                            };
+                            match event {
+                                Ok(event) => {
+                                    Python::attach(|py| {
+                                        use marketdata_core::websocket::ConnectionEvent;
+                                        match event {
+                                            ConnectionEvent::Reconnecting { attempt } => {
+                                                callbacks_for_events.invoke_reconnect(py, attempt);
+                                            }
+                                            ConnectionEvent::Error { message, code } => {
+                                                callbacks_for_events.invoke_error(py, &message, code);
+                                            }
+                                            ConnectionEvent::Disconnected { code, reason } => {
+                                                callbacks_for_events.invoke_disconnect(py, code, &reason);
+                                            }
+                                            ConnectionEvent::ReconnectFailed { attempts } => {
+                                                callbacks_for_events.invoke_error(
+                                                    py,
+                                                    &format!("Reconnection failed after {} attempts", attempts),
+                                                    -1,
+                                                );
+                                            }
+                                            ConnectionEvent::PongMissed => {
+                                                callbacks_for_events.invoke_error(
+                                                    py,
+                                                    "Health check: pong missed",
+                                                    -2,
+                                                );
+                                            }
+                                            ConnectionEvent::Authenticated => {
+                                                callbacks_for_events.invoke_authenticated(py);
+                                            }
+                                            ConnectionEvent::Unauthenticated { message } => {
+                                                callbacks_for_events.invoke_unauthenticated(py, &message);
+                                            }
+                                            _ => {} // Connecting, Connected handled elsewhere
+                                        }
+                                    });
+                                }
+                                Err(_) => break, // Channel closed
+                            }
+                        }
+                    })
+                    .ok();
 
                 // Invoke connect callbacks
                 callbacks.invoke_connect(py);
@@ -1233,13 +1494,36 @@ impl FutOptWebSocketClient {
     ///     ws.futopt.subscribe("trades", "TXFC4")
     ///     ws.futopt.subscribe("books", "MXFB4", after_hours=True)
     ///     ```
-    #[pyo3(signature = (channel, symbol, after_hours=false))]
+    #[pyo3(signature = (channel, symbol=None, *, symbols=None, after_hours=false))]
     pub fn subscribe(
         &self,
         channel: &str,
-        symbol: &str,
+        symbol: Option<&str>,
+        symbols: Option<Vec<String>>,
         after_hours: bool,
     ) -> PyResult<()> {
+        // Mirror the stock client: accept either single `symbol` or batch `symbols`,
+        // loop internally so the wire protocol stays one-message-per-symbol.
+        let target_symbols: Vec<String> = match (symbol, symbols) {
+            (Some(s), None) => vec![s.to_string()],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe(symbols=[]) is empty - provide at least one symbol",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe() accepts either `symbol` or `symbols`, not both",
+                ));
+            }
+            (None, None) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "subscribe() requires either `symbol` or `symbols`",
+                ));
+            }
+        };
+
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -1262,10 +1546,6 @@ impl FutOptWebSocketClient {
             }
         };
 
-        // Create FutOpt subscription with after_hours parameter
-        let _sub = marketdata_core::FutOptSubscription::new(ch, symbol)
-            .with_after_hours(after_hours);
-
         let runtime_guard = self.runtime.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -1274,30 +1554,58 @@ impl FutOptWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        // Build a custom WebSocketRequest for FutOpt with afterHours support
-        // We need to send raw JSON because SubscribeRequest doesn't support afterHours
-        let request = marketdata_core::WebSocketRequest::subscribe(
-            marketdata_core::SubscribeRequest {
-                channel: ch.as_str().to_string(),
-                symbol: Some(symbol.to_string()),
-            }
-        );
+        for sym in target_symbols {
+            // Construct via FutOptSubscription so the after_hours flag is honored
+            let _sub = marketdata_core::FutOptSubscription::new(ch, &sym)
+                .with_after_hours(after_hours);
 
-        // For now, send via the standard WebSocketRequest
-        // TODO: Add afterHours support to SubscribeRequest in marketdata-core
-        let result = runtime.block_on(async {
-            state.inner.send(request).await
-        });
+            // TODO: Add afterHours support to SubscribeRequest in marketdata-core.
+            // For now, send a plain SubscribeRequest (after_hours flag is constructed
+            // above for parity with the stock side and future wiring).
+            let request = marketdata_core::WebSocketRequest::subscribe(
+                marketdata_core::SubscribeRequest {
+                    channel: ch.as_str().to_string(),
+                    symbol: Some(sym.clone()),
+                },
+            );
 
-        result.map_err(errors::to_py_err)
+            let result = runtime.block_on(async { state.inner.send(request).await });
+            result.map_err(errors::to_py_err)?;
+        }
+
+        Ok(())
     }
 
-    /// Unsubscribe from a channel by subscription ID
+    /// Unsubscribe from a channel
     ///
-    /// Args:
-    ///     subscription_id: The subscription ID returned from subscribe
-    #[pyo3(signature = (subscription_id))]
-    pub fn unsubscribe(&self, subscription_id: &str) -> PyResult<()> {
+    /// Accepts either `subscription_id` (single) or `ids` (batch). Mirrors the
+    /// old fugle-marketdata Node SDK shape.
+    #[pyo3(signature = (subscription_id=None, *, ids=None))]
+    pub fn unsubscribe(
+        &self,
+        subscription_id: Option<&str>,
+        ids: Option<Vec<String>>,
+    ) -> PyResult<()> {
+        let target_ids: Vec<String> = match (subscription_id, ids) {
+            (Some(id), None) => vec![id.to_string()],
+            (None, Some(list)) if !list.is_empty() => list,
+            (None, Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe(ids=[]) is empty - provide at least one id",
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe() accepts either `subscription_id` or `ids`, not both",
+                ));
+            }
+            (None, None) => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "unsubscribe() requires either `subscription_id` or `ids`",
+                ));
+            }
+        };
+
         let state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
@@ -1314,12 +1622,12 @@ impl FutOptWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        let id = subscription_id.to_string();
-        let result = runtime.block_on(async {
-            state.inner.unsubscribe_by_id(&id).await
-        });
+        for id in target_ids {
+            let result = runtime.block_on(async { state.inner.unsubscribe_by_id(&id).await });
+            result.map_err(errors::to_py_err)?;
+        }
 
-        result.map_err(errors::to_py_err)
+        Ok(())
     }
 
     /// Get message iterator for consuming streaming data
@@ -1348,9 +1656,14 @@ impl FutOptWebSocketClient {
         Ok(crate::iterator::MessageIterator::new(receiver, timeout))
     }
 
-    /// Get list of active subscription keys
+    /// Get the locally cached list of active subscription keys.
+    ///
+    /// Note: this is the *local* cache maintained by core's SubscriptionManager.
+    /// To request the authoritative list from the server (matches the old
+    /// fugle-marketdata SDK), call `subscriptions()` instead — the server's
+    /// response will arrive via the registered `message` callback.
     #[pyo3(signature = ())]
-    pub fn subscriptions(&self) -> Vec<String> {
+    pub fn local_subscriptions(&self) -> Vec<String> {
         let state_guard = match self.state.lock() {
             Ok(g) => g,
             Err(_) => return vec![],
@@ -1360,6 +1673,63 @@ impl FutOptWebSocketClient {
             .as_ref()
             .map(|s| s.inner.subscription_keys())
             .unwrap_or_default()
+    }
+
+    /// Ask the server for its current subscription list.
+    ///
+    /// Sends `{"event": "subscriptions"}` to the server. The server replies
+    /// asynchronously and the response is delivered via the `message` callback,
+    /// matching the old `fugle-marketdata` SDK's `subscriptions()` semantics.
+    ///
+    /// Raises:
+    ///     RuntimeError: If not connected
+    #[pyo3(signature = ())]
+    pub fn subscriptions(&self) -> PyResult<()> {
+        let state_guard = self.state.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let state = state_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first.")
+        })?;
+        let runtime_guard = self.runtime.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let runtime = runtime_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
+        })?;
+
+        let request = marketdata_core::WebSocketRequest::subscriptions();
+        runtime
+            .block_on(async { state.inner.send(request).await })
+            .map_err(errors::to_py_err)
+    }
+
+    /// Send a `ping` frame to the server (matches the old fugle-marketdata SDK).
+    ///
+    /// Args:
+    ///     state: Optional state string echoed back in the server's `pong` reply
+    ///
+    /// Raises:
+    ///     RuntimeError: If not connected
+    #[pyo3(signature = (state=None))]
+    pub fn ping(&self, state: Option<String>) -> PyResult<()> {
+        let state_guard = self.state.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let st = state_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Not connected. Call connect() first.")
+        })?;
+        let runtime_guard = self.runtime.lock().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
+        })?;
+        let runtime = runtime_guard.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
+        })?;
+
+        let request = marketdata_core::WebSocketRequest::ping(state);
+        runtime
+            .block_on(async { st.inner.send(request).await })
+            .map_err(errors::to_py_err)
     }
 }
 
@@ -1438,21 +1808,33 @@ mod tests {
     #[test]
     fn test_websocket_client_creation_with_api_key() {
         // WebSocketClient::new requires Python bindings, test the internal child client instead
-        let client = StockWebSocketClient::new("test-key".to_string());
+        let client = StockWebSocketClient::new(
+            "test-key".to_string(),
+            ReconnectConfig::default(),
+            HealthCheckConfig::default(),
+        );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
     }
 
     #[test]
     fn test_stock_websocket_client_creation() {
-        let client = StockWebSocketClient::new("test-key".to_string());
+        let client = StockWebSocketClient::new(
+            "test-key".to_string(),
+            ReconnectConfig::default(),
+            HealthCheckConfig::default(),
+        );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
     }
 
     #[test]
     fn test_futopt_websocket_client_creation() {
-        let client = FutOptWebSocketClient::new("test-key".to_string());
+        let client = FutOptWebSocketClient::new(
+            "test-key".to_string(),
+            ReconnectConfig::default(),
+            HealthCheckConfig::default(),
+        );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
     }

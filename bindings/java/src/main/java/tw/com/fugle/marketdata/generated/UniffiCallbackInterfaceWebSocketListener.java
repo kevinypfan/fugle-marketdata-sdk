@@ -21,6 +21,8 @@ public class UniffiCallbackInterfaceWebSocketListener {
             onDisconnected.INSTANCE,
             onMessage.INSTANCE,
             onError.INSTANCE,
+            onReconnecting.INSTANCE,
+            onReconnectFailed.INSTANCE,
             UniffiFree.INSTANCE
         );
     }
@@ -93,6 +95,42 @@ public class UniffiCallbackInterfaceWebSocketListener {
             Supplier<Void> makeCall = () -> {
                 uniffiObj.onError(
                     FfiConverterString.INSTANCE.lift(errorMessage)
+                );
+                return null;
+            };
+            Consumer<Void> writeReturn = (nothing) -> {};
+            UniffiHelpers.uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn);
+        }
+    }
+
+    public static class onReconnecting implements UniffiCallbackInterfaceWebSocketListenerMethod4 {
+        public static final onReconnecting INSTANCE = new onReconnecting();
+        private onReconnecting() {}
+
+        @Override
+        public void callback(long uniffiHandle,Integer attempt,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
+            var uniffiObj = FfiConverterTypeWebSocketListener.INSTANCE.handleMap.get(uniffiHandle);
+            Supplier<Void> makeCall = () -> {
+                uniffiObj.onReconnecting(
+                    FfiConverterInteger.INSTANCE.lift(attempt)
+                );
+                return null;
+            };
+            Consumer<Void> writeReturn = (nothing) -> {};
+            UniffiHelpers.uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn);
+        }
+    }
+
+    public static class onReconnectFailed implements UniffiCallbackInterfaceWebSocketListenerMethod5 {
+        public static final onReconnectFailed INSTANCE = new onReconnectFailed();
+        private onReconnectFailed() {}
+
+        @Override
+        public void callback(long uniffiHandle,Integer attempts,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
+            var uniffiObj = FfiConverterTypeWebSocketListener.INSTANCE.handleMap.get(uniffiHandle);
+            Supplier<Void> makeCall = () -> {
+                uniffiObj.onReconnectFailed(
+                    FfiConverterInteger.INSTANCE.lift(attempts)
                 );
                 return null;
             };

@@ -116,3 +116,19 @@ coverage/
 *.lcov
 test-results/
 
+# --------------------------------------------
+# Local-only references and tooling state
+# --------------------------------------------
+# Old fugle-marketdata SDK clones used as local reference for compatibility work.
+# Keep these checked out locally but never commit them into this repo.
+fugle-marketdata-node/
+fugle-marketdata-python/
+
+# Serena MCP cache
+.serena/
+
+# Ad-hoc developer scratch files (not part of the test suite)
+js/test_dummy.js
+py/test_1.py
+py/ws_stream.py
+

@@ -71,6 +71,68 @@ pub trait WebSocketListener: Send + Sync {
 
     /// Called when an error occurs
     fn on_error(&self, error_message: String);
+
+    /// Called when a reconnection attempt starts
+    fn on_reconnecting(&self, attempt: u32);
+
+    /// Called when all reconnection attempts are exhausted
+    fn on_reconnect_failed(&self, attempts: u32);
+}
+
+/// Reconnection configuration record for FFI
+///
+/// All fields are optional — zero/false values mean "use default".
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ReconnectConfigRecord {
+    /// Maximum reconnection attempts (default: 5, min: 1)
+    pub max_attempts: u32,
+    /// Initial reconnection delay in milliseconds (default: 1000, min: 100)
+    pub initial_delay_ms: u64,
+    /// Maximum reconnection delay in milliseconds (default: 60000)
+    pub max_delay_ms: u64,
+}
+
+impl ReconnectConfigRecord {
+    fn to_core(&self) -> marketdata_core::ReconnectionConfig {
+        let mut cfg = marketdata_core::ReconnectionConfig::default();
+        if self.max_attempts > 0 {
+            cfg.max_attempts = self.max_attempts;
+        }
+        if self.initial_delay_ms > 0 {
+            cfg.initial_delay = std::time::Duration::from_millis(self.initial_delay_ms);
+        }
+        if self.max_delay_ms > 0 {
+            cfg.max_delay = std::time::Duration::from_millis(self.max_delay_ms);
+        }
+        cfg
+    }
+}
+
+/// Health check configuration record for FFI
+///
+/// All fields are optional — zero/false values mean "use default".
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct HealthCheckConfigRecord {
+    /// Whether health check is enabled (default: false)
+    pub enabled: bool,
+    /// Interval between ping messages in milliseconds (default: 30000, min: 5000)
+    pub interval_ms: u64,
+    /// Maximum missed pongs before disconnect (default: 2, min: 1)
+    pub max_missed_pongs: u64,
+}
+
+impl HealthCheckConfigRecord {
+    fn to_core(&self) -> marketdata_core::HealthCheckConfig {
+        let mut cfg = marketdata_core::HealthCheckConfig::default();
+        cfg.enabled = self.enabled;
+        if self.interval_ms > 0 {
+            cfg.interval = std::time::Duration::from_millis(self.interval_ms);
+        }
+        if self.max_missed_pongs > 0 {
+            cfg.max_missed_pongs = self.max_missed_pongs;
+        }
+        cfg
+    }
 }
 
 /// Endpoint type for WebSocket connection
@@ -94,6 +156,8 @@ pub struct WebSocketClient {
     endpoint: WebSocketEndpoint,
     connected: Arc<AtomicBool>,
     shutdown: Arc<AtomicBool>,
+    reconnect_config: Option<marketdata_core::ReconnectionConfig>,
+    health_check_config: Option<marketdata_core::HealthCheckConfig>,
 }
 
 impl WebSocketClient {
@@ -102,6 +166,8 @@ impl WebSocketClient {
         api_key: String,
         listener: Arc<dyn WebSocketListener>,
         endpoint: WebSocketEndpoint,
+        reconnect_config: Option<marketdata_core::ReconnectionConfig>,
+        health_check_config: Option<marketdata_core::HealthCheckConfig>,
     ) -> Arc<Self> {
         Arc::new(Self {
             inner: Arc::new(Mutex::new(None)),
@@ -110,6 +176,8 @@ impl WebSocketClient {
             endpoint,
             connected: Arc::new(AtomicBool::new(false)),
             shutdown: Arc::new(AtomicBool::new(false)),
+            reconnect_config,
+            health_check_config,
         })
     }
 }
@@ -123,7 +191,7 @@ impl WebSocketClient {
     /// * `listener` - Callback interface for receiving WebSocket events
     #[uniffi::constructor]
     pub fn new(api_key: String, listener: Arc<dyn WebSocketListener>) -> Arc<Self> {
-        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock)
+        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock, None, None)
     }
 
     /// Create a new WebSocket client for a specific endpoint
@@ -138,7 +206,32 @@ impl WebSocketClient {
         listener: Arc<dyn WebSocketListener>,
         endpoint: WebSocketEndpoint,
     ) -> Arc<Self> {
-        Self::new_internal(api_key, listener, endpoint)
+        Self::new_internal(api_key, listener, endpoint, None, None)
+    }
+
+    /// Create a new WebSocket client with full configuration
+    ///
+    /// # Arguments
+    /// * `api_key` - Fugle API key for authentication
+    /// * `listener` - Callback interface for receiving WebSocket events
+    /// * `endpoint` - The market data endpoint (Stock or FutOpt)
+    /// * `reconnect_config` - Optional reconnection configuration
+    /// * `health_check_config` - Optional health check configuration
+    #[uniffi::constructor]
+    pub fn new_with_config(
+        api_key: String,
+        listener: Arc<dyn WebSocketListener>,
+        endpoint: WebSocketEndpoint,
+        reconnect_config: Option<ReconnectConfigRecord>,
+        health_check_config: Option<HealthCheckConfigRecord>,
+    ) -> Arc<Self> {
+        Self::new_internal(
+            api_key,
+            listener,
+            endpoint,
+            reconnect_config.map(|c| c.to_core()),
+            health_check_config.map(|c| c.to_core()),
+        )
     }
 
     /// Check if the client is currently connected
@@ -167,8 +260,24 @@ impl WebSocketClient {
             WebSocketEndpoint::FutOpt => ConnectionConfig::fugle_futopt(auth),
         };
 
-        // Create core WebSocket client
-        let core_ws = CoreWebSocketClient::new(config);
+        // Create core WebSocket client with optional reconnection/health-check config
+        let core_ws = if let (Some(rc), Some(hc)) = (&self.reconnect_config, &self.health_check_config) {
+            CoreWebSocketClient::with_full_config(config, rc.clone(), hc.clone())
+        } else if let Some(rc) = &self.reconnect_config {
+            CoreWebSocketClient::with_full_config(
+                config,
+                rc.clone(),
+                marketdata_core::HealthCheckConfig::default(),
+            )
+        } else if let Some(hc) = &self.health_check_config {
+            CoreWebSocketClient::with_full_config(
+                config,
+                marketdata_core::ReconnectionConfig::default(),
+                hc.clone(),
+            )
+        } else {
+            CoreWebSocketClient::new(config)
+        };
 
         // Connect to server
         core_ws.connect().await?;
@@ -177,6 +286,9 @@ impl WebSocketClient {
         // The core WebSocket client exposes messages via client.messages() method
         // which returns Arc<MessageReceiver>
         let receiver: Arc<MessageReceiver> = core_ws.messages();
+
+        // Capture state events receiver BEFORE storing core_ws (move would lose access)
+        let events = Arc::clone(core_ws.state_events());
 
         // Store client in inner
         {
@@ -200,6 +312,51 @@ impl WebSocketClient {
         tokio::spawn(async move {
             run_message_loop(receiver, listener, shutdown, connected).await;
         });
+
+        // Spawn thread to monitor state events and forward to listener
+        let event_listener = Arc::clone(&self.listener);
+        let event_connected = Arc::clone(&self.connected);
+        let event_shutdown = Arc::clone(&self.shutdown);
+        std::thread::Builder::new()
+            .name("ws_event_monitor".to_string())
+            .spawn(move || {
+                loop {
+                    if event_shutdown.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let event = {
+                        let rx = events.blocking_lock();
+                        rx.recv()
+                    };
+                    match event {
+                        Ok(event) => {
+                            use marketdata_core::websocket::ConnectionEvent;
+                            match event {
+                                ConnectionEvent::Reconnecting { attempt } => {
+                                    event_listener.on_reconnecting(attempt);
+                                }
+                                ConnectionEvent::ReconnectFailed { attempts } => {
+                                    event_listener.on_reconnect_failed(attempts);
+                                    event_connected.store(false, Ordering::SeqCst);
+                                }
+                                ConnectionEvent::Error { message, .. } => {
+                                    event_listener.on_error(message);
+                                }
+                                ConnectionEvent::Disconnected { .. } => {
+                                    event_listener.on_disconnected();
+                                    event_connected.store(false, Ordering::SeqCst);
+                                }
+                                ConnectionEvent::Authenticated => {
+                                    event_connected.store(true, Ordering::SeqCst);
+                                }
+                                _ => {}
+                            }
+                        }
+                        Err(_) => break, // Channel closed
+                    }
+                }
+            })
+            .ok();
 
         Ok(())
     }
@@ -379,6 +536,28 @@ pub fn new_websocket_client_with_endpoint(
     WebSocketClient::new_with_endpoint(api_key, listener, endpoint)
 }
 
+/// Create a new WebSocket client with full configuration
+///
+/// # Arguments
+/// * `api_key` - Fugle API key for authentication
+/// * `listener` - Callback interface for receiving WebSocket events
+/// * `endpoint` - The market data endpoint (Stock or FutOpt)
+/// * `reconnect_config` - Optional reconnection configuration
+/// * `health_check_config` - Optional health check configuration
+///
+/// # Returns
+/// A WebSocketClient instance wrapped in Arc for thread-safe access
+#[uniffi::export]
+pub fn new_websocket_client_with_config(
+    api_key: String,
+    listener: Arc<dyn WebSocketListener>,
+    endpoint: WebSocketEndpoint,
+    reconnect_config: Option<ReconnectConfigRecord>,
+    health_check_config: Option<HealthCheckConfigRecord>,
+) -> Arc<WebSocketClient> {
+    WebSocketClient::new_with_config(api_key, listener, endpoint, reconnect_config, health_check_config)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +569,8 @@ mod tests {
         disconnected_count: AtomicUsize,
         message_count: AtomicUsize,
         error_count: AtomicUsize,
+        reconnecting_count: AtomicUsize,
+        reconnect_failed_count: AtomicUsize,
         last_error: Mutex<Option<String>>,
     }
 
@@ -400,6 +581,8 @@ mod tests {
                 disconnected_count: AtomicUsize::new(0),
                 message_count: AtomicUsize::new(0),
                 error_count: AtomicUsize::new(0),
+                reconnecting_count: AtomicUsize::new(0),
+                reconnect_failed_count: AtomicUsize::new(0),
                 last_error: Mutex::new(None),
             }
         }
@@ -423,6 +606,14 @@ mod tests {
             if let Ok(mut guard) = self.last_error.lock() {
                 *guard = Some(error_message);
             }
+        }
+
+        fn on_reconnecting(&self, _attempt: u32) {
+            self.reconnecting_count.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn on_reconnect_failed(&self, _attempts: u32) {
+            self.reconnect_failed_count.fetch_add(1, Ordering::SeqCst);
         }
     }
 

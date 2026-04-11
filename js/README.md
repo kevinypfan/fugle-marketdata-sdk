@@ -130,7 +130,7 @@ const ws = new WebSocketClient({
   apiKey: 'your-key',
   healthCheck: {
     enabled: true,
-    intervalMs: 15000,
+    pingInterval: 15000,
     maxMissedPongs: 3
   }
 });
@@ -138,7 +138,7 @@ const ws = new WebSocketClient({
 
 **HealthCheckOptions:**
 - `enabled` (boolean): Whether health check is enabled (default: false)
-- `intervalMs` (number): Ping interval in milliseconds (default: 30000, min: 5000)
+- `pingInterval` (number): Ping interval in milliseconds (default: 30000, min: 5000)
 - `maxMissedPongs` (number): Maximum missed pongs before considering connection stale (default: 2, min: 1)
 
 ### Combined Configuration
@@ -149,7 +149,7 @@ const { WebSocketClient } = require('@fubon/marketdata-js');
 const ws = new WebSocketClient({
   apiKey: 'your-key',
   reconnect: { maxAttempts: 10, initialDelayMs: 2000 },
-  healthCheck: { enabled: true, intervalMs: 15000 }
+  healthCheck: { enabled: true, pingInterval: 15000 }
 });
 ```
 

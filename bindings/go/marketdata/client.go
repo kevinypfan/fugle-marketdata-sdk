@@ -120,7 +120,25 @@ func NewFugleWebSocketClient(listener WebSocketListener, opts ...Option) (*Strea
 	var client *WebSocketClient
 
 	if cfg.apiKey != "" {
-		if cfg.endpoint == WebSocketEndpointStock {
+		if cfg.reconnect != nil || cfg.healthCheck != nil {
+			var reconnectRecord *ReconnectConfigRecord
+			if cfg.reconnect != nil {
+				reconnectRecord = &ReconnectConfigRecord{
+					MaxAttempts:    cfg.reconnect.MaxAttempts,
+					InitialDelayMs: cfg.reconnect.InitialDelayMs,
+					MaxDelayMs:     cfg.reconnect.MaxDelayMs,
+				}
+			}
+			var healthCheckRecord *HealthCheckConfigRecord
+			if cfg.healthCheck != nil {
+				healthCheckRecord = &HealthCheckConfigRecord{
+					Enabled:        cfg.healthCheck.Enabled,
+					IntervalMs:     cfg.healthCheck.IntervalMs,
+					MaxMissedPongs: cfg.healthCheck.MaxMissedPongs,
+				}
+			}
+			client = WebSocketClientNewWithConfig(cfg.apiKey, channelListener, cfg.endpoint, reconnectRecord, healthCheckRecord)
+		} else if cfg.endpoint == WebSocketEndpointStock {
 			client = NewWebSocketClient(cfg.apiKey, channelListener)
 		} else {
 			client = WebSocketClientNewWithEndpoint(cfg.apiKey, channelListener, cfg.endpoint)
@@ -131,10 +149,6 @@ func NewFugleWebSocketClient(listener WebSocketListener, opts ...Option) (*Strea
 		return nil, errors.New("bearer token and SDK token authentication not yet supported for WebSocket client")
 	}
 
-	// TODO: Wire reconnect and healthCheck configs to core WebSocketClient
-	// Currently stored but not propagated (same pattern as other languages)
-	_ = cfg.reconnect
-	_ = cfg.healthCheck
 	_ = cfg.baseUrl
 
 	return &StreamingClient{

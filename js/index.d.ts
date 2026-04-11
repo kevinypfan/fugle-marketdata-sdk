@@ -451,27 +451,50 @@ export type StockChannel = 'trades' | 'books' | 'candles' | 'aggregates' | 'indi
 export type FutOptChannel = 'trades' | 'books' | 'candles' | 'aggregates';
 
 /**
- * Subscribe options for stock WebSocket
+ * Subscribe options for stock WebSocket.
+ *
+ * Provide either `symbol` (single) or `symbols` (batch list) — exactly one is
+ * required, mirroring the old `@fugle/marketdata` SDK shape.
  */
 export interface StockSubscribeOptions {
   /** Channel to subscribe to */
   channel: StockChannel;
   /** Stock symbol */
-  symbol: string;
+  symbol?: string;
+  /** Multiple stock symbols (batch subscribe) */
+  symbols?: string[];
   /** Include intraday odd lot data */
   intradayOddLot?: boolean;
 }
 
 /**
- * Subscribe options for FutOpt WebSocket
+ * Subscribe options for FutOpt WebSocket.
+ *
+ * Provide either `symbol` (single) or `symbols` (batch list) — exactly one is
+ * required.
  */
 export interface FutOptSubscribeOptions {
   /** Channel to subscribe to */
   channel: FutOptChannel;
   /** Contract symbol */
-  symbol: string;
+  symbol?: string;
+  /** Multiple contract symbols (batch subscribe) */
+  symbols?: string[];
   /** Include after-hours data */
   afterHours?: boolean;
+}
+
+/**
+ * Unsubscribe options for stock and FutOpt WebSocket clients.
+ *
+ * Provide either `id` (single) or `ids` (batch list) — exactly one is required.
+ * Mirrors the old `@fugle/marketdata` Node SDK shape.
+ */
+export interface UnsubscribeOptions {
+  /** Subscription ID returned from a `subscribed` event */
+  id?: string;
+  /** Multiple subscription IDs (batch unsubscribe) */
+  ids?: string[];
 }
 
 /**
@@ -488,56 +511,14 @@ export interface WebSocketEventMap {
   reconnect: (info: string) => void;
   /** Error occurred */
   error: (error: string) => void;
+  /** Server accepted authentication (parallels old @fugle/marketdata `authenticated` event) */
+  authenticated: (info: string) => void;
+  /** Server rejected authentication (parallels old @fugle/marketdata `unauthenticated` event) */
+  unauthenticated: (message: string) => void;
 }
 
 /** Event names for WebSocket */
 export type WebSocketEvent = keyof WebSocketEventMap;
-
-// ============================================================================
-// Configuration Option Types (v0.3.0)
-// ============================================================================
-
-/** Reconnection options for WebSocket clients */
-export interface ReconnectOptions {
-  /** Maximum reconnection attempts (default: 5, min: 1) */
-  maxAttempts?: number;
-  /** Initial reconnection delay in milliseconds (default: 1000, min: 100) */
-  initialDelayMs?: number;
-  /** Maximum reconnection delay in milliseconds (default: 60000) */
-  maxDelayMs?: number;
-}
-
-/** Health check options for WebSocket connections */
-export interface HealthCheckOptions {
-  /** Whether health check is enabled (default: false) */
-  enabled?: boolean;
-  /** Interval between ping messages in milliseconds (default: 30000, min: 5000) */
-  intervalMs?: number;
-  /** Maximum missed pongs before disconnect (default: 2, min: 1) */
-  maxMissedPongs?: number;
-}
-
-/**
- * REST client options with exactly-one-auth enforcement
- *
- * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
- * TypeScript enforces this at compile time via union types.
- */
-export type RestClientOptions =
-  | { apiKey: string; bearerToken?: never; sdkToken?: never; baseUrl?: string }
-  | { apiKey?: never; bearerToken: string; sdkToken?: never; baseUrl?: string }
-  | { apiKey?: never; bearerToken?: never; sdkToken: string; baseUrl?: string };
-
-/**
- * WebSocket client options with exactly-one-auth enforcement
- *
- * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
- * TypeScript enforces this at compile time via union types.
- */
-export type WebSocketClientOptions =
-  | { apiKey: string; bearerToken?: never; sdkToken?: never; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions }
-  | { apiKey?: never; bearerToken: string; sdkToken?: never; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions }
-  | { apiKey?: never; bearerToken?: never; sdkToken: string; baseUrl?: string; reconnect?: ReconnectOptions; healthCheck?: HealthCheckOptions };
 
 // ============================================================================
 // REST Response Types - Stock Historical
@@ -1236,6 +1217,16 @@ export declare class FutOptIntradayClient {
    */
   volumes(symbol: string): Promise<VolumesResponse>
   /**
+   * Get batch ticker list for a FutOpt contract type
+   *
+   * @param type - Contract type ("FUTURE" or "OPTION")
+   * @param exchange - Optional exchange filter (e.g., "TAIFEX")
+   * @param afterHours - Query after-hours session data
+   * @param contractType - Optional contract type code: "I" / "R" / "B" / "C" / "S" / "E"
+   * @returns Promise resolving to an array of FutOpt ticker info objects
+   */
+  tickers(type: FutOptType, exchange?: string, afterHours?: boolean, contractType?: ContractType): Promise<TickerResponse[]>
+  /**
    * Get product list for futures/options
    *
    * @param typ - Type: "FUTURE" or "OPTION" (required)
@@ -1290,11 +1281,28 @@ export declare class FutOptWebSocketClient {
   /**
    * Unsubscribe from a channel by subscription ID
    *
-   * @param subscriptionId - The subscription ID returned from subscribed event
+   * Accepts either a subscription id string (legacy form) or an
+   * `UnsubscribeOptions` object with `{ id }` or `{ ids: [...] }`.
    */
-  unsubscribe(subscriptionId: string): void
+  unsubscribe(options: string | UnsubscribeOptions): void
   /** Disconnect from the WebSocket server */
   disconnect(): void
+  /**
+   * Send a `ping` frame to the server.
+   *
+   * Mirrors the old `@fugle/marketdata` Node SDK. The pong reply is delivered
+   * via the `message` callback (or processed internally by the health check).
+   *
+   * @param state - Optional state string echoed back in the server's pong reply
+   */
+  ping(state?: string | undefined | null): void
+  /**
+   * Ask the server for its current subscription list.
+   *
+   * Sends `{ event: "subscriptions" }`. The reply arrives via the `message`
+   * callback, matching the old `@fugle/marketdata` Node SDK semantics.
+   */
+  subscriptions(): void
   /** Check if connected */
   get isConnected(): boolean
   /**
@@ -1314,8 +1322,8 @@ export declare class FutOptWebSocketClient {
  * ```javascript
  * const { RestClient } = require('@fubon/marketdata-js');
  *
- * // Create client with options object
- * const client = new RestClient({ apiKey: 'your-api-key' });
+ * // Create client with API key
+ * const client = new RestClient('your-api-key');
  *
  * // Access stock market data
  * const quote = client.stock.intraday.quote('2330');
@@ -1334,7 +1342,9 @@ export declare class RestClient {
    * @throws {Error} If validation fails (zero or multiple auth methods)
    *
    * @example
-   * ```typescript
+   * ```javascript
+   * const { RestClient } = require('@fugle/marketdata');
+   *
    * // API key auth
    * const client = new RestClient({ apiKey: 'your-key' });
    *
@@ -1428,14 +1438,12 @@ export declare class StockIntradayClient {
    *
    * @example
    * ```javascript
-   * const client = new RestClient('your-api-key');
+   * const client = new RestClient({ apiKey: 'your-api-key' });
    * const quote = await client.stock.intraday.quote('2330');
-   * console.log(quote.lastPrice);  // 580.0
-   * console.log(quote.symbol);     // "2330"
-   * console.log(quote.bids);       // [{price: 579.0, size: 100}, ...]
+   * const oddLotQuote = await client.stock.intraday.quote('2330', true);
    * ```
    */
-  quote(symbol: string): Promise<QuoteResponse>
+  quote(symbol: string, oddLot?: boolean | undefined | null): Promise<QuoteResponse>
   /**
    * Get intraday ticker for a stock symbol
    *
@@ -1465,6 +1473,17 @@ export declare class StockIntradayClient {
    * @returns Promise resolving to Volumes response with volume at each price level
    */
   volumes(symbol: string): Promise<VolumesResponse>
+  /**
+   * Get batch ticker list for a security type
+   *
+   * @param type - Security type ("EQUITY", "INDEX", "ETF", ...)
+   * @param exchange - Optional exchange filter (e.g., "TWSE", "TPEx")
+   * @param market - Optional market filter (e.g., "TSE", "OTC")
+   * @param industry - Optional industry code filter
+   * @param isNormal - Filter to normal-status tickers only
+   * @returns Promise resolving to an array of ticker info objects
+   */
+  tickers(type: string, exchange?: string | undefined | null, market?: string | undefined | null, industry?: string | undefined | null, isNormal?: boolean | undefined | null): Promise<TickerResponse[]>
 }
 
 /** Stock snapshot data client */
@@ -1613,11 +1632,28 @@ export declare class StockWebSocketClient {
   /**
    * Unsubscribe from a channel by subscription ID
    *
-   * @param subscriptionId - The subscription ID returned from subscribed event
+   * Accepts either a subscription id string (legacy form) or an
+   * `UnsubscribeOptions` object with `{ id }` or `{ ids: [...] }`.
    */
-  unsubscribe(subscriptionId: string): void
+  unsubscribe(options: string | UnsubscribeOptions): void
   /** Disconnect from the WebSocket server */
   disconnect(): void
+  /**
+   * Send a `ping` frame to the server.
+   *
+   * Mirrors the old `@fugle/marketdata` Node SDK. The pong reply is delivered
+   * via the `message` callback (or processed internally by the health check).
+   *
+   * @param state - Optional state string echoed back in the server's pong reply
+   */
+  ping(state?: string | undefined | null): void
+  /**
+   * Ask the server for its current subscription list.
+   *
+   * Sends `{ event: "subscriptions" }`. The reply arrives via the `message`
+   * callback, matching the old `@fugle/marketdata` Node SDK semantics.
+   */
+  subscriptions(): void
   /** Check if connected */
   get isConnected(): boolean
   /**
@@ -1637,8 +1673,8 @@ export declare class StockWebSocketClient {
  * ```javascript
  * const { WebSocketClient } = require('@fubon/marketdata-js');
  *
- * // Create client with options
- * const ws = new WebSocketClient({ apiKey: 'your-api-key' });
+ * // Create client with API key
+ * const ws = new WebSocketClient('your-api-key');
  *
  * // Register event handlers for stock data
  * ws.stock.on('message', (data) => console.log(JSON.parse(data)));
@@ -1658,7 +1694,9 @@ export declare class WebSocketClient {
    * @throws {Error} If validation fails (zero or multiple auth methods, invalid config values)
    *
    * @example
-   * ```typescript
+   * ```javascript
+   * const { WebSocketClient } = require('@fugle/marketdata');
+   *
    * // Simple usage with defaults
    * const ws = new WebSocketClient({ apiKey: 'your-key' });
    *
@@ -1671,7 +1709,7 @@ export declare class WebSocketClient {
    * // Enable health check
    * const ws = new WebSocketClient({
    *   apiKey: 'your-key',
-   *   healthCheck: { enabled: true, intervalMs: 20000 }
+   *   healthCheck: { enabled: true, pingInterval: 20000 }
    * });
    * ```
    */
@@ -1680,4 +1718,78 @@ export declare class WebSocketClient {
   get stock(): StockWebSocketClient
   /** Get the FutOpt WebSocket client for real-time futures/options data */
   get futopt(): FutOptWebSocketClient
+}
+
+/**
+ * Health check options for WebSocket connections
+ *
+ * All fields are optional - defaults are applied when not specified:
+ * - enabled: false
+ * - pingInterval: 30000
+ * - maxMissedPongs: 2
+ *
+ * `pingInterval` is named to match the official `@fugle/marketdata` SDK.
+ */
+export interface HealthCheckOptions {
+  /** Whether health check is enabled (default: false) */
+  enabled?: boolean
+  /** Interval between ping messages in milliseconds (default: 30000, min: 5000) */
+  pingInterval?: number
+  /** Maximum missed pongs before disconnect (default: 2, min: 1) */
+  maxMissedPongs?: number
+}
+
+/**
+ * Reconnection options for WebSocket clients
+ *
+ * All fields are optional - defaults are applied when not specified:
+ * - maxAttempts: 5
+ * - initialDelayMs: 1000
+ * - maxDelayMs: 60000
+ */
+export interface ReconnectOptions {
+  /** Maximum reconnection attempts (default: 5, min: 1) */
+  maxAttempts?: number
+  /** Initial reconnection delay in milliseconds (default: 1000, min: 100) */
+  initialDelayMs?: number
+  /** Maximum reconnection delay in milliseconds (default: 60000) */
+  maxDelayMs?: number
+}
+
+/**
+ * REST client options
+ *
+ * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+ * baseUrl is optional for custom endpoint override.
+ */
+export interface RestClientOptions {
+  /** API key for authentication */
+  apiKey?: string
+  /** Bearer token for authentication */
+  bearerToken?: string
+  /** SDK token for authentication */
+  sdkToken?: string
+  /** Override base URL (optional) */
+  baseUrl?: string
+}
+
+/**
+ * WebSocket client options
+ *
+ * Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
+ * reconnect and healthCheck are optional configuration objects.
+ */
+export interface WebSocketClientOptions {
+  /** API key for authentication */
+  apiKey?: string
+  /** Bearer token for authentication */
+  bearerToken?: string
+  /** SDK token for authentication */
+  sdkToken?: string
+  /** Override base URL (optional) */
+  baseUrl?: string
+  /** Reconnection configuration (optional) */
+  reconnect?: ReconnectOptions
+  /** Health check configuration (optional) */
+  healthCheck?: HealthCheckOptions
 }

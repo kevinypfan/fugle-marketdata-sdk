@@ -47,6 +47,18 @@ namespace FugleMarketData
         /// </summary>
         /// <param name="errorMessage">Error description</param>
         void OnError(string errorMessage);
+
+        /// <summary>
+        /// Called when a reconnection attempt starts.
+        /// </summary>
+        /// <param name="attempt">Current attempt number (1-based)</param>
+        void OnReconnecting(uint attempt);
+
+        /// <summary>
+        /// Called when all reconnection attempts are exhausted.
+        /// </summary>
+        /// <param name="attempts">Total number of attempts made</param>
+        void OnReconnectFailed(uint attempts);
     }
 
     /// <summary>
@@ -65,6 +77,8 @@ namespace FugleMarketData
         public void OnDisconnected() => _listener.OnDisconnected();
         public void OnMessage(uniffi.marketdata_uniffi.StreamMessage message) => _listener.OnMessage(message);
         public void OnError(string errorMessage) => _listener.OnError(errorMessage);
+        public void OnReconnecting(uint attempt) => _listener.OnReconnecting(attempt);
+        public void OnReconnectFailed(uint attempts) => _listener.OnReconnectFailed(attempts);
     }
 
     /// <summary>
@@ -185,10 +199,33 @@ namespace FugleMarketData
             {
                 if (!string.IsNullOrEmpty(options.ApiKey))
                 {
-                    _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithEndpoint(
+                    // Convert config options to UniFFI record types
+                    uniffi.marketdata_uniffi.ReconnectConfigRecord? reconnectRecord = null;
+                    if (options.Reconnect != null)
+                    {
+                        reconnectRecord = new uniffi.marketdata_uniffi.ReconnectConfigRecord(
+                            maxAttempts: options.Reconnect.MaxAttempts ?? 0,
+                            initialDelayMs: options.Reconnect.InitialDelayMs ?? 0,
+                            maxDelayMs: options.Reconnect.MaxDelayMs ?? 0
+                        );
+                    }
+
+                    uniffi.marketdata_uniffi.HealthCheckConfigRecord? healthCheckRecord = null;
+                    if (options.HealthCheck != null)
+                    {
+                        healthCheckRecord = new uniffi.marketdata_uniffi.HealthCheckConfigRecord(
+                            enabled: options.HealthCheck.Enabled ?? false,
+                            intervalMs: options.HealthCheck.IntervalMs ?? 0,
+                            maxMissedPongs: options.HealthCheck.MaxMissedPongs ?? 0
+                        );
+                    }
+
+                    _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithConfig(
                         options.ApiKey,
                         adapter,
-                        uniffiEndpoint
+                        uniffiEndpoint,
+                        reconnectRecord,
+                        healthCheckRecord
                     );
                 }
                 else
@@ -201,8 +238,6 @@ namespace FugleMarketData
                     );
                 }
 
-                // Store config options for future propagation to ConnectionConfig
-                // TODO: Apply these when ConnectionConfig is exposed in WebSocketClient
                 _reconnectOptions = options.Reconnect;
                 _healthCheckOptions = options.HealthCheck;
 

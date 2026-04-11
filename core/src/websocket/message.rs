@@ -124,10 +124,9 @@ pub(crate) async fn dispatch_messages(
                         // Check for pong message (handled by health check)
                         if ws_msg.is_pong() {
                             health_check.on_pong_received();
-                            continue;
                         }
 
-                        // Send to message channel
+                        // Send to message channel (including pong messages)
                         if message_tx.send(ws_msg).is_err() {
                             // Channel closed (receiver dropped), exit gracefully
                             return None;
@@ -147,7 +146,6 @@ pub(crate) async fn dispatch_messages(
                     Ok(ws_msg) => {
                         if ws_msg.is_pong() {
                             health_check.on_pong_received();
-                            continue;
                         }
 
                         if message_tx.send(ws_msg).is_err() {

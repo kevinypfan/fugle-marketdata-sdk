@@ -13,6 +13,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::mpsc as tokio_mpsc;
 
 /// Default health check enabled state - aligns with official SDKs (CON-01)
 pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = false;
@@ -208,7 +209,7 @@ impl HealthCheck {
     /// Join handle for the monitoring thread
     pub fn spawn_check_task(
         &self,
-        ping_sender: mpsc::Sender<()>,
+        ping_sender: tokio_mpsc::Sender<()>,
         event_tx: mpsc::Sender<ConnectionEvent>,
     ) -> JoinHandle<()> {
         let config = self.config.clone();
@@ -232,7 +233,7 @@ impl HealthCheck {
                     .as_secs();
 
                 // Send ping signal
-                if ping_sender.send(()).is_err() {
+                if ping_sender.blocking_send(()).is_err() {
                     // Channel closed, exit thread
                     break;
                 }
