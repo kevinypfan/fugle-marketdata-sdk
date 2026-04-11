@@ -166,6 +166,7 @@ impl Default for EventCallbacks {
 #[napi]
 pub struct WebSocketClient {
     api_key: String,
+    base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
 }
@@ -265,6 +266,7 @@ impl WebSocketClient {
 
         Ok(Self {
             api_key,
+            base_url: options.base_url,
             reconnect_config: reconnect_cfg,
             health_check_config: health_check_cfg,
         })
@@ -275,6 +277,7 @@ impl WebSocketClient {
     pub fn stock(&self) -> StockWebSocketClient {
         StockWebSocketClient::new(
             self.api_key.clone(),
+            self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
         )
@@ -285,6 +288,7 @@ impl WebSocketClient {
     pub fn futopt(&self) -> FutOptWebSocketClient {
         FutOptWebSocketClient::new(
             self.api_key.clone(),
+            self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
         )
@@ -316,6 +320,7 @@ impl WebSocketClient {
 #[napi]
 pub struct StockWebSocketClient {
     api_key: String,
+    base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
@@ -329,11 +334,13 @@ impl StockWebSocketClient {
     /// Create a new stock WebSocket client (internal use)
     fn new(
         api_key: String,
+        base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
     ) -> Self {
         Self {
             api_key,
+            base_url,
             reconnect_config,
             health_check_config,
             callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
@@ -414,6 +421,7 @@ impl StockWebSocketClient {
 
         // Clone data for the worker thread
         let api_key = self.api_key.clone();
+        let base_url = self.base_url.clone();
         let reconnect_config = self.reconnect_config.clone();
         let health_check_config = self.health_check_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
@@ -443,8 +451,17 @@ impl StockWebSocketClient {
                     }
                 };
 
-                // Create WebSocket client with stock endpoint and full config
-                let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(&api_key));
+                // Build connection config. If base_url is provided, append the
+                // stock streaming path (legacy SDK parity); otherwise fall back
+                // to the production Fugle endpoint.
+                let auth = AuthRequest::with_api_key(&api_key);
+                let config = match base_url {
+                    Some(base) => {
+                        let url = format!("{}/stock/streaming", base.trim_end_matches('/'));
+                        ConnectionConfig::new(url, auth)
+                    }
+                    None => ConnectionConfig::fugle_stock(auth),
+                };
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 // Connect (core's connect().await returns once authenticated)
@@ -801,6 +818,7 @@ impl StockWebSocketClient {
 #[napi]
 pub struct FutOptWebSocketClient {
     api_key: String,
+    base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
@@ -814,11 +832,13 @@ impl FutOptWebSocketClient {
     /// Create a new FutOpt WebSocket client (internal use)
     fn new(
         api_key: String,
+        base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
     ) -> Self {
         Self {
             api_key,
+            base_url,
             reconnect_config,
             health_check_config,
             callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
@@ -878,6 +898,7 @@ impl FutOptWebSocketClient {
         let (auth_tx, auth_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
 
         let api_key = self.api_key.clone();
+        let base_url = self.base_url.clone();
         let reconnect_config = self.reconnect_config.clone();
         let health_check_config = self.health_check_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
@@ -905,7 +926,16 @@ impl FutOptWebSocketClient {
                     }
                 };
 
-                let config = ConnectionConfig::fugle_futopt(AuthRequest::with_api_key(&api_key));
+                // Build connection config. If base_url is provided, append the
+                // futopt streaming path (legacy SDK parity).
+                let auth = AuthRequest::with_api_key(&api_key);
+                let config = match base_url {
+                    Some(base) => {
+                        let url = format!("{}/futopt/streaming", base.trim_end_matches('/'));
+                        ConnectionConfig::new(url, auth)
+                    }
+                    None => ConnectionConfig::fugle_futopt(auth),
+                };
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 let connect_result = rt.block_on(async {
