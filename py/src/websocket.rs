@@ -842,8 +842,8 @@ impl StockWebSocketClient {
 
     /// Disconnect from WebSocket server
     #[pyo3(signature = ())]
-    pub fn disconnect(&self, py: Python<'_>) -> PyResult<()> {
-        // Stop background message thread first
+    pub fn disconnect(&self, _py: Python<'_>) -> PyResult<()> {
+        // Stop background message dispatch thread first.
         self.stop_message_thread();
 
         let mut state_guard = self.state.lock().map_err(|e| {
@@ -851,18 +851,34 @@ impl StockWebSocketClient {
         })?;
 
         if let Some(state) = state_guard.take() {
-            let runtime_guard = self.runtime.lock().map_err(|e| {
+            // Take ownership of the runtime so dropping it at the end of this
+            // scope aborts every spawned task (dispatch, writer, health check).
+            // Without this, those tasks keep their Arc<WebSocketClient> clones
+            // alive, the event channel never closes, and the event listener
+            // thread blocks forever on recv() — preventing Python from
+            // shutting down.
+            let mut runtime_guard = self.runtime.lock().map_err(|e| {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
             })?;
+            let runtime = runtime_guard.take();
+            drop(runtime_guard);
 
-            if let Some(runtime) = runtime_guard.as_ref() {
-                runtime.block_on(async {
+            if let Some(rt) = runtime {
+                rt.block_on(async {
                     let _ = state.inner.disconnect().await;
                 });
+                // `rt` drops here → all spawned tasks aborted and futures
+                // dropped, releasing every Arc<WebSocketClient> clone they
+                // held. `state` drops next → core's WebSocketClient drops →
+                // event_tx drops → the event listener thread sees Err on
+                // recv() and exits cleanly.
             }
 
-            // Invoke disconnect callbacks
-            self.callbacks.invoke_disconnect(py, Some(1000), "Normal closure");
+            // Note: do NOT manually invoke_disconnect here. Core's
+            // disconnect() emits a ConnectionEvent::Disconnected on the
+            // event channel, and the event listener thread dispatches it
+            // to the user callback. Calling it explicitly fires the
+            // callback twice.
         }
 
         Ok(())
@@ -1284,28 +1300,22 @@ impl StockWebSocketClient {
     ///     await ws.stock.disconnect_async()
     ///     ```
     pub fn disconnect_async<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // Stop background message thread first
         self.stop_message_thread();
 
         let state_arc = Arc::clone(&self.state);
-        let callbacks = Arc::clone(&self.callbacks);
 
         future_into_py(py, async move {
-            // Extract state from mutex without holding guard across await
             let state_opt = {
                 let mut state_guard = state_arc.lock()
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
                 state_guard.take()
             };
-            // Guard is dropped here
 
             if let Some(state) = state_opt {
                 let _ = state.inner.disconnect().await;
-
-                // Invoke disconnect callbacks with GIL
-                Python::attach(|py| {
-                    callbacks.invoke_disconnect(py, Some(1000), "Normal closure");
-                });
+                // Note: do NOT manually invoke_disconnect — core's disconnect()
+                // emits ConnectionEvent::Disconnected on the event channel and
+                // the event listener thread fires the user callback.
             }
 
             Ok(())
@@ -1608,24 +1618,31 @@ impl FutOptWebSocketClient {
 
     /// Disconnect from WebSocket server
     #[pyo3(signature = ())]
-    pub fn disconnect(&self, py: Python<'_>) -> PyResult<()> {
+    pub fn disconnect(&self, _py: Python<'_>) -> PyResult<()> {
         let mut state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
 
         if let Some(state) = state_guard.take() {
-            let runtime_guard = self.runtime.lock().map_err(|e| {
+            // Take ownership of the runtime — see StockWebSocketClient::disconnect
+            // for the rationale (forces all spawned tasks to drop their
+            // Arc<WebSocketClient> clones so the event channel can close).
+            let mut runtime_guard = self.runtime.lock().map_err(|e| {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
             })?;
+            let runtime = runtime_guard.take();
+            drop(runtime_guard);
 
-            if let Some(runtime) = runtime_guard.as_ref() {
-                runtime.block_on(async {
+            if let Some(rt) = runtime {
+                rt.block_on(async {
                     let _ = state.inner.disconnect().await;
                 });
             }
 
-            // Invoke disconnect callbacks
-            self.callbacks.invoke_disconnect(py, Some(1000), "Normal closure");
+            // Note: do NOT manually invoke_disconnect here. Core's
+            // disconnect() emits ConnectionEvent::Disconnected and the event
+            // listener thread fires the callback. Manual invocation would
+            // double-fire.
         }
 
         Ok(())
