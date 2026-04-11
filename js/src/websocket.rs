@@ -8,7 +8,20 @@
 //! - Commands (connect, subscribe, disconnect) are sent via crossbeam channel
 //! - Events (message, connect, disconnect, error) are delivered via ThreadsafeFunction callbacks
 
+use napi::bindgen_prelude::Unknown;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use napi::Status;
+
+/// Single-argument event callback.
+///
+/// Uses napi-rs ThreadsafeFunction with `CalleeHandled = false` so the JS
+/// callback signature is `(data) => void` instead of the default
+/// `(err, data) => void`. This matches the legacy fugle-marketdata-node
+/// SDK shape, e.g.:
+/// ```js
+/// stock.on('message', (data) => console.log(JSON.parse(data)));
+/// ```
+pub type EventTsfn = ThreadsafeFunction<String, Unknown<'static>, String, Status, false>;
 use napi_derive::napi;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use std::thread;
@@ -18,7 +31,7 @@ use std::time::Duration;
 /// In napi-rs 3.x, ThreadsafeFunction uses const generics instead of ErrorStrategy type.
 /// Default CalleeHandled = true means the callee (JS function) handles errors.
 /// We use Arc<ThreadsafeFunction> to allow cloning for use across threads.
-pub type JsCallback = Arc<ThreadsafeFunction<String>>;
+pub type JsCallback = Arc<EventTsfn>;
 
 /// Reconnection options for WebSocket clients
 ///
@@ -342,7 +355,7 @@ impl StockWebSocketClient {
     /// ws.stock.on('error', (err) => console.error(err));
     /// ```
     #[napi(ts_args_type = "event: WebSocketEvent, callback: (data: string) => void")]
-    pub fn on(&self, event: String, callback: ThreadsafeFunction<String>) -> napi::Result<()> {
+    pub fn on(&self, event: String, callback: EventTsfn) -> napi::Result<()> {
         let mut callbacks = self
             .callbacks
             .lock()
@@ -369,12 +382,22 @@ impl StockWebSocketClient {
         Ok(())
     }
 
-    /// Connect to the stock WebSocket server
+    /// Connect to the stock WebSocket server.
     ///
-    /// This method spawns a background thread that manages the WebSocket connection.
-    /// Connection result will be delivered via 'connect' or 'error' callbacks.
+    /// Returns a Promise that resolves when authentication completes, matching
+    /// the legacy fugle-marketdata Node SDK shape:
+    ///
+    /// ```js
+    /// stock.connect().then(() => {
+    ///   stock.subscribe({ channel: 'trades', symbol: '2330' });
+    /// });
+    /// ```
+    ///
+    /// On rejection, the Promise carries the underlying error message. The
+    /// `connect` event callback also fires after the Promise resolves, so
+    /// existing callback-style code keeps working.
     #[napi]
-    pub fn connect(&self) -> napi::Result<()> {
+    pub async fn connect(&self) -> napi::Result<()> {
         // Create command channel
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<WsCommand>();
 
@@ -385,6 +408,9 @@ impl StockWebSocketClient {
             })?;
             *tx_guard = Some(cmd_tx);
         }
+
+        // Oneshot channel for auth completion signal back to the awaiting Promise.
+        let (auth_tx, auth_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
 
         // Clone data for the worker thread
         let api_key = self.api_key.clone();
@@ -410,7 +436,9 @@ impl StockWebSocketClient {
                 {
                     Ok(rt) => rt,
                     Err(e) => {
-                        fire_callback(&callbacks, "error", format!("Failed to create runtime: {}", e));
+                        let msg = format!("Failed to create runtime: {}", e);
+                        let _ = auth_tx.send(Err(msg.clone()));
+                        fire_callback(&callbacks, "error", msg);
                         return;
                     }
                 };
@@ -419,15 +447,20 @@ impl StockWebSocketClient {
                 let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(&api_key));
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
-                // Connect
+                // Connect (core's connect().await returns once authenticated)
                 let connect_result = rt.block_on(async {
                     client.connect().await
                 });
 
                 if let Err(e) = connect_result {
-                    fire_callback(&callbacks, "error", format!("[{}] {}", e.to_error_code(), e));
+                    let msg = format!("[{}] {}", e.to_error_code(), e);
+                    let _ = auth_tx.send(Err(msg.clone()));
+                    fire_callback(&callbacks, "error", msg);
                     return;
                 }
+
+                // Signal the awaiting Promise that authentication succeeded.
+                let _ = auth_tx.send(Ok(()));
 
                 // Mark as connected
                 connected.store(true, Ordering::SeqCst);
@@ -542,7 +575,15 @@ impl StockWebSocketClient {
             })
             .map_err(|e| napi::Error::from_reason(format!("Failed to spawn worker thread: {}", e)))?;
 
-        Ok(())
+        // Await the auth signal from the worker thread so the returned
+        // Promise resolves only after authentication completes.
+        match auth_rx.await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(msg)) => Err(napi::Error::from_reason(msg)),
+            Err(_) => Err(napi::Error::from_reason(
+                "Worker thread terminated before authentication signal",
+            )),
+        }
     }
 
     /// Subscribe to a channel
@@ -792,7 +833,7 @@ impl FutOptWebSocketClient {
     /// @param event - Event type: "message", "connect", "disconnect", "reconnect", "error"
     /// @param callback - JavaScript callback function receiving string data
     #[napi(ts_args_type = "event: WebSocketEvent, callback: (data: string) => void")]
-    pub fn on(&self, event: String, callback: ThreadsafeFunction<String>) -> napi::Result<()> {
+    pub fn on(&self, event: String, callback: EventTsfn) -> napi::Result<()> {
         let mut callbacks = self
             .callbacks
             .lock()
@@ -819,16 +860,14 @@ impl FutOptWebSocketClient {
         Ok(())
     }
 
-    /// Connect to the FutOpt WebSocket server
+    /// Connect to the FutOpt WebSocket server.
     ///
-    /// This method spawns a background thread that manages the WebSocket connection.
-    /// Connection result will be delivered via 'connect' or 'error' callbacks.
+    /// Returns a Promise that resolves when authentication completes.
+    /// See `StockWebSocketClient::connect` for the rationale and example.
     #[napi]
-    pub fn connect(&self) -> napi::Result<()> {
-        // Create command channel
+    pub async fn connect(&self) -> napi::Result<()> {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<WsCommand>();
 
-        // Store command sender
         {
             let mut tx_guard = self.command_tx.lock().map_err(|e| {
                 napi::Error::from_reason(format!("Lock error: {}", e))
@@ -836,7 +875,8 @@ impl FutOptWebSocketClient {
             *tx_guard = Some(cmd_tx);
         }
 
-        // Clone data for the worker thread
+        let (auth_tx, auth_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+
         let api_key = self.api_key.clone();
         let reconnect_config = self.reconnect_config.clone();
         let health_check_config = self.health_check_config.clone();
@@ -844,7 +884,6 @@ impl FutOptWebSocketClient {
         let connected = Arc::clone(&self.connected);
         let closed = Arc::clone(&self.closed);
 
-        // Spawn worker thread that owns WebSocketClient
         thread::Builder::new()
             .name("futopt_ws_worker".to_string())
             .spawn(move || {
@@ -853,33 +892,35 @@ impl FutOptWebSocketClient {
                 use marketdata_core::models::futopt::FutOptChannel;
                 use marketdata_core::websocket::channels::FutOptSubscription;
 
-                // Create tokio runtime
                 let rt = match tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
                 {
                     Ok(rt) => rt,
                     Err(e) => {
-                        fire_callback(&callbacks, "error", format!("Failed to create runtime: {}", e));
+                        let msg = format!("Failed to create runtime: {}", e);
+                        let _ = auth_tx.send(Err(msg.clone()));
+                        fire_callback(&callbacks, "error", msg);
                         return;
                     }
                 };
 
-                // Create WebSocket client with FutOpt endpoint and full config
                 let config = ConnectionConfig::fugle_futopt(AuthRequest::with_api_key(&api_key));
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
-                // Connect
                 let connect_result = rt.block_on(async {
                     client.connect().await
                 });
 
                 if let Err(e) = connect_result {
-                    fire_callback(&callbacks, "error", format!("[{}] {}", e.to_error_code(), e));
+                    let msg = format!("[{}] {}", e.to_error_code(), e);
+                    let _ = auth_tx.send(Err(msg.clone()));
+                    fire_callback(&callbacks, "error", msg);
                     return;
                 }
 
-                // Mark as connected
+                let _ = auth_tx.send(Ok(()));
+
                 connected.store(true, Ordering::SeqCst);
                 fire_callback(&callbacks, "connect", "connected".to_string());
 
@@ -998,7 +1039,13 @@ impl FutOptWebSocketClient {
             })
             .map_err(|e| napi::Error::from_reason(format!("Failed to spawn worker thread: {}", e)))?;
 
-        Ok(())
+        match auth_rx.await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(msg)) => Err(napi::Error::from_reason(msg)),
+            Err(_) => Err(napi::Error::from_reason(
+                "Worker thread terminated before authentication signal",
+            )),
+        }
     }
 
     /// Subscribe to a channel
@@ -1212,7 +1259,7 @@ fn fire_callback(callbacks: &Arc<Mutex<EventCallbacks>>, event: &str, data: Stri
             // Clone the Arc (not the callback itself) for thread-safe access
             let callback_ref = Arc::clone(callback);
             // In napi-rs 3.x with CalleeHandled=true (default), call() takes Result<T, ErrorStatus>
-            callback_ref.call(Ok(data), ThreadsafeFunctionCallMode::NonBlocking);
+            callback_ref.call(data, ThreadsafeFunctionCallMode::NonBlocking);
         }
     }
 }

@@ -5,8 +5,32 @@
 
 use crate::errors::to_napi_error;
 use crate::websocket::RestClientOptions;
+use napi::Either;
 use napi_derive::napi;
 use serde_json::Value;
+
+// ---------------------------------------------------------------------------
+// Legacy fugle-marketdata-node compatibility helpers
+//
+// The legacy `@fugle/marketdata` SDK calls REST methods with a single object
+// argument (e.g. `stock.intraday.quote({ symbol: '2330' })`). Our binding
+// originally only accepted positional strings; the helper structs and
+// `Either<String, _>` parameter types let both shapes coexist without
+// breaking existing positional callers.
+// ---------------------------------------------------------------------------
+
+/// Stock intraday quote params (object form)
+#[napi(object)]
+pub struct StockIntradayQuoteParams {
+    pub symbol: String,
+    pub odd_lot: Option<bool>,
+}
+
+/// Plain `{ symbol }` params reused by methods that take only a symbol.
+#[napi(object)]
+pub struct SymbolParams {
+    pub symbol: String,
+}
 
 /// REST client for Fugle market data API (JavaScript wrapper)
 ///
@@ -168,20 +192,30 @@ pub struct StockIntradayClient {
 
 #[napi]
 impl StockIntradayClient {
-    /// Get intraday quote for a stock symbol
+    /// Get intraday quote for a stock symbol.
     ///
-    /// @param symbol - Stock symbol (e.g., "2330" for TSMC)
-    /// @param oddLot - Query odd-lot data instead of regular round-lot data
-    /// @returns Promise resolving to Quote object with current price and volume data
+    /// Two call shapes are supported (legacy fugle-marketdata-node parity):
     ///
-    /// @example
     /// ```javascript
-    /// const client = new RestClient({ apiKey: 'your-api-key' });
-    /// const quote = await client.stock.intraday.quote('2330');
-    /// const oddLotQuote = await client.stock.intraday.quote('2330', true);
+    /// // Object shape (matches legacy SDK README)
+    /// await client.stock.intraday.quote({ symbol: '2330' });
+    /// await client.stock.intraday.quote({ symbol: '2330', oddLot: true });
+    ///
+    /// // Positional shape
+    /// await client.stock.intraday.quote('2330');
+    /// await client.stock.intraday.quote('2330', true);
     /// ```
     #[napi(ts_return_type = "Promise<QuoteResponse>")]
-    pub async fn quote(&self, symbol: String, odd_lot: Option<bool>) -> napi::Result<Value> {
+    pub async fn quote(
+        &self,
+        symbol: Either<String, StockIntradayQuoteParams>,
+        odd_lot: Option<bool>,
+    ) -> napi::Result<Value> {
+        let (symbol, effective_odd_lot) = match symbol {
+            Either::A(s) => (s, odd_lot),
+            Either::B(p) => (p.symbol, p.odd_lot.or(odd_lot)),
+        };
+
         let inner = self.inner.clone();
 
         // Use spawn_blocking since core uses synchronous HTTP (ureq)
@@ -189,7 +223,7 @@ impl StockIntradayClient {
             let stock = inner.stock();
             let intraday = stock.intraday();
             let mut builder = intraday.quote().symbol(&symbol);
-            if let Some(ol) = odd_lot {
+            if let Some(ol) = effective_odd_lot {
                 builder = builder.odd_lot(ol);
             }
             builder.send()

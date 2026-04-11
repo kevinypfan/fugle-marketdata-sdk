@@ -451,50 +451,27 @@ export type StockChannel = 'trades' | 'books' | 'candles' | 'aggregates' | 'indi
 export type FutOptChannel = 'trades' | 'books' | 'candles' | 'aggregates';
 
 /**
- * Subscribe options for stock WebSocket.
- *
- * Provide either `symbol` (single) or `symbols` (batch list) — exactly one is
- * required, mirroring the old `@fugle/marketdata` SDK shape.
+ * Subscribe options for stock WebSocket
  */
 export interface StockSubscribeOptions {
   /** Channel to subscribe to */
   channel: StockChannel;
   /** Stock symbol */
-  symbol?: string;
-  /** Multiple stock symbols (batch subscribe) */
-  symbols?: string[];
+  symbol: string;
   /** Include intraday odd lot data */
   intradayOddLot?: boolean;
 }
 
 /**
- * Subscribe options for FutOpt WebSocket.
- *
- * Provide either `symbol` (single) or `symbols` (batch list) — exactly one is
- * required.
+ * Subscribe options for FutOpt WebSocket
  */
 export interface FutOptSubscribeOptions {
   /** Channel to subscribe to */
   channel: FutOptChannel;
   /** Contract symbol */
-  symbol?: string;
-  /** Multiple contract symbols (batch subscribe) */
-  symbols?: string[];
+  symbol: string;
   /** Include after-hours data */
   afterHours?: boolean;
-}
-
-/**
- * Unsubscribe options for stock and FutOpt WebSocket clients.
- *
- * Provide either `id` (single) or `ids` (batch list) — exactly one is required.
- * Mirrors the old `@fugle/marketdata` Node SDK shape.
- */
-export interface UnsubscribeOptions {
-  /** Subscription ID returned from a `subscribed` event */
-  id?: string;
-  /** Multiple subscription IDs (batch unsubscribe) */
-  ids?: string[];
 }
 
 /**
@@ -511,10 +488,6 @@ export interface WebSocketEventMap {
   reconnect: (info: string) => void;
   /** Error occurred */
   error: (error: string) => void;
-  /** Server accepted authentication (parallels old @fugle/marketdata `authenticated` event) */
-  authenticated: (info: string) => void;
-  /** Server rejected authentication (parallels old @fugle/marketdata `unauthenticated` event) */
-  unauthenticated: (message: string) => void;
 }
 
 /** Event names for WebSocket */
@@ -1219,13 +1192,13 @@ export declare class FutOptIntradayClient {
   /**
    * Get batch ticker list for a FutOpt contract type
    *
-   * @param type - Contract type ("FUTURE" or "OPTION")
+   * @param type - Contract type: "FUTURE" or "OPTION"
    * @param exchange - Optional exchange filter (e.g., "TAIFEX")
    * @param afterHours - Query after-hours session data
    * @param contractType - Optional contract type code: "I" / "R" / "B" / "C" / "S" / "E"
    * @returns Promise resolving to an array of FutOpt ticker info objects
    */
-  tickers(type: FutOptType, exchange?: string, afterHours?: boolean, contractType?: ContractType): Promise<TickerResponse[]>
+  tickers(type: FutOptType, exchange?: string, afterHours?: boolean, contractType?: ContractType): Promise<FutOptTickerResponse[]>
   /**
    * Get product list for futures/options
    *
@@ -1266,32 +1239,32 @@ export declare class FutOptWebSocketClient {
    */
   on(event: WebSocketEvent, callback: (data: string) => void): void
   /**
-   * Connect to the FutOpt WebSocket server
+   * Connect to the FutOpt WebSocket server.
    *
-   * This method spawns a background thread that manages the WebSocket connection.
-   * Connection result will be delivered via 'connect' or 'error' callbacks.
+   * Returns a Promise that resolves when authentication completes.
+   * See `StockWebSocketClient::connect` for the rationale and example.
    */
-  connect(): void
+  connect(): Promise<void>
   /**
    * Subscribe to a channel
    *
-   * @param options - Subscription options: { channel: string, symbol: string, afterHours?: boolean }
+   * @param options - Subscription options. Provide either `symbol` (single)
+   *                  or `symbols` (batch list) — exactly one is required.
+   *                  Shape: `{ channel, symbol?, symbols?, afterHours? }`
    */
   subscribe(options: FutOptSubscribeOptions): void
   /**
-   * Unsubscribe from a channel by subscription ID
+   * Unsubscribe from a channel
    *
-   * Accepts either a subscription id string (legacy form) or an
-   * `UnsubscribeOptions` object with `{ id }` or `{ ids: [...] }`.
+   * Accepts either `{ id: "..." }` (single) or `{ ids: ["...", "..."] }` (batch).
    */
   unsubscribe(options: string | UnsubscribeOptions): void
-  /** Disconnect from the WebSocket server */
-  disconnect(): void
   /**
    * Send a `ping` frame to the server.
    *
-   * Mirrors the old `@fugle/marketdata` Node SDK. The pong reply is delivered
-   * via the `message` callback (or processed internally by the health check).
+   * Mirrors the old `@fugle/marketdata` Node SDK. The server's `pong` reply
+   * is delivered via the `message` callback (or processed internally by the
+   * health check, if enabled).
    *
    * @param state - Optional state string echoed back in the server's pong reply
    */
@@ -1299,10 +1272,13 @@ export declare class FutOptWebSocketClient {
   /**
    * Ask the server for its current subscription list.
    *
-   * Sends `{ event: "subscriptions" }`. The reply arrives via the `message`
-   * callback, matching the old `@fugle/marketdata` Node SDK semantics.
+   * Sends `{ event: "subscriptions" }` to the server. The reply is delivered
+   * asynchronously via the `message` callback, matching the old
+   * `@fugle/marketdata` Node SDK semantics.
    */
   subscriptions(): void
+  /** Disconnect from the WebSocket server */
+  disconnect(): void
   /** Check if connected */
   get isConnected(): boolean
   /**
@@ -1431,19 +1407,21 @@ export declare class StockHistoricalClient {
 /** Stock intraday data client */
 export declare class StockIntradayClient {
   /**
-   * Get intraday quote for a stock symbol
+   * Get intraday quote for a stock symbol.
    *
-   * @param symbol - Stock symbol (e.g., "2330" for TSMC)
-   * @returns Promise resolving to Quote object with current price and volume data
+   * Two call shapes are supported (legacy fugle-marketdata-node parity):
    *
-   * @example
    * ```javascript
-   * const client = new RestClient({ apiKey: 'your-api-key' });
-   * const quote = await client.stock.intraday.quote('2330');
-   * const oddLotQuote = await client.stock.intraday.quote('2330', true);
+   * // Object shape (matches legacy SDK README)
+   * await client.stock.intraday.quote({ symbol: '2330' });
+   * await client.stock.intraday.quote({ symbol: '2330', oddLot: true });
+   *
+   * // Positional shape
+   * await client.stock.intraday.quote('2330');
+   * await client.stock.intraday.quote('2330', true);
    * ```
    */
-  quote(symbol: string, oddLot?: boolean | undefined | null): Promise<QuoteResponse>
+  quote(symbol: string | StockIntradayQuoteParams, oddLot?: boolean | undefined | null): Promise<QuoteResponse>
   /**
    * Get intraday ticker for a stock symbol
    *
@@ -1483,7 +1461,7 @@ export declare class StockIntradayClient {
    * @param isNormal - Filter to normal-status tickers only
    * @returns Promise resolving to an array of ticker info objects
    */
-  tickers(type: string, exchange?: string | undefined | null, market?: string | undefined | null, industry?: string | undefined | null, isNormal?: boolean | undefined | null): Promise<TickerResponse[]>
+  tickers(r#type: string, exchange?: string | undefined | null, market?: string | undefined | null, industry?: string | undefined | null, isNormal?: boolean | undefined | null): Promise<TickerResponse[]>
 }
 
 /** Stock snapshot data client */
@@ -1617,32 +1595,44 @@ export declare class StockWebSocketClient {
    */
   on(event: WebSocketEvent, callback: (data: string) => void): void
   /**
-   * Connect to the stock WebSocket server
+   * Connect to the stock WebSocket server.
    *
-   * This method spawns a background thread that manages the WebSocket connection.
-   * Connection result will be delivered via 'connect' or 'error' callbacks.
+   * Returns a Promise that resolves when authentication completes, matching
+   * the legacy fugle-marketdata Node SDK shape:
+   *
+   * ```js
+   * stock.connect().then(() => {
+   *   stock.subscribe({ channel: 'trades', symbol: '2330' });
+   * });
+   * ```
+   *
+   * On rejection, the Promise carries the underlying error message. The
+   * `connect` event callback also fires after the Promise resolves, so
+   * existing callback-style code keeps working.
    */
-  connect(): void
+  connect(): Promise<void>
   /**
    * Subscribe to a channel
    *
-   * @param options - Subscription options: { channel: string, symbol: string, intradayOddLot?: boolean }
+   * @param options - Subscription options. Provide either `symbol` (single)
+   *                  or `symbols` (batch list) — exactly one is required, matching
+   *                  the old `@fugle/marketdata` shape.
+   *                  Shape: `{ channel, symbol?, symbols?, intradayOddLot? }`
    */
   subscribe(options: StockSubscribeOptions): void
   /**
-   * Unsubscribe from a channel by subscription ID
+   * Unsubscribe from a channel
    *
-   * Accepts either a subscription id string (legacy form) or an
-   * `UnsubscribeOptions` object with `{ id }` or `{ ids: [...] }`.
+   * Accepts either `{ id: "..." }` (single) or `{ ids: ["...", "..."] }` (batch).
+   * Mirrors the old `@fugle/marketdata` Node SDK shape.
    */
   unsubscribe(options: string | UnsubscribeOptions): void
-  /** Disconnect from the WebSocket server */
-  disconnect(): void
   /**
    * Send a `ping` frame to the server.
    *
-   * Mirrors the old `@fugle/marketdata` Node SDK. The pong reply is delivered
-   * via the `message` callback (or processed internally by the health check).
+   * Mirrors the old `@fugle/marketdata` Node SDK. The server's `pong` reply
+   * is delivered via the `message` callback (or processed internally by the
+   * health check, if enabled).
    *
    * @param state - Optional state string echoed back in the server's pong reply
    */
@@ -1650,10 +1640,13 @@ export declare class StockWebSocketClient {
   /**
    * Ask the server for its current subscription list.
    *
-   * Sends `{ event: "subscriptions" }`. The reply arrives via the `message`
-   * callback, matching the old `@fugle/marketdata` Node SDK semantics.
+   * Sends `{ event: "subscriptions" }` to the server. The reply is delivered
+   * asynchronously via the `message` callback, matching the old
+   * `@fugle/marketdata` Node SDK semantics.
    */
   subscriptions(): void
+  /** Disconnect from the WebSocket server */
+  disconnect(): void
   /** Check if connected */
   get isConnected(): boolean
   /**
@@ -1728,7 +1721,7 @@ export declare class WebSocketClient {
  * - pingInterval: 30000
  * - maxMissedPongs: 2
  *
- * `pingInterval` is named to match the official `@fugle/marketdata` SDK.
+ * Note: `pingInterval` is named to match the official `@fugle/marketdata` SDK.
  */
 export interface HealthCheckOptions {
   /** Whether health check is enabled (default: false) */
@@ -1771,6 +1764,17 @@ export interface RestClientOptions {
   sdkToken?: string
   /** Override base URL (optional) */
   baseUrl?: string
+}
+
+/** Stock intraday quote params (object form) */
+export interface StockIntradayQuoteParams {
+  symbol: string
+  oddLot?: boolean
+}
+
+/** Plain `{ symbol }` params reused by methods that take only a symbol. */
+export interface SymbolParams {
+  symbol: string
 }
 
 /**
