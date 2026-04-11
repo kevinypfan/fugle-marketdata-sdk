@@ -630,13 +630,6 @@ impl StockWebSocketClient {
                                                     -1,
                                                 );
                                             }
-                                            ConnectionEvent::PongMissed => {
-                                                callbacks_for_events.invoke_error(
-                                                    py,
-                                                    "Health check: pong missed",
-                                                    -2,
-                                                );
-                                            }
                                             ConnectionEvent::Authenticated => {
                                                 callbacks_for_events.invoke_authenticated(py);
                                             }
@@ -1366,13 +1359,6 @@ impl FutOptWebSocketClient {
                                                     py,
                                                     &format!("Reconnection failed after {} attempts", attempts),
                                                     -1,
-                                                );
-                                            }
-                                            ConnectionEvent::PongMissed => {
-                                                callbacks_for_events.invoke_error(
-                                                    py,
-                                                    "Health check: pong missed",
-                                                    -2,
                                                 );
                                             }
                                             ConnectionEvent::Authenticated => {

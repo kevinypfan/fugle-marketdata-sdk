@@ -118,17 +118,10 @@ pub(crate) async fn dispatch_messages(
     while let Some(msg_result) = ws_read.next().await {
         match msg_result {
             Ok(Message::Text(text)) => {
-                // Deserialize and send to message channel
                 match serde_json::from_str::<WebSocketMessage>(&text) {
                     Ok(ws_msg) => {
-                        // Check for pong message (handled by health check)
-                        if ws_msg.is_pong() {
-                            health_check.on_pong_received();
-                        }
-
-                        // Send to message channel (including pong messages)
+                        health_check.touch();
                         if message_tx.send(ws_msg).is_err() {
-                            // Channel closed (receiver dropped), exit gracefully
                             return None;
                         }
                     }
@@ -141,15 +134,10 @@ pub(crate) async fn dispatch_messages(
                 }
             }
             Ok(Message::Binary(data)) => {
-                // Attempt to deserialize binary message
                 match serde_json::from_slice::<WebSocketMessage>(&data) {
                     Ok(ws_msg) => {
-                        if ws_msg.is_pong() {
-                            health_check.on_pong_received();
-                        }
-
+                        health_check.touch();
                         if message_tx.send(ws_msg).is_err() {
-                            // Channel closed (receiver dropped), exit gracefully
                             return None;
                         }
                     }
@@ -162,8 +150,9 @@ pub(crate) async fn dispatch_messages(
                 }
             }
             Ok(Message::Pong(_)) => {
-                // Pong frame received (not JSON message)
-                health_check.on_pong_received();
+                // RFC 6455 control-frame pong: count as activity. Fugle
+                // sends pong via JSON message; this branch is defensive.
+                health_check.touch();
             }
             Ok(Message::Close(close_frame)) => {
                 // Server initiated close - RFC 6455 compliant handling

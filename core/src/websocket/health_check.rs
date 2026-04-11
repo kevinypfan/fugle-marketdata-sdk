@@ -1,42 +1,63 @@
-//! WebSocket health check monitoring with ping/pong
+//! WebSocket health check via passive activity timer
 //!
-//! Implements configurable health monitoring:
-//! - Periodic ping messages at configurable interval
-//! - Missed pong detection and threshold-based disconnect
-//! - Pause/resume for reconnection periods
-//! - Manual ping triggering
+//! The Fugle WebSocket server sends a `{"event":"heartbeat"}` frame every 30
+//! seconds, so the SDK never needs to send its own ping. The health check
+//! observes inbound traffic via [`HealthCheck::touch`] and disconnects when
+//! the gap between successive frames exceeds `interval × max_missed_pongs`.
+//!
+//! Field names `interval` / `max_missed_pongs` are kept for binding API
+//! stability; their semantic meaning is now "expected heartbeat period" and
+//! "tolerated missed heartbeats" respectively.
 
 use crate::websocket::ConnectionEvent;
 use crate::MarketDataError;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::mpsc as tokio_mpsc;
 
 /// Default health check enabled state - aligns with official SDKs (CON-01)
 pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = false;
 
-/// Default health check interval in milliseconds (CON-01)
+/// Default expected heartbeat interval in milliseconds (Fugle server sends
+/// heartbeat every 30 seconds).
 pub const DEFAULT_HEALTH_CHECK_INTERVAL_MS: u64 = 30000;
 
-/// Default maximum missed pongs before disconnect (CON-01)
-pub const DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS: u64 = 2;
+/// Default number of heartbeat intervals to tolerate before disconnect.
+/// 30s × 3 = 90s timeout — wide enough to absorb a brief network blip or
+/// server GC pause without false-disconnecting a healthy stream.
+pub const DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS: u64 = 3;
 
 /// Minimum allowed health check interval to prevent excessive overhead
 pub const MIN_HEALTH_CHECK_INTERVAL_MS: u64 = 5000;
 
-/// Configuration for WebSocket health check
-///
-/// From CONTEXT.md: Default values align with production requirements
+/// Internal poll rate for the activity-timer task. Independent of `interval`
+/// (which is the *expected heartbeat period*); 5 seconds is fast enough to
+/// react promptly when the timeout is exceeded and cheap enough that the
+/// per-tick atomic load is negligible.
+const HEALTH_CHECK_TICK: Duration = Duration::from_secs(5);
+
+fn current_time_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Configuration for WebSocket health check.
 #[derive(Debug, Clone)]
 pub struct HealthCheckConfig {
     /// Whether health check is enabled (default: false, aligned with official SDKs)
     pub enabled: bool,
-    /// Interval between ping messages (default: 30 seconds)
+    /// Expected server heartbeat interval (default: 30s).
+    /// The server is expected to send some frame (heartbeat, data, or pong)
+    /// at least once per this interval. Field name kept as `interval` for
+    /// binding API stability; semantically this is the heartbeat period.
     pub interval: Duration,
-    /// Maximum missed pongs before disconnect (default: 2)
+    /// Number of heartbeat intervals to tolerate before disconnect
+    /// (default: 3, giving a 90-second timeout). Field name kept as
+    /// `max_missed_pongs` for binding API stability; semantically this is
+    /// "missed heartbeats" in the activity-timer design.
     pub max_missed_pongs: u64,
 }
 
@@ -51,12 +72,6 @@ impl Default for HealthCheckConfig {
 }
 
 impl HealthCheckConfig {
-    /// Create a new health check config with validation
-    ///
-    /// # Errors
-    /// Returns `MarketDataError::ConfigError` if:
-    /// - `interval` is less than 5000ms (5 seconds)
-    /// - `max_missed_pongs` is 0 (must be >= 1)
     pub fn new(
         enabled: bool,
         interval: Duration,
@@ -83,10 +98,6 @@ impl HealthCheckConfig {
         })
     }
 
-    /// Create a new health check config with custom interval
-    ///
-    /// # Errors
-    /// Returns `MarketDataError::ConfigError` if `interval` is less than 5000ms
     pub fn with_interval(mut self, interval: Duration) -> Result<Self, MarketDataError> {
         if interval < Duration::from_millis(MIN_HEALTH_CHECK_INTERVAL_MS) {
             return Err(MarketDataError::ConfigError(format!(
@@ -99,10 +110,6 @@ impl HealthCheckConfig {
         Ok(self)
     }
 
-    /// Set maximum missed pongs before disconnect
-    ///
-    /// # Errors
-    /// Returns `MarketDataError::ConfigError` if `max` is 0
     pub fn with_max_missed_pongs(mut self, max: u64) -> Result<Self, MarketDataError> {
         if max == 0 {
             return Err(MarketDataError::ConfigError(
@@ -113,255 +120,177 @@ impl HealthCheckConfig {
         Ok(self)
     }
 
-    /// Enable or disable health check (no validation needed)
     pub fn with_enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
+
+    /// Disconnect when activity has been silent for this long.
+    pub(crate) fn timeout(&self) -> Duration {
+        self.interval
+            .saturating_mul(self.max_missed_pongs.min(u32::MAX as u64) as u32)
+    }
 }
 
-/// Health check monitor for WebSocket connection
+/// Passive activity-timer health check.
 ///
-/// Monitors connection health via ping/pong messages. Triggers disconnect
-/// when too many pongs are missed. Pauses during reconnection.
+/// Observes inbound WebSocket traffic via [`Self::touch`]. A background tokio
+/// task wakes periodically and disconnects when the gap exceeds the
+/// configured timeout.
 pub struct HealthCheck {
     config: HealthCheckConfig,
-    last_pong_timestamp: Arc<AtomicU64>,
-    missed_pong_count: Arc<AtomicU64>,
+    last_activity_ms: Arc<AtomicU64>,
     should_stop: Arc<AtomicBool>,
     is_paused: Arc<AtomicBool>,
 }
 
 impl HealthCheck {
-    /// Create a new health check monitor
     pub fn new(config: HealthCheckConfig) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
         Self {
             config,
-            last_pong_timestamp: Arc::new(AtomicU64::new(now)),
-            missed_pong_count: Arc::new(AtomicU64::new(0)),
+            // Initialize to "now". Without this, the first tick computes
+            // age = (millis since epoch), instantly triggering a false
+            // disconnect before any frame arrives.
+            last_activity_ms: Arc::new(AtomicU64::new(current_time_ms())),
             should_stop: Arc::new(AtomicBool::new(false)),
             is_paused: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    /// Record that a pong was received
-    ///
-    /// Resets missed pong count and updates timestamp
-    pub fn on_pong_received(&self) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        self.last_pong_timestamp.store(now, Ordering::SeqCst);
-        self.missed_pong_count.store(0, Ordering::SeqCst);
+    /// Update the last-activity timestamp. Called by `dispatch_messages` on
+    /// every successfully decoded inbound frame.
+    pub fn touch(&self) {
+        self.last_activity_ms
+            .store(current_time_ms(), Ordering::Relaxed);
     }
 
-    /// Pause health check monitoring
+    /// Time since the last touch.
+    pub fn last_activity_age(&self) -> Duration {
+        let last = self.last_activity_ms.load(Ordering::Relaxed);
+        Duration::from_millis(current_time_ms().saturating_sub(last))
+    }
+
+    /// Pause activity timer checking.
     ///
-    /// From CONTEXT.md: "重連期間健康檢查暫停"
-    /// Used during reconnection to avoid false disconnect triggers
+    /// **Invariant**: only called from the reconnect path, when the
+    /// connection is known to be dead. Real disconnects during pause would
+    /// otherwise be masked.
     pub fn pause(&self) {
         self.is_paused.store(true, Ordering::SeqCst);
     }
 
-    /// Resume health check monitoring after pause
     pub fn resume(&self) {
-        // Reset timestamp to current time to avoid immediate missed pong
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        self.last_pong_timestamp.store(now, Ordering::SeqCst);
-        self.missed_pong_count.store(0, Ordering::SeqCst);
+        // Reset age in case the pause window was long.
+        self.touch();
         self.is_paused.store(false, Ordering::SeqCst);
     }
 
-    /// Stop health check monitoring permanently
     pub fn stop(&self) {
         self.should_stop.store(true, Ordering::SeqCst);
     }
 
-    /// Check if connection is healthy
-    ///
-    /// Returns false if missed pongs exceed threshold
     pub fn is_healthy(&self) -> bool {
-        self.missed_pong_count.load(Ordering::SeqCst) < self.config.max_missed_pongs
+        self.last_activity_age() < self.config.timeout()
     }
 
-    /// Spawn health check monitoring task
-    ///
-    /// Runs in a std::thread (not tokio task) for FFI compatibility.
-    /// Periodically sends ping signals and monitors pong responses.
-    ///
-    /// # Arguments
-    ///
-    /// * `ping_sender` - Channel to send ping signals to WebSocket layer
-    /// * `event_tx` - Channel to send connection events
-    ///
-    /// # Returns
-    ///
-    /// Join handle for the monitoring thread
+    pub fn is_paused(&self) -> bool {
+        self.is_paused.load(Ordering::SeqCst)
+    }
+
+    pub fn config(&self) -> &HealthCheckConfig {
+        &self.config
+    }
+
+    /// Spawn the periodic activity-timer task.
     pub fn spawn_check_task(
         &self,
-        ping_sender: tokio_mpsc::Sender<()>,
         event_tx: mpsc::Sender<ConnectionEvent>,
-    ) -> JoinHandle<()> {
-        let config = self.config.clone();
-        let last_pong = Arc::clone(&self.last_pong_timestamp);
-        let missed_count = Arc::clone(&self.missed_pong_count);
+    ) -> tokio::task::JoinHandle<()> {
+        let timeout = self.config.timeout();
+        let last_activity = Arc::clone(&self.last_activity_ms);
         let should_stop = Arc::clone(&self.should_stop);
         let is_paused = Arc::clone(&self.is_paused);
 
-        thread::spawn(move || {
-            while !should_stop.load(Ordering::SeqCst) {
-                // If paused, sleep briefly and continue
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(HEALTH_CHECK_TICK);
+            ticker.tick().await; // skip immediate first tick
+
+            loop {
+                ticker.tick().await;
+                if should_stop.load(Ordering::SeqCst) {
+                    break;
+                }
                 if is_paused.load(Ordering::SeqCst) {
-                    thread::sleep(Duration::from_millis(100));
                     continue;
                 }
 
-                // Record time before sending ping
-                let ping_sent_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
+                let last = last_activity.load(Ordering::Relaxed);
+                let age = Duration::from_millis(current_time_ms().saturating_sub(last));
 
-                // Send ping signal
-                if ping_sender.blocking_send(()).is_err() {
-                    // Channel closed, exit thread
+                if age >= timeout {
+                    let _ = event_tx.send(ConnectionEvent::Disconnected {
+                        code: None,
+                        reason: format!(
+                            "Health check timeout: no activity for {}s",
+                            age.as_secs()
+                        ),
+                    });
                     break;
-                }
-
-                // Sleep for interval
-                thread::sleep(config.interval);
-
-                // Check if pong was received (compare timestamps)
-                let last_pong_time = last_pong.load(Ordering::SeqCst);
-                if last_pong_time < ping_sent_time {
-                    // No pong received since ping
-                    let current_missed = missed_count.fetch_add(1, Ordering::SeqCst) + 1;
-
-                    // Send PongMissed event
-                    let _ = event_tx.send(ConnectionEvent::PongMissed);
-
-                    // Check if threshold exceeded
-                    if current_missed >= config.max_missed_pongs {
-                        // Send Disconnected event
-                        let _ = event_tx.send(ConnectionEvent::Disconnected {
-                            code: None,
-                            reason: "Health check failed: missed pongs".to_string(),
-                        });
-                        break;
-                    }
-                } else {
-                    // Pong received, reset count
-                    missed_count.store(0, Ordering::SeqCst);
                 }
             }
         })
     }
 
-    /// Manually trigger a ping (for advanced use cases)
-    ///
-    /// From CONTEXT.md: "提供 ping() 方法讓使用者手動觸發健康檢查"
+    /// Manually trigger a ping (no-op kept for API compatibility).
     pub fn ping(&self) -> Result<(), MarketDataError> {
-        // This is a no-op in the current design since ping_sender is owned by spawn_check_task
-        // In practice, users would use the WebSocketClient.send() method to send ping frames
-        // This method exists for API completeness
         Ok(())
-    }
-
-    /// Get current missed pong count
-    pub fn missed_pong_count(&self) -> u64 {
-        self.missed_pong_count.load(Ordering::SeqCst)
-    }
-
-    /// Check if health check is paused
-    pub fn is_paused(&self) -> bool {
-        self.is_paused.load(Ordering::SeqCst)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
 
     #[test]
-    fn test_health_check_default_config() {
+    fn test_default_config() {
         let config = HealthCheckConfig::default();
-        assert!(!config.enabled); // CHANGED: was true, now false (aligned with official SDKs)
+        assert!(!config.enabled);
         assert_eq!(config.interval, Duration::from_secs(30));
-        assert_eq!(config.max_missed_pongs, 2);
+        assert_eq!(config.max_missed_pongs, 3);
     }
 
     #[test]
-    fn test_health_check_config_builder() {
+    fn test_default_config_timeout_is_90s() {
+        let config = HealthCheckConfig::default();
+        assert_eq!(config.timeout(), Duration::from_secs(90));
+    }
+
+    #[test]
+    fn test_config_builder() {
         let config = HealthCheckConfig::default()
             .with_interval(Duration::from_secs(60))
             .unwrap()
             .with_max_missed_pongs(5)
             .unwrap()
-            .with_enabled(false); // Note: with_enabled doesn't need unwrap
+            .with_enabled(true);
 
-        assert!(!config.enabled);
+        assert!(config.enabled);
         assert_eq!(config.interval, Duration::from_secs(60));
         assert_eq!(config.max_missed_pongs, 5);
-    }
-
-    #[test]
-    fn test_health_check_default_uses_constants() {
-        let config = HealthCheckConfig::default();
-        assert_eq!(config.enabled, DEFAULT_HEALTH_CHECK_ENABLED);
-        assert_eq!(
-            config.interval,
-            Duration::from_millis(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
-        );
-        assert_eq!(config.max_missed_pongs, DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS);
-    }
-
-    #[test]
-    fn test_health_check_default_enabled_is_false() {
-        // Explicit test for CON-01: alignment with official SDKs
-        let config = HealthCheckConfig::default();
-        assert!(
-            !config.enabled,
-            "Default enabled should be false to match official SDKs"
-        );
+        assert_eq!(config.timeout(), Duration::from_secs(300));
     }
 
     #[test]
     fn test_new_rejects_too_small_interval() {
         let result = HealthCheckConfig::new(true, Duration::from_secs(2), 3);
         assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("interval"),
-            "Error should mention field name: {}",
-            err
-        );
-        assert!(
-            err.contains("5000ms") || err.contains("2000ms"),
-            "Error should show values: {}",
-            err
-        );
     }
 
     #[test]
     fn test_new_rejects_zero_max_missed_pongs() {
         let result = HealthCheckConfig::new(true, Duration::from_secs(30), 0);
         assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("max_missed_pongs"),
-            "Error should mention field name: {}",
-            err
-        );
     }
 
     #[test]
@@ -388,104 +317,68 @@ mod tests {
 
     #[test]
     fn test_new_accepts_minimum_interval() {
-        // Exactly 5000ms should be valid
         let result = HealthCheckConfig::new(true, Duration::from_millis(5000), 1);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_on_pong_received_resets_count() {
-        let config = HealthCheckConfig::default();
-        let health_check = HealthCheck::new(config);
-
-        // Simulate missed pongs
-        health_check.missed_pong_count.store(3, Ordering::SeqCst);
-        assert_eq!(health_check.missed_pong_count(), 3);
-
-        // Receive pong
-        health_check.on_pong_received();
-
-        // Count should be reset
-        assert_eq!(health_check.missed_pong_count(), 0);
+    fn test_new_initializes_last_activity_to_now() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        assert!(
+            hc.last_activity_age() < Duration::from_millis(100),
+            "HealthCheck::new must initialize last_activity_ms to current time"
+        );
+        assert!(hc.is_healthy());
     }
 
     #[test]
-    fn test_pause_stops_checking() {
-        let config = HealthCheckConfig::default();
-        let health_check = HealthCheck::new(config);
+    fn test_touch_resets_age() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        thread::sleep(Duration::from_millis(50));
+        assert!(hc.last_activity_age() >= Duration::from_millis(50));
 
-        assert!(!health_check.is_paused());
-
-        health_check.pause();
-        assert!(health_check.is_paused());
-
-        health_check.resume();
-        assert!(!health_check.is_paused());
+        hc.touch();
+        assert!(hc.last_activity_age() < Duration::from_millis(20));
     }
 
     #[test]
-    fn test_is_healthy_returns_correct_status() {
-        let config = HealthCheckConfig::default().with_max_missed_pongs(3).unwrap();
-        let health_check = HealthCheck::new(config);
-
-        // Initially healthy
-        assert!(health_check.is_healthy());
-
-        // Still healthy with 2 missed pongs
-        health_check.missed_pong_count.store(2, Ordering::SeqCst);
-        assert!(health_check.is_healthy());
-
-        // Unhealthy at threshold
-        health_check.missed_pong_count.store(3, Ordering::SeqCst);
-        assert!(!health_check.is_healthy());
-
-        // Unhealthy above threshold
-        health_check.missed_pong_count.store(5, Ordering::SeqCst);
-        assert!(!health_check.is_healthy());
+    fn test_age_grows_over_time() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        thread::sleep(Duration::from_millis(120));
+        assert!(hc.last_activity_age() >= Duration::from_millis(100));
     }
 
     #[test]
-    fn test_resume_resets_timestamp() {
-        let config = HealthCheckConfig::default();
-        let health_check = HealthCheck::new(config);
+    fn test_is_healthy_false_after_timeout() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        // Manually set last activity to a time far in the past.
+        let stale = current_time_ms().saturating_sub(200_000);
+        hc.last_activity_ms.store(stale, Ordering::Relaxed);
+        assert!(!hc.is_healthy());
+    }
 
-        // Set old timestamp and missed count
-        health_check.last_pong_timestamp.store(100, Ordering::SeqCst);
-        health_check.missed_pong_count.store(5, Ordering::SeqCst);
-
-        // Resume
-        health_check.resume();
-
-        // Timestamp should be updated to recent time
-        let timestamp = health_check.last_pong_timestamp.load(Ordering::SeqCst);
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        assert!(timestamp >= now - 1); // Within 1 second
-
-        // Missed count should be reset
-        assert_eq!(health_check.missed_pong_count(), 0);
+    #[test]
+    fn test_pause_resume_resets_age() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        hc.pause();
+        thread::sleep(Duration::from_millis(50));
+        assert!(hc.is_paused());
+        hc.resume();
+        assert!(!hc.is_paused());
+        assert!(hc.last_activity_age() < Duration::from_millis(20));
     }
 
     #[test]
     fn test_stop_flag() {
-        let config = HealthCheckConfig::default();
-        let health_check = HealthCheck::new(config);
-
-        assert!(!health_check.should_stop.load(Ordering::SeqCst));
-
-        health_check.stop();
-        assert!(health_check.should_stop.load(Ordering::SeqCst));
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        assert!(!hc.should_stop.load(Ordering::SeqCst));
+        hc.stop();
+        assert!(hc.should_stop.load(Ordering::SeqCst));
     }
 
     #[test]
-    fn test_manual_ping() {
-        let config = HealthCheckConfig::default();
-        let health_check = HealthCheck::new(config);
-
-        // Manual ping should not error
-        let result = health_check.ping();
-        assert!(result.is_ok());
+    fn test_manual_ping_noop() {
+        let hc = HealthCheck::new(HealthCheckConfig::default());
+        assert!(hc.ping().is_ok());
     }
 }

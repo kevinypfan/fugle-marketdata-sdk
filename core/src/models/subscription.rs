@@ -151,9 +151,20 @@ impl WebSocketMessage {
         self.event == "data"
     }
 
-    /// Check if this is a pong message
+    /// Check if this is a pong message. With the activity-timer health check
+    /// the SDK never sends internal pings, so any pong arriving on this
+    /// connection is a response to a user-initiated `ping(state)` and is
+    /// forwarded to user message callbacks unchanged.
     pub fn is_pong(&self) -> bool {
         self.event == "pong"
+    }
+
+    /// Check if this is a server-initiated heartbeat (`{"event":"heartbeat"}`).
+    /// Heartbeats arrive every ~30 seconds and carry a microsecond timestamp
+    /// in `data.time`. They are forwarded to user message callbacks so callers
+    /// can use them for latency measurement or clock alignment.
+    pub fn is_heartbeat(&self) -> bool {
+        self.event == "heartbeat"
     }
 
     /// Check if this is a subscribed confirmation
@@ -172,6 +183,7 @@ impl WebSocketMessage {
             .and_then(|m| m.as_str())
             .map(|s| s.to_string())
     }
+
 }
 
 /// WebSocket authentication request

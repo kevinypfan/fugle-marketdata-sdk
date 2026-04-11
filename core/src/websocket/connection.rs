@@ -10,6 +10,7 @@ use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::{mpsc, Arc};
 use tokio::net::TcpStream;
+use tokio::sync::mpsc as tokio_mpsc;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Duration};
@@ -55,8 +56,6 @@ pub enum ConnectionEvent {
     Reconnecting { attempt: u32 },
     /// Reconnection failed after max attempts
     ReconnectFailed { attempts: u32 },
-    /// Pong message missed (health check)
-    PongMissed,
     /// Error occurred
     Error { message: String, code: i32 },
 }
@@ -68,8 +67,14 @@ pub struct WebSocketClient {
     state: Arc<RwLock<ConnectionState>>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     event_rx: Arc<Mutex<mpsc::Receiver<ConnectionEvent>>>,
-    /// Write half of the WebSocket stream (for sending messages)
+    /// Write half of the WebSocket stream (held by the writer task during
+    /// normal operation; close/force_close paths may also touch it).
     ws_sink: Arc<Mutex<Option<WsSink>>>,
+    /// Outbound write channel. All `subscribe`/`unsubscribe`/`send`/health-check
+    /// pings push pre-serialized JSON strings here; a single writer task drains
+    /// it into `ws_sink`. This eliminates lock contention on `ws_sink` between
+    /// concurrent senders.
+    write_tx: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
     reconnection: Arc<Mutex<ReconnectionManager>>,
     subscriptions: Arc<SubscriptionManager>,
     health_check: Arc<HealthCheck>,
@@ -77,7 +82,8 @@ pub struct WebSocketClient {
     message_receiver: Arc<MessageReceiver>,
     // Internal handles
     dispatch_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    health_check_handle: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
+    health_check_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl WebSocketClient {
@@ -138,6 +144,7 @@ impl WebSocketClient {
             event_tx,
             event_rx: Arc::new(Mutex::new(event_rx)),
             ws_sink: Arc::new(Mutex::new(None)),
+            write_tx: Arc::new(Mutex::new(None)),
             reconnection: Arc::new(Mutex::new(ReconnectionManager::new(reconnection_config))),
             subscriptions: Arc::new(SubscriptionManager::new()),
             health_check: Arc::new(HealthCheck::new(health_check_config)),
@@ -145,6 +152,7 @@ impl WebSocketClient {
             message_receiver: Arc::new(MessageReceiver::new(message_rx)),
             dispatch_handle: Arc::new(Mutex::new(None)),
             health_check_handle: Arc::new(Mutex::new(None)),
+            writer_handle: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -241,7 +249,6 @@ impl WebSocketClient {
     /// - `Disconnected { code, reason }` - Connection closed
     /// - `Reconnecting { attempt }` - Reconnection attempt started
     /// - `ReconnectFailed { attempts }` - Reconnection failed after max attempts
-    /// - `PongMissed` - Health check pong timeout
     /// - `Error { message, code }` - Error occurred
     ///
     /// # Example
@@ -408,6 +415,10 @@ impl WebSocketClient {
                     *sink_guard = Some(ws_sink);
                 }
 
+                // Spawn the writer task and install its sender. All
+                // subsequent outbound messages flow through this channel.
+                self.start_writer_task().await;
+
                 {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Connected;
@@ -418,7 +429,7 @@ impl WebSocketClient {
                 self.spawn_dispatch_task(ws_read).await;
 
                 // Start health check task if enabled
-                self.start_health_check();
+                self.start_health_check().await;
 
                 Ok(())
             }
@@ -483,24 +494,33 @@ impl WebSocketClient {
             let mut handle = self.dispatch_handle.lock().await;
             if let Some(h) = handle.take() {
                 h.abort();
-                // Wait for task to actually stop
                 let _ = h.await;
             }
         }
 
-        // 3. Join health check thread (blocking wait with timeout)
+        // 3. Cancel health check task
         {
             let mut handle = self.health_check_handle.lock().await;
             if let Some(h) = handle.take() {
-                // Use a thread for joining to avoid blocking async runtime
-                let join_result = tokio::task::spawn_blocking(move || h.join()).await;
-                if let Err(e) = join_result {
-                    eprintln!("Warning: Health check thread join failed: {:?}", e);
-                }
+                h.abort();
+                let _ = h.await;
             }
         }
 
-        // 4 & 5. Send close frame with timeout
+        // 4. Drop the write_tx slot and abort the writer task
+        {
+            let mut tx_guard = self.write_tx.lock().await;
+            *tx_guard = None;
+        }
+        {
+            let mut handle = self.writer_handle.lock().await;
+            if let Some(h) = handle.take() {
+                h.abort();
+                let _ = h.await;
+            }
+        }
+
+        // 5. Send close frame with timeout
         let close_result = self.close_websocket_with_timeout(Duration::from_secs(5)).await;
 
         // 6. Update state to Closed (always, even if close failed)
@@ -560,6 +580,26 @@ impl WebSocketClient {
             }
         }
 
+        // Abort health check task
+        {
+            let mut handle = self.health_check_handle.lock().await;
+            if let Some(h) = handle.take() {
+                h.abort();
+            }
+        }
+
+        // Abort writer task and clear sender
+        {
+            let mut tx_guard = self.write_tx.lock().await;
+            *tx_guard = None;
+        }
+        {
+            let mut handle = self.writer_handle.lock().await;
+            if let Some(h) = handle.take() {
+                h.abort();
+            }
+        }
+
         // Drop sink without close frame
         {
             let mut sink_guard = self.ws_sink.lock().await;
@@ -608,19 +648,12 @@ impl WebSocketClient {
         // Add to subscription state immediately
         self.subscriptions.subscribe(req.clone());
 
-        // If connected, send subscribe message to server
+        // If connected, enqueue subscribe message
         if self.is_connected().await {
             let sub_msg = WebSocketRequest::subscribe(req);
             let sub_json = serde_json::to_string(&sub_msg)
                 .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-
-            let mut sink_guard = self.ws_sink.lock().await;
-            if let Some(ref mut sink) = *sink_guard {
-                sink
-                    .send(Message::Text(sub_json.into()))
-                    .await
-                    .map_err(MarketDataError::from)?;
-            }
+            self.enqueue_write(sub_json).await?;
         }
 
         Ok(())
@@ -645,21 +678,14 @@ impl WebSocketClient {
         // Remove from subscription state immediately
         self.subscriptions.unsubscribe(key);
 
-        // If connected, send unsubscribe message to server
+        // If connected, enqueue unsubscribe message
         if self.is_connected().await {
             let unsub_msg = WebSocketRequest::unsubscribe(
                 crate::models::UnsubscribeRequest::by_id(key.to_string()),
             );
             let unsub_json = serde_json::to_string(&unsub_msg)
                 .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-
-            let mut sink_guard = self.ws_sink.lock().await;
-            if let Some(ref mut sink) = *sink_guard {
-                sink
-                    .send(Message::Text(unsub_json.into()))
-                    .await
-                    .map_err(MarketDataError::from)?;
-            }
+            self.enqueue_write(unsub_json).await?;
         }
 
         Ok(())
@@ -710,14 +736,7 @@ impl WebSocketClient {
             let sub_msg = WebSocketRequest::subscribe(req);
             let sub_json = serde_json::to_string(&sub_msg)
                 .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-
-            let mut sink_guard = self.ws_sink.lock().await;
-            if let Some(ref mut sink) = *sink_guard {
-                sink
-                    .send(Message::Text(sub_json.into()))
-                    .await
-                    .map_err(MarketDataError::from)?;
-            }
+            self.enqueue_write(sub_json).await?;
         }
 
         Ok(())
@@ -731,44 +750,20 @@ impl WebSocketClient {
     ///
     /// Returns `ClientClosed` if the client has been closed.
     pub async fn send(&self, request: WebSocketRequest) -> Result<(), MarketDataError> {
-        // Check if client is closed
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
 
         let json = serde_json::to_string(&request)
             .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-
-        let mut sink_guard = self.ws_sink.lock().await;
-        if let Some(ref mut sink) = *sink_guard {
-            sink
-                .send(Message::Text(json.into()))
-                .await
-                .map_err(MarketDataError::from)?;
-            Ok(())
-        } else {
-            Err(MarketDataError::ConnectionError {
-                msg: "Not connected".to_string(),
-            })
-        }
+        self.enqueue_write(json).await
     }
 
     /// Send raw text message to WebSocket
     ///
     /// Used internally for sending subscription requests
     pub(crate) async fn send_text(&self, text: &str) -> Result<(), MarketDataError> {
-        let mut sink_guard = self.ws_sink.lock().await;
-        if let Some(ref mut sink) = *sink_guard {
-            sink
-                .send(Message::Text(text.to_string().into()))
-                .await
-                .map_err(MarketDataError::from)?;
-            Ok(())
-        } else {
-            Err(MarketDataError::ConnectionError {
-                msg: "Not connected".to_string(),
-            })
-        }
+        self.enqueue_write(text.to_string()).await
     }
 
     // ========================================================================
@@ -901,6 +896,8 @@ impl WebSocketClient {
         let config = self.config.clone();
         let state = Arc::clone(&self.state);
         let ws_sink = Arc::clone(&self.ws_sink);
+        let write_tx_slot = Arc::clone(&self.write_tx);
+        let writer_handle = Arc::clone(&self.writer_handle);
         let subscriptions = Arc::clone(&self.subscriptions);
         let health_check_handle = Arc::clone(&self.health_check_handle);
 
@@ -917,8 +914,6 @@ impl WebSocketClient {
                 .await;
 
                 // Attempt auto-reconnect; returns new streams on success.
-                // Pass cloned owned values (not references) because mpsc::Sender is !Sync
-                // and &mpsc::Sender across await points would make the future !Send.
                 match try_reconnect(
                     close_code,
                     Arc::clone(&reconnection),
@@ -926,6 +921,8 @@ impl WebSocketClient {
                     Arc::clone(&state),
                     event_tx.clone(),
                     Arc::clone(&ws_sink),
+                    Arc::clone(&write_tx_slot),
+                    Arc::clone(&writer_handle),
                     Arc::clone(&subscriptions),
                     Arc::clone(&health_check),
                     Arc::clone(&health_check_handle),
@@ -949,39 +946,66 @@ impl WebSocketClient {
         *dispatch_handle_guard = Some(handle);
     }
 
-    /// Internal: Start health check monitoring
-    fn start_health_check(&self) {
-        let (ping_tx, mut ping_rx) = tokio::sync::mpsc::channel(1);
-        let event_tx = self.event_tx.clone();
+    /// Internal: Spawn the writer task that drains the outbound channel into
+    /// the WebSocket sink. Also installs the new `write_tx` sender into the
+    /// shared slot. Call after `ws_sink` has been populated.
+    async fn start_writer_task(&self) {
+        // Aborts any previous writer task. Channel buffer 64 is generous for a
+        // ping-every-30s + occasional sub/unsub workload while staying small
+        // enough to surface backpressure if the sink stalls.
+        if let Some(prev) = self.writer_handle.lock().await.take() {
+            prev.abort();
+        }
 
-        // Spawn health check thread
-        let handle = self.health_check.spawn_check_task(ping_tx, event_tx);
+        let (tx, rx) = tokio_mpsc::channel::<String>(64);
+        {
+            let mut guard = self.write_tx.lock().await;
+            *guard = Some(tx);
+        }
 
-        // Store handle
-        let health_check_handle = Arc::clone(&self.health_check_handle);
-        tokio::spawn(async move {
-            let mut guard = health_check_handle.lock().await;
-            *guard = Some(handle);
-        });
-
-        // Resume health check (was paused during connect)
-        self.health_check.resume();
-
-        // Spawn JSON ping sender task: reads from ping_rx and sends {"event":"ping"} via ws_sink
         let ws_sink = Arc::clone(&self.ws_sink);
-        tokio::spawn(async move {
-            while ping_rx.recv().await.is_some() {
-                let ping_msg = WebSocketRequest::ping(None);
-                if let Ok(json) = serde_json::to_string(&ping_msg) {
-                    let mut sink_guard = ws_sink.lock().await;
-                    if let Some(ref mut sink) = *sink_guard {
-                        if sink.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
+        let event_tx = self.event_tx.clone();
+        let handle = tokio::spawn(run_writer_task(rx, ws_sink, event_tx));
+
+        let mut guard = self.writer_handle.lock().await;
+        *guard = Some(handle);
+    }
+
+    /// Internal: Push a JSON string onto the outbound write channel. Returns
+    /// `ConnectionError` if the writer task is not running (e.g., disconnected).
+    async fn enqueue_write(&self, json: String) -> Result<(), MarketDataError> {
+        let sender = { self.write_tx.lock().await.clone() };
+        match sender {
+            Some(s) => s.send(json).await.map_err(|_| MarketDataError::ConnectionError {
+                msg: "Writer task is not running".to_string(),
+            }),
+            None => Err(MarketDataError::ConnectionError {
+                msg: "Not connected".to_string(),
+            }),
+        }
+    }
+
+    /// Internal: Start health check monitoring
+    async fn start_health_check(&self) {
+        if !self.health_check.config().enabled {
+            return;
+        }
+
+        // CRITICAL: reset activity timer to "now" before spawning the task.
+        // HealthCheck::new() ran at client construction, possibly long before
+        // connect() was called. Without this touch the first tick would see a
+        // stale age and could false-disconnect immediately.
+        self.health_check.touch();
+
+        let event_tx = self.event_tx.clone();
+        let handle = self.health_check.spawn_check_task(event_tx);
+
+        {
+            let mut guard = self.health_check_handle.lock().await;
+            *guard = Some(handle);
+        }
+
+        self.health_check.resume();
     }
 
     /// Internal: Automatic reconnection flow (&self version)
@@ -1093,6 +1117,31 @@ impl WebSocketClient {
     }
 }
 
+/// Single-writer task body. Drains pre-serialized JSON strings from `rx`
+/// and writes them as text frames to the shared `ws_sink`. Exits when the
+/// channel closes or when a write fails. Errors are reported via `event_tx`.
+async fn run_writer_task(
+    mut rx: tokio_mpsc::Receiver<String>,
+    ws_sink: Arc<Mutex<Option<WsSink>>>,
+    event_tx: mpsc::Sender<ConnectionEvent>,
+) {
+    while let Some(text) = rx.recv().await {
+        let mut sink_guard = ws_sink.lock().await;
+        let Some(sink) = sink_guard.as_mut() else {
+            // Sink has been cleared (disconnect/force_close). Stop draining.
+            break;
+        };
+        if let Err(e) = sink.send(Message::Text(text.into())).await {
+            let err: MarketDataError = e.into();
+            let _ = event_tx.send(ConnectionEvent::Error {
+                message: format!("Writer error: {}", err),
+                code: err.to_error_code(),
+            });
+            break;
+        }
+    }
+}
+
 /// Attempt auto-reconnection after a disconnect.
 ///
 /// Called from within the dispatch loop's spawned task. Takes owned values
@@ -1100,6 +1149,7 @@ impl WebSocketClient {
 /// holding `&mpsc::Sender` across await points would make the future `!Send`.
 /// Returns `Some(ws_read)` on successful reconnect, `None` if reconnect is not
 /// configured or all attempts are exhausted.
+#[allow(clippy::too_many_arguments)]
 async fn try_reconnect(
     close_code: Option<u16>,
     reconnection: Arc<Mutex<ReconnectionManager>>,
@@ -1107,9 +1157,11 @@ async fn try_reconnect(
     state: Arc<RwLock<ConnectionState>>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     ws_sink: Arc<Mutex<Option<WsSink>>>,
+    write_tx_slot: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
+    writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     subscriptions: Arc<SubscriptionManager>,
     health_check: Arc<HealthCheck>,
-    health_check_handle: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
+    health_check_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     message_tx: mpsc::Sender<WebSocketMessage>,
 ) -> Option<WsStream> {
     // Check if we should attempt reconnection
@@ -1186,43 +1238,47 @@ async fn try_reconnect(
                             reconnection.reset();
                         }
 
-                        // Resubscribe all stored subscriptions
+                        // Rebuild the writer task for the new sink
+                        if let Some(prev) = writer_handle.lock().await.take() {
+                            prev.abort();
+                        }
+                        let (new_write_tx, new_write_rx) = tokio_mpsc::channel::<String>(64);
+                        {
+                            let mut guard = write_tx_slot.lock().await;
+                            *guard = Some(new_write_tx.clone());
+                        }
+                        let writer_task_handle = tokio::spawn(run_writer_task(
+                            new_write_rx,
+                            Arc::clone(&ws_sink),
+                            event_tx.clone(),
+                        ));
+                        {
+                            let mut guard = writer_handle.lock().await;
+                            *guard = Some(writer_task_handle);
+                        }
+
+                        // Resubscribe all stored subscriptions through the new writer
                         let subs = subscriptions.get_all();
                         for req in subs {
                             let sub_msg = WebSocketRequest::subscribe(req);
                             if let Ok(sub_json) = serde_json::to_string(&sub_msg) {
-                                let mut sink_guard = ws_sink.lock().await;
-                                if let Some(ref mut sink) = *sink_guard {
-                                    let _ = sink.send(Message::Text(sub_json.into())).await;
-                                }
+                                let _ = new_write_tx.send(sub_json).await;
                             }
                         }
 
-                        // Start health check for the new connection
-                        let (ping_tx, mut ping_rx) = tokio::sync::mpsc::channel(1);
-                        let hc_handle =
-                            health_check.spawn_check_task(ping_tx, event_tx.clone());
-                        {
+                        // Restart health check for the new connection if enabled
+                        if let Some(prev) = health_check_handle.lock().await.take() {
+                            prev.abort();
+                        }
+                        if health_check.config().enabled {
+                            // Reset activity timer before restarting the task.
+                            health_check.touch();
+                            health_check.resume();
+                            let hc_handle =
+                                health_check.spawn_check_task(event_tx.clone());
                             let mut hch = health_check_handle.lock().await;
                             *hch = Some(hc_handle);
                         }
-                        health_check.resume();
-
-                        // Spawn JSON ping sender for reconnected connection
-                        let ws_sink_for_ping = Arc::clone(&ws_sink);
-                        tokio::spawn(async move {
-                            while ping_rx.recv().await.is_some() {
-                                let ping_msg = WebSocketRequest::ping(None);
-                                if let Ok(json) = serde_json::to_string(&ping_msg) {
-                                    let mut sink_guard = ws_sink_for_ping.lock().await;
-                                    if let Some(ref mut sink) = *sink_guard {
-                                        if sink.send(Message::Text(json.into())).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        });
 
                         return Some(ws_read);
                     }
@@ -1415,7 +1471,6 @@ mod tests {
         };
         let _reconnecting = ConnectionEvent::Reconnecting { attempt: 1 };
         let _failed = ConnectionEvent::ReconnectFailed { attempts: 5 };
-        let _pong_missed = ConnectionEvent::PongMissed;
         let _error = ConnectionEvent::Error {
             message: "Connection failed".to_string(),
             code: 2001,
