@@ -90,7 +90,10 @@ def section_ws():
 
 
 # ---------------------------------------------------------------------------
-# Section 3 — Error handling (legacy README "Catching API Errors" block)
+# Section 3 — Error handling
+#
+# Maps to two adjacent blocks in the legacy README ("Catching API Errors"
+# and "Common Error Scenarios"). Both are exercised here as 3a / 3b.
 # ---------------------------------------------------------------------------
 def section_errors():
     print("=" * 60)
@@ -99,24 +102,31 @@ def section_errors():
 
     client = RestClient(api_key=API_KEY)
 
-    # 3a. Generic catch — happy path
+    # 3a. Happy path: legitimate symbol should succeed.
+    print("\n--- 3a. Successful quote (sanity check) ---")
+    print(">>> client.stock.intraday.quote(symbol='2330')")
     try:
         data = client.stock.intraday.quote(symbol="2330")
         print(f"OK: got quote for 2330 ({len(str(data))} bytes)")
     except FugleAPIError as e:
-        print(f"Error: {e}")
+        print(f"UNEXPECTED error on a valid symbol: {e}")
 
-    # 3b. Common error scenario — invalid symbol triggers an HTTP error
-    print("\nTriggering an invalid-symbol error:")
+    # 3b. Error path: an invalid symbol intentionally triggers a 404 so we
+    # can validate that FugleAPIError is raised and catchable. The 404 is
+    # the *expected* outcome of this test, not a bug.
+    print("\n--- 3b. Intentional 404 (testing error handling) ---")
+    print(">>> client.stock.intraday.quote(symbol='INVALID_SYMBOL')")
+    print("    (we expect a 404 here — this validates the FugleAPIError catch path)")
     try:
         client.stock.intraday.quote(symbol="INVALID_SYMBOL")
+        print("UNEXPECTED: invalid symbol did not raise")
     except FugleAPIError as e:
-        # The legacy README accesses e.message / e.url / e.status_code /
-        # e.params / e.response_text. Our MarketDataError variants don't
-        # currently expose those as attributes, but `str(e)` carries the
-        # diagnostic. The except-clause itself is the API contract being
-        # validated here.
-        print(f"  caught FugleAPIError: {e}")
+        # NOTE: the legacy README also accesses e.message / e.url /
+        # e.status_code / e.params / e.response_text. Our MarketDataError
+        # alias does not expose those as attributes yet — only `str(e)`
+        # and the exception type are validated here. Adding the legacy
+        # attribute surface is tracked as a follow-up.
+        print(f"  caught FugleAPIError (expected): {e}")
         print(f"  type: {type(e).__name__}")
     print()
 
