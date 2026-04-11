@@ -340,7 +340,7 @@ class TestQuoteIntegration:
             pytest.skip("FUGLE_API_KEY not set")
 
         # Get live response
-        live_response = await rest_client.stock.intraday.quote("2330")
+        live_response = await rest_client.stock.intraday.quote_async("2330")
 
         # Load fixture for comparison
         fixture_response = load_cassette_response('official_sdk_quote.yaml')
@@ -364,7 +364,7 @@ class TestTickerIntegration:
         if not os.environ.get("FUGLE_API_KEY"):
             pytest.skip("FUGLE_API_KEY not set")
 
-        live_response = await rest_client.stock.intraday.ticker("2330")
+        live_response = await rest_client.stock.intraday.ticker_async("2330")
 
         # Extract ticker array
         if 'data' in live_response:

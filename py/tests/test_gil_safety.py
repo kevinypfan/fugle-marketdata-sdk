@@ -33,7 +33,7 @@ class TestGilSafety:
         async def make_request():
             try:
                 # This will fail with mock key, but we're testing GIL behavior
-                await asyncio.to_thread(lambda: client.stock.intraday.quote("2330"))
+                await asyncio.to_thread(lambda: client.stock.intraday.quote_async("2330"))
             except Exception:
                 pass  # Expected to fail with mock key
 
@@ -61,7 +61,7 @@ class TestGilSafety:
 
         async def async_request():
             try:
-                await asyncio.to_thread(lambda: client.stock.intraday.quote("2330"))
+                await asyncio.to_thread(lambda: client.stock.intraday.quote_async("2330"))
             except Exception:
                 pass
 

@@ -242,7 +242,7 @@ impl StockIntradayClient {
     ///     print(f"Change: {quote['change']}")
     ///     ```
     #[pyo3(signature = (symbol, odd_lot=false))]
-    pub fn quote<'py>(&self, py: Python<'py>, symbol: String, odd_lot: bool) -> PyResult<Bound<'py, PyAny>> {
+    pub fn quote_async<'py>(&self, py: Python<'py>, symbol: String, odd_lot: bool) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -268,7 +268,7 @@ impl StockIntradayClient {
     /// Sync sibling of `quote()` for callers migrating from the legacy
     /// fugle-marketdata Python SDK. Releases the GIL during the network call.
     #[pyo3(signature = (symbol, odd_lot=false))]
-    pub fn quote_sync(&self, py: Python<'_>, symbol: String, odd_lot: bool) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn quote(&self, py: Python<'_>, symbol: String, odd_lot: bool) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -301,7 +301,7 @@ impl StockIntradayClient {
     ///     ticker = await client.stock.intraday.ticker("2330")
     ///     ```
     #[pyo3(signature = (symbol))]
-    pub fn ticker<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn ticker_async<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -320,7 +320,7 @@ impl StockIntradayClient {
 
     /// Sync sibling of `ticker()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol))]
-    pub fn ticker_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn ticker(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -350,7 +350,7 @@ impl StockIntradayClient {
     ///     candles = await client.stock.intraday.candles("2330", "5")
     ///     ```
     #[pyo3(signature = (symbol, timeframe="1".to_string()))]
-    pub fn candles<'py>(&self, py: Python<'py>, symbol: String, timeframe: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn candles_async<'py>(&self, py: Python<'py>, symbol: String, timeframe: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -369,7 +369,7 @@ impl StockIntradayClient {
 
     /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, timeframe="1".to_string()))]
-    pub fn candles_sync(&self, py: Python<'_>, symbol: String, timeframe: String) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn candles(&self, py: Python<'_>, symbol: String, timeframe: String) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -398,7 +398,7 @@ impl StockIntradayClient {
     ///     trades = await client.stock.intraday.trades("2330")
     ///     ```
     #[pyo3(signature = (symbol))]
-    pub fn trades<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn trades_async<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -417,7 +417,7 @@ impl StockIntradayClient {
 
     /// Sync sibling of `trades()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol))]
-    pub fn trades_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn trades(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -446,7 +446,7 @@ impl StockIntradayClient {
     ///     volumes = await client.stock.intraday.volumes("2330")
     ///     ```
     #[pyo3(signature = (symbol))]
-    pub fn volumes<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn volumes_async<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -465,7 +465,7 @@ impl StockIntradayClient {
 
     /// Sync sibling of `volumes()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol))]
-    pub fn volumes_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn volumes(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -495,7 +495,7 @@ impl StockIntradayClient {
     ///     tickers = await client.stock.intraday.tickers(type="EQUITY")
     ///     ```
     #[pyo3(signature = (r#type, exchange=None, market=None, industry=None, is_normal=None))]
-    pub fn tickers<'py>(
+    pub fn tickers_async<'py>(
         &self,
         py: Python<'py>,
         r#type: String,
@@ -539,7 +539,7 @@ impl StockIntradayClient {
 
     /// Sync sibling of `tickers()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (r#type, exchange=None, market=None, industry=None, is_normal=None))]
-    pub fn tickers_sync(
+    pub fn tickers(
         &self,
         py: Python<'_>,
         r#type: String,
@@ -612,7 +612,7 @@ impl StockHistoricalClient {
     ///     )
     ///     ```
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fields=None, sort=None, adjusted=None))]
-    pub fn candles<'py>(
+    pub fn candles_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -661,7 +661,7 @@ impl StockHistoricalClient {
 
     /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fields=None, sort=None, adjusted=None))]
-    pub fn candles_sync(
+    pub fn candles(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -717,7 +717,7 @@ impl StockHistoricalClient {
     ///     print(f"52-week high: {stats['week52High']}")
     ///     ```
     #[pyo3(signature = (symbol))]
-    pub fn stats<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
+    pub fn stats_async<'py>(&self, py: Python<'py>, symbol: String) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -737,7 +737,7 @@ impl StockHistoricalClient {
 
     /// Sync sibling of `stats()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol))]
-    pub fn stats_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn stats(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let stock = inner.stock();
@@ -775,7 +775,7 @@ impl StockSnapshotClient {
     ///     quotes = await client.stock.snapshot.quotes("TSE", type_filter="COMMONSTOCK")
     ///     ```
     #[pyo3(signature = (market, type_filter=None))]
-    pub fn quotes<'py>(
+    pub fn quotes_async<'py>(
         &self,
         py: Python<'py>,
         market: String,
@@ -817,7 +817,7 @@ impl StockSnapshotClient {
     ///     movers = await client.stock.snapshot.movers("TSE", direction="up", change="percent")
     ///     ```
     #[pyo3(signature = (market, direction=None, change=None))]
-    pub fn movers<'py>(
+    pub fn movers_async<'py>(
         &self,
         py: Python<'py>,
         market: String,
@@ -862,7 +862,7 @@ impl StockSnapshotClient {
     ///     actives = await client.stock.snapshot.actives("TSE", trade="volume")
     ///     ```
     #[pyo3(signature = (market, trade=None))]
-    pub fn actives<'py>(
+    pub fn actives_async<'py>(
         &self,
         py: Python<'py>,
         market: String,
@@ -891,7 +891,7 @@ impl StockSnapshotClient {
 
     /// Sync sibling of `quotes()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (market, type_filter=None))]
-    pub fn quotes_sync(
+    pub fn quotes(
         &self,
         py: Python<'_>,
         market: String,
@@ -915,7 +915,7 @@ impl StockSnapshotClient {
 
     /// Sync sibling of `movers()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (market, direction=None, change=None))]
-    pub fn movers_sync(
+    pub fn movers(
         &self,
         py: Python<'_>,
         market: String,
@@ -943,7 +943,7 @@ impl StockSnapshotClient {
 
     /// Sync sibling of `actives()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (market, trade=None))]
-    pub fn actives_sync(
+    pub fn actives(
         &self,
         py: Python<'_>,
         market: String,
@@ -988,7 +988,7 @@ impl StockTechnicalClient {
     /// Returns:
     ///     Awaitable[dict]: SMA indicator data
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn sma<'py>(
+    pub fn sma_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -1039,7 +1039,7 @@ impl StockTechnicalClient {
     /// Returns:
     ///     Awaitable[dict]: RSI indicator data
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn rsi<'py>(
+    pub fn rsi_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -1090,7 +1090,7 @@ impl StockTechnicalClient {
     /// Returns:
     ///     Awaitable[dict]: KDJ indicator data with K, D, J values
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn kdj<'py>(
+    pub fn kdj_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -1143,7 +1143,7 @@ impl StockTechnicalClient {
     /// Returns:
     ///     Awaitable[dict]: MACD indicator data with MACD, signal, histogram
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fast=None, slow=None, signal=None))]
-    pub fn macd<'py>(
+    pub fn macd_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -1203,7 +1203,7 @@ impl StockTechnicalClient {
     /// Returns:
     ///     Awaitable[dict]: Bollinger Bands data with upper, middle, lower bands
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None, stddev=None))]
-    pub fn bb<'py>(
+    pub fn bb_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -1248,7 +1248,7 @@ impl StockTechnicalClient {
 
     /// Sync sibling of `sma()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn sma_sync(
+    pub fn sma(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -1276,7 +1276,7 @@ impl StockTechnicalClient {
 
     /// Sync sibling of `rsi()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn rsi_sync(
+    pub fn rsi(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -1304,7 +1304,7 @@ impl StockTechnicalClient {
 
     /// Sync sibling of `kdj()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
-    pub fn kdj_sync(
+    pub fn kdj(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -1332,7 +1332,7 @@ impl StockTechnicalClient {
 
     /// Sync sibling of `macd()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fast=None, slow=None, signal=None))]
-    pub fn macd_sync(
+    pub fn macd(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -1364,7 +1364,7 @@ impl StockTechnicalClient {
 
     /// Sync sibling of `bb()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None, stddev=None))]
-    pub fn bb_sync(
+    pub fn bb(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -1421,7 +1421,7 @@ impl StockCorporateActionsClient {
     ///     )
     ///     ```
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn capital_changes<'py>(
+    pub fn capital_changes_async<'py>(
         &self,
         py: Python<'py>,
         date: Option<String>,
@@ -1473,7 +1473,7 @@ impl StockCorporateActionsClient {
     ///     )
     ///     ```
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn dividends<'py>(
+    pub fn dividends_async<'py>(
         &self,
         py: Python<'py>,
         date: Option<String>,
@@ -1522,7 +1522,7 @@ impl StockCorporateActionsClient {
     ///     applicants = await client.stock.corporate_actions.listing_applicants()
     ///     ```
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn listing_applicants<'py>(
+    pub fn listing_applicants_async<'py>(
         &self,
         py: Python<'py>,
         date: Option<String>,
@@ -1558,7 +1558,7 @@ impl StockCorporateActionsClient {
 
     /// Sync sibling of `capital_changes()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn capital_changes_sync(
+    pub fn capital_changes(
         &self,
         py: Python<'_>,
         date: Option<String>,
@@ -1583,7 +1583,7 @@ impl StockCorporateActionsClient {
 
     /// Sync sibling of `dividends()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn dividends_sync(
+    pub fn dividends(
         &self,
         py: Python<'_>,
         date: Option<String>,
@@ -1608,7 +1608,7 @@ impl StockCorporateActionsClient {
 
     /// Sync sibling of `listing_applicants()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (date=None, start_date=None, end_date=None))]
-    pub fn listing_applicants_sync(
+    pub fn listing_applicants(
         &self,
         py: Python<'_>,
         date: Option<String>,
@@ -1696,7 +1696,7 @@ impl FutOptIntradayClient {
     ///     ah_quote = await client.futopt.intraday.quote("TXFC4", after_hours=True)
     ///     ```
     #[pyo3(signature = (symbol, after_hours=false))]
-    pub fn quote<'py>(&self, py: Python<'py>, symbol: String, after_hours: bool) -> PyResult<Bound<'py, PyAny>> {
+    pub fn quote_async<'py>(&self, py: Python<'py>, symbol: String, after_hours: bool) -> PyResult<Bound<'py, PyAny>> {
         let client = self.inner.clone();
         future_into_py(py, async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -1733,7 +1733,7 @@ impl FutOptIntradayClient {
     ///     tickers = await client.futopt.intraday.tickers(type="FUTURE")
     ///     ```
     #[pyo3(signature = (r#type, exchange=None, after_hours=false, contract_type=None))]
-    pub fn tickers<'py>(
+    pub fn tickers_async<'py>(
         &self,
         py: Python<'py>,
         r#type: String,
@@ -1790,7 +1790,7 @@ impl FutOptIntradayClient {
     ///     products = await client.futopt.intraday.products(type="FUTURE")
     ///     ```
     #[pyo3(signature = (r#type, contract_type=None))]
-    pub fn products<'py>(
+    pub fn products_async<'py>(
         &self,
         py: Python<'py>,
         r#type: String,
@@ -1827,7 +1827,7 @@ impl FutOptIntradayClient {
 
     /// Sync sibling of `quote()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, after_hours=false))]
-    pub fn quote_sync(&self, py: Python<'_>, symbol: String, after_hours: bool) -> PyResult<Py<pyo3::types::PyDict>> {
+    pub fn quote(&self, py: Python<'_>, symbol: String, after_hours: bool) -> PyResult<Py<pyo3::types::PyDict>> {
         let inner = self.inner.clone();
         let result = py.detach(|| {
             let futopt = inner.futopt();
@@ -1846,7 +1846,7 @@ impl FutOptIntradayClient {
 
     /// Sync sibling of `tickers()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (r#type, exchange=None, after_hours=false, contract_type=None))]
-    pub fn tickers_sync(
+    pub fn tickers(
         &self,
         py: Python<'_>,
         r#type: String,
@@ -1887,7 +1887,7 @@ impl FutOptIntradayClient {
 
     /// Sync sibling of `products()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (r#type, contract_type=None))]
-    pub fn products_sync(
+    pub fn products(
         &self,
         py: Python<'_>,
         r#type: String,
@@ -1979,7 +1979,7 @@ impl FutOptHistoricalClient {
     ///     )
     ///     ```
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, after_hours=false))]
-    pub fn candles<'py>(
+    pub fn candles_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -2020,7 +2020,7 @@ impl FutOptHistoricalClient {
 
     /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, after_hours=false))]
-    pub fn candles_sync(
+    pub fn candles(
         &self,
         py: Python<'_>,
         symbol: String,
@@ -2066,7 +2066,7 @@ impl FutOptHistoricalClient {
     ///     )
     ///     ```
     #[pyo3(signature = (symbol, from_date=None, to_date=None, after_hours=false))]
-    pub fn daily<'py>(
+    pub fn daily_async<'py>(
         &self,
         py: Python<'py>,
         symbol: String,
@@ -2103,7 +2103,7 @@ impl FutOptHistoricalClient {
 
     /// Sync sibling of `daily()` for legacy fugle-marketdata callers.
     #[pyo3(signature = (symbol, from_date=None, to_date=None, after_hours=false))]
-    pub fn daily_sync(
+    pub fn daily(
         &self,
         py: Python<'_>,
         symbol: String,

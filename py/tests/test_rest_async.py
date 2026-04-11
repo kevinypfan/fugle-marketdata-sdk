@@ -52,42 +52,42 @@ class TestAsyncMethods:
         client = RestClient(mock_api_key)
         # This should raise an error (invalid key) but BE awaitable
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.stock.intraday.quote("2330")
+            await client.stock.intraday.quote_async("2330")
 
     @pytest.mark.asyncio
     async def test_ticker_returns_awaitable(self, mock_api_key):
         """ticker() should return an awaitable."""
         client = RestClient(mock_api_key)
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.stock.intraday.ticker("2330")
+            await client.stock.intraday.ticker_async("2330")
 
     @pytest.mark.asyncio
     async def test_candles_returns_awaitable(self, mock_api_key):
         """candles() should return an awaitable."""
         client = RestClient(mock_api_key)
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.stock.intraday.candles("2330")
+            await client.stock.intraday.candles_async("2330")
 
     @pytest.mark.asyncio
     async def test_trades_returns_awaitable(self, mock_api_key):
         """trades() should return an awaitable."""
         client = RestClient(mock_api_key)
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.stock.intraday.trades("2330")
+            await client.stock.intraday.trades_async("2330")
 
     @pytest.mark.asyncio
     async def test_volumes_returns_awaitable(self, mock_api_key):
         """volumes() should return an awaitable."""
         client = RestClient(mock_api_key)
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.stock.intraday.volumes("2330")
+            await client.stock.intraday.volumes_async("2330")
 
     @pytest.mark.asyncio
     async def test_futopt_quote_returns_awaitable(self, mock_api_key):
         """futopt.intraday.quote() should return an awaitable."""
         client = RestClient(mock_api_key)
         with pytest.raises((MarketDataError, ApiError, AuthError)):
-            await client.futopt.intraday.quote("TXFC4")
+            await client.futopt.intraday.quote_async("TXFC4")
 
 
 class TestMethodSignatures:
@@ -127,7 +127,7 @@ class TestIntegrationRest:
     @pytest.mark.asyncio
     async def test_quote_returns_dict(self, rest_client):
         """quote() should return a dict with market data."""
-        result = await rest_client.stock.intraday.quote("2330")
+        result = await rest_client.stock.intraday.quote_async("2330")
         assert isinstance(result, dict)
         # The response should contain data fields
         assert len(result) > 0
@@ -135,36 +135,36 @@ class TestIntegrationRest:
     @pytest.mark.asyncio
     async def test_ticker_returns_dict(self, rest_client):
         """ticker() should return a dict with ticker data."""
-        result = await rest_client.stock.intraday.ticker("2330")
+        result = await rest_client.stock.intraday.ticker_async("2330")
         assert isinstance(result, dict)
         assert len(result) > 0
 
     @pytest.mark.asyncio
     async def test_candles_returns_dict(self, rest_client):
         """candles() should return a dict with candlestick data."""
-        result = await rest_client.stock.intraday.candles("2330")
+        result = await rest_client.stock.intraday.candles_async("2330")
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_trades_returns_dict(self, rest_client):
         """trades() should return a dict with trade data."""
-        result = await rest_client.stock.intraday.trades("2330")
+        result = await rest_client.stock.intraday.trades_async("2330")
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_volumes_returns_dict(self, rest_client):
         """volumes() should return a dict with volume data."""
-        result = await rest_client.stock.intraday.volumes("2330")
+        result = await rest_client.stock.intraday.volumes_async("2330")
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_invalid_symbol_raises_error(self, rest_client):
         """Invalid symbol should raise MarketDataError."""
         with pytest.raises(MarketDataError):
-            await rest_client.stock.intraday.quote("INVALID_SYMBOL_12345")
+            await rest_client.stock.intraday.quote_async("INVALID_SYMBOL_12345")
 
     @pytest.mark.asyncio
     async def test_futopt_quote_returns_dict(self, rest_client):
         """futopt.intraday.quote() should return a dict."""
-        result = await rest_client.futopt.intraday.quote("TXFC4")
+        result = await rest_client.futopt.intraday.quote_async("TXFC4")
         assert isinstance(result, dict)

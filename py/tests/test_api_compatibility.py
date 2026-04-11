@@ -379,7 +379,7 @@ class TestOfficialSDKExamplePatterns:
         Our implementation:
             from marketdata_py import RestClient
             client = RestClient('YOUR_API_KEY')
-            data = await client.stock.intraday.quote('2330')  # async!
+            data = await client.stock.intraday.quote_async('2330')  # async!
         """
         # Same constructor pattern
         client = RestClient("mock-api-key")
@@ -477,7 +477,7 @@ class TestOfficialSDKExamplePatterns:
 #
 # ============================================================================
 # Key Differences:
-# 1. REST methods return awaitables (use `await client.stock.intraday.quote()`)
+# 1. REST methods return awaitables (use `await client.stock.intraday.quote_async()`)
 # 2. WebSocket has both sync and async methods (connect vs connect_async)
 # 3. Additional utility methods for connection status and message iteration
 # 4. Async context manager support for automatic connection management

@@ -42,6 +42,10 @@ from .marketdata_py import (
     ConnectionError,
     TimeoutError,
     WebSocketError,
+    # Backward-compat alias for the legacy fugle-marketdata-python single
+    # exception class. Resolves to MarketDataError so `except FugleAPIError:`
+    # keeps catching every error variant.
+    FugleAPIError,
     # Config
     ReconnectConfig,
     HealthCheckConfig,
@@ -66,6 +70,7 @@ __all__ = [
     "ConnectionError",
     "TimeoutError",
     "WebSocketError",
+    "FugleAPIError",
     "ReconnectConfig",
     "HealthCheckConfig",
     "__version__",

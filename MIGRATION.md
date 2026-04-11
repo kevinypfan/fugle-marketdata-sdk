@@ -59,23 +59,31 @@ These are the differences this SDK does **not** paper over. They are limited
 on purpose — either because the new behaviour is materially better, or because
 hiding them would mask real bugs in legacy code.
 
-#### 1. Python REST methods are async
+#### 1. Python REST methods: sync by default, `_async` siblings available
 
 The legacy `fugle-marketdata` Python SDK is fully synchronous (`requests.get`
-under the hood). This SDK exposes REST as `async` methods so calls do not
-block the event loop in modern asyncio applications.
+under the hood). This SDK matches that default — bare `quote()` calls
+return a dict directly, just like the legacy SDK — and additionally exposes
+an `_async` sibling for every REST method so asyncio-based applications can
+avoid blocking the event loop.
 
 ```python
-# Legacy fugle-marketdata
+# Legacy fugle-marketdata (still works verbatim)
 quote = client.stock.intraday.quote(symbol="2330")
 
-# This SDK
-quote = await client.stock.intraday.quote("2330")
+# This SDK — sync default (drop-in replacement)
+quote = client.stock.intraday.quote("2330")
+
+# This SDK — async sibling for asyncio apps
+quote = await client.stock.intraday.quote_async("2330")
 ```
 
-If you have a fully synchronous codebase you currently need to wrap calls in
-`asyncio.run(...)`. A blocking sync wrapper for each method is planned (see
-the project TODO list); until then `asyncio.run` is the workaround.
+The async sibling exists for every REST method:
+`quote_async`, `ticker_async`, `candles_async`, `trades_async`,
+`volumes_async`, `tickers_async`, `stats_async`, `quotes_async`,
+`movers_async`, `actives_async`, `sma_async`, `rsi_async`, `kdj_async`,
+`macd_async`, `bb_async`, `capital_changes_async`, `dividends_async`,
+`listing_applicants_async`, `products_async`, `daily_async`.
 
 #### 2. Python REST: positional symbol + explicit named params
 

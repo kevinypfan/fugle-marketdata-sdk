@@ -35,7 +35,7 @@ class TestErrorHandlingBoundary:
 
         # Invalid symbol should raise a specific error subclass
         with pytest.raises(MarketDataError) as exc_info:
-            await client.stock.intraday.quote("INVALID_SYMBOL_12345")
+            await client.stock.intraday.quote_async("INVALID_SYMBOL_12345")
 
         # Error should be a subclass of MarketDataError (not the base class)
         assert type(exc_info.value).__name__ in ["ApiError", "AuthError"]
@@ -54,7 +54,7 @@ class TestErrorHandlingBoundary:
         client = RestClient(mock_api_key)
 
         try:
-            await client.stock.intraday.quote("2330")
+            await client.stock.intraday.quote_async("2330")
         except AuthError as e:
             # AuthError should be subclass of MarketDataError
             assert isinstance(e, MarketDataError)
@@ -75,7 +75,7 @@ class TestErrorHandlingBoundary:
 
         try:
             # This will likely fail - we're testing error handling
-            await client.stock.intraday.quote("2330")
+            await client.stock.intraday.quote_async("2330")
         except MarketDataError as e:
             # Error message should be valid UTF-8 string
             msg = str(e)
@@ -94,7 +94,7 @@ class TestErrorHandlingBoundary:
         client = RestClient(mock_api_key)
 
         try:
-            await client.stock.intraday.quote("INVALID")
+            await client.stock.intraday.quote_async("INVALID")
         except MarketDataError as e:
             # PyO3 errors should have args tuple
             assert hasattr(e, "args")
@@ -134,7 +134,7 @@ class TestPanicRecovery:
         long_symbol = "A" * 10000
 
         with pytest.raises(Exception):
-            await client.stock.intraday.quote(long_symbol)
+            await client.stock.intraday.quote_async(long_symbol)
 
         # Should raise exception, not segfault
 
@@ -155,7 +155,7 @@ class TestPanicRecovery:
 
         for symbol in unicode_symbols:
             try:
-                await client.stock.intraday.quote(symbol)
+                await client.stock.intraday.quote_async(symbol)
             except Exception as e:
                 # Should get exception with valid error message
                 assert isinstance(str(e), str)
@@ -206,13 +206,13 @@ class TestMemorySafety:
 
         # Cause an error
         try:
-            await client.stock.intraday.quote("INVALID")
+            await client.stock.intraday.quote_async("INVALID")
         except Exception:
             pass
 
         # Client should still be usable
         try:
-            await client.stock.intraday.quote("2330")
+            await client.stock.intraday.quote_async("2330")
         except Exception:
             pass  # Error is expected, but should not segfault
 
@@ -234,7 +234,7 @@ class TestMemorySafety:
         for inp in inputs:
             try:
                 # Most FFI functions expect strings, this should fail gracefully
-                await client.stock.intraday.quote(inp)  # type: ignore
+                await client.stock.intraday.quote_async(inp)  # type: ignore
             except (TypeError, Exception):
                 # Expected - should fail with exception, not segfault
                 pass
@@ -255,7 +255,7 @@ class TestGilSafety:
 
         async def make_request():
             try:
-                await client.stock.intraday.quote("2330")
+                await client.stock.intraday.quote_async("2330")
             except Exception:
                 results.append("request_attempted")
 
@@ -282,7 +282,7 @@ class TestGilSafety:
         async def use_client(client_id):
             client = RestClient(f"key_{client_id}")
             try:
-                await client.stock.intraday.quote("2330")
+                await client.stock.intraday.quote_async("2330")
             except Exception:
                 pass
             results.append(client_id)
