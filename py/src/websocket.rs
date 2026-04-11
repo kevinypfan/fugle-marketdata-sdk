@@ -359,6 +359,7 @@ impl WebSocketClient {
     pub fn stock(&self) -> StockWebSocketClient {
         StockWebSocketClient::new(
             self.api_key.clone(),
+            self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
         )
@@ -372,6 +373,7 @@ impl WebSocketClient {
     pub fn futopt(&self) -> FutOptWebSocketClient {
         FutOptWebSocketClient::new(
             self.api_key.clone(),
+            self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
         )
@@ -397,6 +399,7 @@ struct WebSocketState {
 #[pyclass]
 pub struct StockWebSocketClient {
     api_key: String,
+    base_url: Option<String>,
     reconnect_config: ReconnectConfig,
     health_check_config: HealthCheckConfig,
     callbacks: Arc<CallbackRegistry>,
@@ -411,11 +414,13 @@ pub struct StockWebSocketClient {
 impl StockWebSocketClient {
     fn new(
         api_key: String,
+        base_url: Option<String>,
         reconnect_config: ReconnectConfig,
         health_check_config: HealthCheckConfig,
     ) -> Self {
         Self {
             api_key,
+            base_url,
             reconnect_config,
             health_check_config,
             callbacks: Arc::new(CallbackRegistry::new()),
@@ -423,6 +428,20 @@ impl StockWebSocketClient {
             runtime: Arc::new(Mutex::new(None)),
             message_thread_stop: Arc::new(AtomicBool::new(false)),
             message_thread_handle: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn build_config(&self) -> marketdata_core::ConnectionConfig {
+        let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
+        match &self.base_url {
+            // Legacy SDK semantic: base_url is the host + marketdata version
+            // prefix (e.g. "wss://api.fugle.tw/marketdata/v1.0"), the SDK
+            // appends "/stock/streaming". Trailing slashes tolerated.
+            Some(base) => {
+                let url = format!("{}/stock/streaming", base.trim_end_matches('/'));
+                marketdata_core::ConnectionConfig::new(url, auth)
+            }
+            None => marketdata_core::ConnectionConfig::fugle_stock(auth),
         }
     }
 
@@ -547,8 +566,7 @@ impl StockWebSocketClient {
         })?;
 
         // Create WebSocket client with full config
-        let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
-        let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
+        let config = self.build_config();
         let ws_client = marketdata_core::WebSocketClient::with_full_config(
             config,
             self.reconnect_config.to_core(),
@@ -1005,6 +1023,7 @@ impl StockWebSocketClient {
         })?;
 
         let api_key = self.api_key.clone();
+        let base_url = self.base_url.clone();
         let reconnect_config = self.reconnect_config.to_core();
         let health_check_config = self.health_check_config.to_core();
         let callbacks = Arc::clone(&self.callbacks);
@@ -1016,7 +1035,13 @@ impl StockWebSocketClient {
         future_into_py(py, async move {
             // Create WebSocket client with full config
             let auth = marketdata_core::AuthRequest::with_api_key(&api_key);
-            let config = marketdata_core::ConnectionConfig::fugle_stock(auth);
+            let config = match base_url {
+                Some(base) => {
+                    let url = format!("{}/stock/streaming", base.trim_end_matches('/'));
+                    marketdata_core::ConnectionConfig::new(url, auth)
+                }
+                None => marketdata_core::ConnectionConfig::fugle_stock(auth),
+            };
             let ws_client = marketdata_core::WebSocketClient::with_full_config(
                 config,
                 reconnect_config,
@@ -1215,6 +1240,7 @@ impl StockWebSocketClient {
 #[pyclass(unsendable)]
 pub struct FutOptWebSocketClient {
     api_key: String,
+    base_url: Option<String>,
     reconnect_config: ReconnectConfig,
     health_check_config: HealthCheckConfig,
     callbacks: Arc<CallbackRegistry>,
@@ -1225,16 +1251,29 @@ pub struct FutOptWebSocketClient {
 impl FutOptWebSocketClient {
     fn new(
         api_key: String,
+        base_url: Option<String>,
         reconnect_config: ReconnectConfig,
         health_check_config: HealthCheckConfig,
     ) -> Self {
         Self {
             api_key,
+            base_url,
             reconnect_config,
             health_check_config,
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn build_config(&self) -> marketdata_core::ConnectionConfig {
+        let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
+        match &self.base_url {
+            Some(base) => {
+                let url = format!("{}/futopt/streaming", base.trim_end_matches('/'));
+                marketdata_core::ConnectionConfig::new(url, auth)
+            }
+            None => marketdata_core::ConnectionConfig::fugle_futopt(auth),
         }
     }
 
@@ -1289,8 +1328,7 @@ impl FutOptWebSocketClient {
         })?;
 
         // Create WebSocket client for FutOpt endpoint with full config
-        let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
-        let config = marketdata_core::ConnectionConfig::fugle_futopt(auth);
+        let config = self.build_config();
         let ws_client = marketdata_core::WebSocketClient::with_full_config(
             config,
             self.reconnect_config.to_core(),
