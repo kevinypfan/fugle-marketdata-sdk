@@ -438,7 +438,14 @@ impl StockWebSocketClient {
                 use marketdata_core::websocket::channels::StockSubscription;
 
                 // Create tokio runtime
-                let rt = match tokio::runtime::Builder::new_current_thread()
+                // Multi-thread runtime so core's dispatch/writer/health-check
+                // tasks keep running while the worker loop blocks on std::mpsc
+                // receive_timeout. With a current_thread runtime those tasks
+                // starve the moment the worker stops driving the executor,
+                // causing incoming frames (subscribed, snapshot, heartbeat...)
+                // to stall in tokio-tungstenite's buffer.
+                let rt = match tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(2)
                     .enable_all()
                     .build()
                 {
@@ -913,7 +920,14 @@ impl FutOptWebSocketClient {
                 use marketdata_core::models::futopt::FutOptChannel;
                 use marketdata_core::websocket::channels::FutOptSubscription;
 
-                let rt = match tokio::runtime::Builder::new_current_thread()
+                // Multi-thread runtime so core's dispatch/writer/health-check
+                // tasks keep running while the worker loop blocks on std::mpsc
+                // receive_timeout. With a current_thread runtime those tasks
+                // starve the moment the worker stops driving the executor,
+                // causing incoming frames (subscribed, snapshot, heartbeat...)
+                // to stall in tokio-tungstenite's buffer.
+                let rt = match tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(2)
                     .enable_all()
                     .build()
                 {
