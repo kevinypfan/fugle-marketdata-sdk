@@ -2,7 +2,7 @@
 
 Fugle Market Data SDK - Python bindings with full type annotations.
 """
-from typing import Any, Callable, Optional, List
+from typing import Any, Callable, Mapping, Optional, List
 
 __version__: str
 
@@ -1416,7 +1416,7 @@ class StockWebSocketClient:
 
     def subscribe(
         self,
-        channel: str,
+        channel: Mapping[str, Any] | str,
         symbol: str | None = None,
         *,
         symbols: list[str] | None = None,
@@ -1424,49 +1424,56 @@ class StockWebSocketClient:
     ) -> None:
         """Subscribe to a channel for one or more symbols (blocking).
 
-        Provide either ``symbol`` (single) or ``symbols`` (batch list) — exactly one
-        is required, mirroring the old fugle-marketdata SDK shape.
+        Two call shapes are supported (legacy fugle-marketdata parity):
 
-        Args:
-            channel: Channel name (trades, candles, books, aggregates, indices)
-            symbol: Stock symbol (e.g., "2330")
-            symbols: Multiple stock symbols (e.g., ["2330", "2317"])
-            odd_lot: Whether to subscribe to odd lot data (default: False)
+        **Dict shape** (matches the legacy SDK README)::
 
-        Raises:
-            RuntimeError: If not connected
-            ValueError: If channel is invalid, both/neither symbol args supplied
+            ws.stock.subscribe({"channel": "trades", "symbol": "2330"})
+            ws.stock.subscribe({"channel": "trades", "symbols": ["2330", "2317"]})
+            ws.stock.subscribe({"channel": "candles", "symbol": "2330", "oddLot": True})
+
+        **Positional / kwargs shape**::
+
+            ws.stock.subscribe("trades", "2330")
+            ws.stock.subscribe("trades", symbols=["2330", "2317"])
+            ws.stock.subscribe("candles", "2330", odd_lot=True)
+
+        When a dict is supplied, the kwargs ``symbol`` / ``symbols`` /
+        ``odd_lot`` are ignored — the dict is the single source of truth,
+        matching the legacy SDK's ``def subscribe(self, params)`` behavior.
+        Both ``oddLot`` (camelCase) and ``odd_lot`` keys are accepted.
         """
         ...
 
-    async def subscribe_async(self, channel: str, symbol: str, *, odd_lot: bool = False) -> None:
-        """Subscribe to a channel for a symbol (async).
+    async def subscribe_async(
+        self,
+        channel: Mapping[str, Any] | str,
+        symbol: str | None = None,
+        *,
+        symbols: list[str] | None = None,
+        odd_lot: bool = False,
+    ) -> None:
+        """Subscribe to a channel for one or more symbols (async).
 
-        Args:
-            channel: Channel name (trades, candles, books, aggregates, indices)
-            symbol: Stock symbol (e.g., "2330")
-            odd_lot: Whether to subscribe to odd lot data (default: False)
-
-        Raises:
-            RuntimeError: If not connected
-            ValueError: If channel is invalid
+        Accepts the same dual-shape input as :meth:`subscribe`. See its
+        docstring for details.
         """
         ...
 
     def unsubscribe(
         self,
-        subscription_id: str | None = None,
+        subscription_id: Mapping[str, Any] | str | None = None,
         *,
         ids: list[str] | None = None,
     ) -> None:
-        """Unsubscribe from a channel by subscription id or batch of ids.
+        """Unsubscribe from a channel.
 
-        Provide either ``subscription_id`` (single) or ``ids`` (batch list) — exactly
-        one is required, mirroring the old fugle-marketdata Node SDK shape.
+        Two call shapes are supported::
 
-        Args:
-            subscription_id: The subscription ID returned from subscribe
-            ids: A list of subscription IDs to unsubscribe
+            ws.stock.unsubscribe({"id": "abc123"})
+            ws.stock.unsubscribe({"ids": ["abc123", "def456"]})
+            ws.stock.unsubscribe("abc123")
+            ws.stock.unsubscribe(ids=["abc123", "def456"])
         """
         ...
 
@@ -1593,7 +1600,7 @@ class FutOptWebSocketClient:
 
     def subscribe(
         self,
-        channel: str,
+        channel: Mapping[str, Any] | str,
         symbol: str | None = None,
         *,
         symbols: list[str] | None = None,
@@ -1601,32 +1608,32 @@ class FutOptWebSocketClient:
     ) -> None:
         """Subscribe to a channel for one or more FutOpt symbols (blocking).
 
-        Provide either ``symbol`` (single) or ``symbols`` (batch list) — exactly one
-        is required, mirroring the old fugle-marketdata Node SDK shape.
+        Two call shapes are supported (legacy fugle-marketdata parity)::
 
-        Args:
-            channel: Channel name (trades, candles, books, aggregates)
-            symbol: FutOpt contract symbol (e.g., "TXFC4", "TXF202502")
-            symbols: Multiple FutOpt symbols
-            after_hours: Whether to subscribe to after-hours session (default: False)
+            ws.futopt.subscribe({"channel": "trades", "symbol": "TXFC4"})
+            ws.futopt.subscribe({"channel": "books", "symbol": "MXFB4", "afterHours": True})
+            ws.futopt.subscribe("trades", "TXFC4")
+            ws.futopt.subscribe("books", "MXFB4", after_hours=True)
 
-        Raises:
-            RuntimeError: If not connected
-            ValueError: If channel is invalid, both/neither symbol args supplied
+        Both ``afterHours`` (camelCase) and ``after_hours`` keys are accepted
+        in dict form.
         """
         ...
 
     def unsubscribe(
         self,
-        subscription_id: str | None = None,
+        subscription_id: Mapping[str, Any] | str | None = None,
         *,
         ids: list[str] | None = None,
     ) -> None:
-        """Unsubscribe from a channel by subscription id or batch of ids.
+        """Unsubscribe from a channel.
 
-        Args:
-            subscription_id: The subscription ID returned from subscribe
-            ids: A list of subscription IDs to unsubscribe
+        Accepts the same dual-shape input as the stock client::
+
+            ws.futopt.unsubscribe({"id": "abc123"})
+            ws.futopt.unsubscribe({"ids": ["abc123", "def456"]})
+            ws.futopt.unsubscribe("abc123")
+            ws.futopt.unsubscribe(ids=["abc123", "def456"])
         """
         ...
 

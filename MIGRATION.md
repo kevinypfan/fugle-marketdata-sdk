@@ -103,6 +103,32 @@ Note that `from_` / `to` were renamed to `from_date` / `to_date`. The legacy
 `**params` opaque pass-through is gone — if the API gains a new query
 parameter, the binding has to be updated.
 
+#### 2a. Python WebSocket `subscribe` / `unsubscribe` accept dict OR positional
+
+Both call shapes work — pass a dict (legacy SDK style) or use positional /
+kwarg arguments (this SDK's original style).
+
+```python
+# Legacy SDK style — dict (works verbatim)
+ws.stock.subscribe({"channel": "trades", "symbol": "2330"})
+ws.stock.subscribe({"channel": "trades", "symbols": ["2330", "2317"]})
+ws.stock.subscribe({"channel": "candles", "symbol": "2330", "oddLot": True})
+
+# Positional / kwargs style — also supported
+ws.stock.subscribe("trades", "2330")
+ws.stock.subscribe("trades", symbols=["2330", "2317"])
+ws.stock.subscribe("candles", "2330", odd_lot=True)
+
+# Same dual shape for unsubscribe
+ws.stock.unsubscribe({"id": "abc123"})
+ws.stock.unsubscribe({"ids": ["abc123", "def456"]})
+ws.stock.unsubscribe("abc123")
+```
+
+When a dict is supplied, kwargs are ignored — the dict is the single source
+of truth. Both `oddLot` (camelCase) and `odd_lot` keys are accepted in dict
+form, as are `afterHours` / `after_hours` for futopt.
+
 #### 3. Python WebSocket `message` event delivers a parsed dict
 
 In the legacy Python SDK, the `message` event hands you the raw JSON bytes
