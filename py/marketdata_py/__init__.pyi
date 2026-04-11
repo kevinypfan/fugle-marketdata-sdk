@@ -230,8 +230,10 @@ class StockClient:
 class StockIntradayClient:
     """Stock intraday (real-time) endpoints client.
 
-    Access via `client.stock.intraday`. All methods are async and
-    return coroutines that resolve to dict objects.
+    Access via `client.stock.intraday`. Each async method has a `_sync`
+    sibling (e.g. `quote_sync`) that blocks the calling thread and returns
+    the dict directly — provided for callers migrating from the legacy
+    fugle-marketdata SDK.
     """
 
     async def quote(self, symbol: str, *, odd_lot: bool = False) -> dict[str, Any]:
@@ -338,6 +340,39 @@ class StockIntradayClient:
         """
         ...
 
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def quote_sync(self, symbol: str, *, odd_lot: bool = False) -> dict[str, Any]:
+        """Blocking version of `quote()`."""
+        ...
+
+    def ticker_sync(self, symbol: str) -> dict[str, Any]:
+        """Blocking version of `ticker()`."""
+        ...
+
+    def candles_sync(self, symbol: str, timeframe: str = "1") -> dict[str, Any]:
+        """Blocking version of `candles()`."""
+        ...
+
+    def trades_sync(self, symbol: str) -> dict[str, Any]:
+        """Blocking version of `trades()`."""
+        ...
+
+    def volumes_sync(self, symbol: str) -> dict[str, Any]:
+        """Blocking version of `volumes()`."""
+        ...
+
+    def tickers_sync(
+        self,
+        type: str,
+        exchange: str | None = None,
+        market: str | None = None,
+        industry: str | None = None,
+        is_normal: bool | None = None,
+    ) -> list[dict[str, Any]]:
+        """Blocking version of `tickers()`."""
+        ...
+
 
 class StockHistoricalClient:
     """Stock historical data endpoints client.
@@ -404,6 +439,26 @@ class StockHistoricalClient:
             print(f"52-week high: {stats['week52High']}")
             ```
         """
+        ...
+
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def candles_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        fields: Optional[str] = None,
+        sort: Optional[str] = None,
+        adjusted: Optional[bool] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `candles()`."""
+        ...
+
+    def stats_sync(self, symbol: str) -> dict[str, Any]:
+        """Blocking version of `stats()`."""
         ...
 
 
@@ -489,6 +544,25 @@ class StockSnapshotClient:
             actives = await client.stock.snapshot.actives("TSE", trade="volume")
             ```
         """
+        ...
+
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def quotes_sync(self, market: str, type_filter: Optional[str] = None) -> dict[str, Any]:
+        """Blocking version of `quotes()`."""
+        ...
+
+    def movers_sync(
+        self,
+        market: str,
+        direction: Optional[str] = None,
+        change: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `movers()`."""
+        ...
+
+    def actives_sync(self, market: str, trade: Optional[str] = None) -> dict[str, Any]:
+        """Blocking version of `actives()`."""
         ...
 
 
@@ -635,6 +709,71 @@ class StockTechnicalClient:
         """
         ...
 
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def sma_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `sma()`."""
+        ...
+
+    def rsi_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `rsi()`."""
+        ...
+
+    def kdj_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `kdj()`."""
+        ...
+
+    def macd_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        fast: Optional[int] = None,
+        slow: Optional[int] = None,
+        signal: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `macd()`."""
+        ...
+
+    def bb_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        period: Optional[int] = None,
+        stddev: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `bb()`."""
+        ...
+
 
 class StockCorporateActionsClient:
     """Stock corporate actions endpoints client.
@@ -728,6 +867,38 @@ class StockCorporateActionsClient:
             applicants = await client.stock.corporate_actions.listing_applicants()
             ```
         """
+        ...
+
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def capital_changes_sync(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `capital_changes()`."""
+        ...
+
+    def dividends_sync(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `dividends()`."""
+        ...
+
+    def listing_applicants_sync(
+        self,
+        *,
+        date: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Blocking version of `listing_applicants()`."""
         ...
 
 
@@ -830,6 +1001,30 @@ class FutOptIntradayClient:
         """
         ...
 
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def quote_sync(self, symbol: str, *, after_hours: bool = False) -> dict[str, Any]:
+        """Blocking version of `quote()`."""
+        ...
+
+    def tickers_sync(
+        self,
+        type: str,
+        exchange: str | None = None,
+        after_hours: bool = False,
+        contract_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Blocking version of `tickers()`."""
+        ...
+
+    def products_sync(
+        self,
+        type: str,
+        contract_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Blocking version of `products()`."""
+        ...
+
 
 class FutOptHistoricalClient:
     """FutOpt historical data endpoints client.
@@ -905,6 +1100,31 @@ class FutOptHistoricalClient:
             )
             ```
         """
+        ...
+
+    # ----- Sync siblings (legacy fugle-marketdata compatibility) -----
+
+    def candles_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        after_hours: bool = False,
+    ) -> dict[str, Any]:
+        """Blocking version of `candles()`."""
+        ...
+
+    def daily_sync(
+        self,
+        symbol: str,
+        *,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        after_hours: bool = False,
+    ) -> dict[str, Any]:
+        """Blocking version of `daily()`."""
         ...
 
 

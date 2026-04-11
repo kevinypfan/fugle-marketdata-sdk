@@ -1,4 +1,274 @@
-# Migrating from v0.2.x to v0.3.0
+# Migration Guide
+
+There are two distinct migrations covered in this document:
+
+1. **[Migrating from the legacy `fugle-marketdata` SDKs](#migrating-from-the-legacy-fugle-marketdata-sdks)** —
+   you used the original `fugle-marketdata` (PyPI) or `@fugle/marketdata` (npm)
+   packages and want to switch to this Rust-core based SDK.
+2. **[Migrating from v0.2.x to v0.3.0](#migrating-from-v02x-to-v030)** — you
+   already use this SDK and want to upgrade to the v0.3.0 options-object
+   constructor API.
+
+If you are coming from the old SDK, read section 1. If you already use this
+package, jump to section 2.
+
+---
+
+## Migrating from the legacy `fugle-marketdata` SDKs
+
+This SDK aims to be a near drop-in replacement for the original Fugle market
+data SDKs:
+
+- **`fugle-marketdata`** (PyPI, currently 2.4.1) — pure-Python implementation
+- **`@fugle/marketdata`** (npm, currently 1.4.2) — pure-JS implementation
+
+The biggest change is that this SDK is built on a shared **Rust core** with
+PyO3 + napi-rs bindings, so you get a single behaviour across languages and
+significantly better runtime performance. The public API has been kept as
+close as practical to the legacy SDKs — most call sites compile/run without
+modification.
+
+### Drop-in compatible (no changes needed)
+
+The following old-SDK shapes were intentionally restored so you do **not** have
+to rewrite call sites:
+
+| Capability | Legacy shape (still works) |
+|---|---|
+| Top-level imports | `RestClient`, `WebSocketClient`, `HealthCheckConfig` |
+| Constructor (Py) | `RestClient(api_key=...)`, `WebSocketClient(api_key=...)` |
+| Constructor (Node) | `new RestClient({ apiKey })`, `new WebSocketClient({ apiKey })` |
+| Auth methods | `apiKey` / `bearerToken` / `sdkToken` (exactly one required) |
+| REST namespaces | `client.stock.{intraday,historical,snapshot,technical,corporateActions}`, `client.futopt.{intraday,historical}` |
+| `stock.intraday.tickers(type=...)` | ✅ restored — was missing in early Rust SDK |
+| `futopt.intraday.tickers(type=...)` | ✅ restored |
+| `futopt.intraday.products(type=...)` | ✅ restored on Python (Node already had it) |
+| `quote(..., oddLot=true)` (Node REST) | ✅ second positional arg `quote(symbol, oddLot?)` |
+| WebSocket `subscribe({ channel, symbol })` | ✅ |
+| WebSocket `subscribe({ channel, symbols: [...] })` | ✅ batch supported |
+| WebSocket `unsubscribe({ id })` / `unsubscribe({ ids: [...] })` | ✅ |
+| WebSocket `on('authenticated', cb)` / `on('unauthenticated', cb)` | ✅ restored — old listeners would silently fail without this |
+| WebSocket `ping(state?)` | ✅ public method |
+| WebSocket `subscriptions()` (server query) | ✅ — sends `{event:"subscriptions"}`; reply arrives via `message` callback |
+| Python `except FugleAPIError:` | ✅ aliased to `MarketDataError` so legacy try/except blocks keep working |
+| `HealthCheckConfig.ping_interval` (Py) / `pingInterval` (JS) | ✅ kept the old field name |
+
+### Breaking changes you need to adapt
+
+These are the differences this SDK does **not** paper over. They are limited
+on purpose — either because the new behaviour is materially better, or because
+hiding them would mask real bugs in legacy code.
+
+#### 1. Python REST methods are async
+
+The legacy `fugle-marketdata` Python SDK is fully synchronous (`requests.get`
+under the hood). This SDK exposes REST as `async` methods so calls do not
+block the event loop in modern asyncio applications.
+
+```python
+# Legacy fugle-marketdata
+quote = client.stock.intraday.quote(symbol="2330")
+
+# This SDK
+quote = await client.stock.intraday.quote("2330")
+```
+
+If you have a fully synchronous codebase you currently need to wrap calls in
+`asyncio.run(...)`. A blocking sync wrapper for each method is planned (see
+the project TODO list); until then `asyncio.run` is the workaround.
+
+#### 2. Python REST: positional symbol + explicit named params
+
+Legacy Python passes everything as kwargs and forwards extra `**params` to
+the query string. This SDK expects the path symbol as the first positional
+argument and names every supported query parameter explicitly.
+
+```python
+# Legacy
+client.stock.historical.candles(symbol="2330", from_="2024-01-01", to="2024-02-01")
+
+# This SDK
+await client.stock.historical.candles("2330", from_date="2024-01-01", to_date="2024-02-01")
+```
+
+Note that `from_` / `to` were renamed to `from_date` / `to_date`. The legacy
+`**params` opaque pass-through is gone — if the API gains a new query
+parameter, the binding has to be updated.
+
+#### 3. Python WebSocket `message` event delivers a parsed dict
+
+In the legacy Python SDK, the `message` event hands you the raw JSON bytes
+and you call `json.loads` yourself. This SDK delivers the **already-parsed
+dict** directly.
+
+```python
+# Legacy
+def on_message(msg):
+    payload = json.loads(msg)
+    print(payload["event"], payload.get("data"))
+
+# This SDK
+def on_message(msg):  # msg is already a dict
+    print(msg["event"], msg.get("data"))
+```
+
+This is intentionally asymmetric with the JS binding (which still emits raw
+strings) — the JS side preserves the legacy `JSON.parse(msg)` pattern, while
+the Python side leans into native dict ergonomics. If you have a shared
+test/lint that asserts both behave identically, you will need to special-case
+the language.
+
+#### 4. Node REST methods take positional args (not single object param)
+
+The legacy `@fugle/marketdata` Node SDK takes a single object param for every
+REST method. This SDK uses positional arguments, matching the napi-rs idiom.
+
+```javascript
+// Legacy
+const quote = await rest.stock.intraday.quote({ symbol: '2330', type: 'oddlot' });
+const candles = await rest.stock.intraday.candles({ symbol: '2330', timeframe: 5 });
+
+// This SDK
+const quote = await rest.stock.intraday.quote('2330', true);  // oddLot=true
+const candles = await rest.stock.intraday.candles('2330', '5');
+```
+
+The `type: 'oddlot'` flag becomes the second positional `oddLot` boolean.
+
+#### 5. Auto-reconnect is opt-in (matches the legacy SDKs)
+
+The legacy SDKs do not have any auto-reconnect — when the WebSocket drops you
+get a `disconnect` event and that is it. This SDK ships an auto-reconnect
+machinery but **defaults to disabled** so behaviour matches the legacy SDKs.
+Enable it explicitly if you want it:
+
+```python
+ws = WebSocketClient(api_key="...", reconnect=ReconnectConfig(max_attempts=5))
+```
+```javascript
+const ws = new WebSocketClient({
+  apiKey: '...',
+  reconnect: { maxAttempts: 5, initialDelayMs: 1000, maxDelayMs: 60000 },
+});
+```
+
+When `reconnect` is omitted the client behaves exactly like the legacy SDKs:
+on `disconnect` you call `connect()` again yourself.
+
+#### 6. Python exception hierarchy is finer-grained
+
+The legacy SDK only raises `FugleAPIError`. This SDK has a base class
+`MarketDataError` plus specific subclasses (`ApiError`, `RateLimitError`,
+`AuthError`, `ConnectionError`, `TimeoutError`, `WebSocketError`).
+
+`FugleAPIError` is aliased to `MarketDataError` so your existing
+`except FugleAPIError:` blocks keep catching everything. New code can opt
+into the more specific subclasses for cleaner handling:
+
+```python
+try:
+    quote = await client.stock.intraday.quote("INVALID")
+except RateLimitError as e:
+    backoff(e.args[1])         # error code is in args[1]
+except ApiError as e:
+    log.error(e)
+except MarketDataError as e:
+    raise
+```
+
+#### 7. REST has a default request timeout
+
+The legacy Python SDK calls `requests.get` with **no** timeout, so a stalled
+connection hangs forever. This SDK has a default timeout enforced by the
+Rust core. If you actually relied on the no-timeout behaviour you will see
+new `TimeoutError` exceptions — the fix is to retry at the application
+layer.
+
+#### 8. Python `connect()` raises on auth failure (vs legacy's `unauthenticated` event)
+
+Both this SDK and the legacy SDK block in `connect()` until the server has
+either accepted or rejected authentication. The difference is **how a
+rejection is reported**:
+
+- **Legacy**: `connect()` returns normally; you find out about rejection by
+  listening for the `unauthenticated` event.
+- **This SDK**: `connect()` **raises an exception** (`AuthError` or
+  `MarketDataError`) when the server rejects credentials. The
+  `unauthenticated` event still fires for callers that want to listen for
+  it, but you should also wrap the `connect()` call in `try/except`.
+
+```python
+# Recommended in this SDK
+try:
+    ws.stock.connect()
+except AuthError as e:
+    log.error("auth failed: %s", e)
+    return
+ws.stock.subscribe(channel="trades", symbol="2330")
+```
+
+### New things the legacy SDKs did not have
+
+These are additive and do not break anything; you can ignore them if you
+just want a drop-in replacement.
+
+- **`indices` channel** on stock WebSocket — receive index ticks alongside
+  trades / books / candles / aggregates.
+- **`with_full_config`** core constructor — fully tunable reconnect +
+  health-check config from a single options object.
+- **Per-binding async runtime integration** — Python uses
+  `pyo3-async-runtimes`, JS uses napi-rs Promises and the tokio runtime.
+
+### Per-language quickstart
+
+#### Python
+
+```python
+import asyncio
+from marketdata_py import RestClient, WebSocketClient
+
+async def main():
+    client = RestClient(api_key="your-api-key")
+    quote = await client.stock.intraday.quote("2330")
+    print(quote["lastPrice"])
+
+asyncio.run(main())
+```
+
+```python
+from marketdata_py import WebSocketClient
+
+ws = WebSocketClient(api_key="your-api-key")
+
+ws.stock.on("authenticated", lambda: print("auth ok"))
+ws.stock.on("message", lambda msg: print(msg["event"], msg.get("data")))
+
+ws.stock.connect()
+ws.stock.subscribe(channel="trades", symbols=["2330", "2317"])
+```
+
+#### Node.js
+
+```javascript
+const { RestClient, WebSocketClient } = require('marketdata-js');
+
+const rest = new RestClient({ apiKey: 'your-api-key' });
+const quote = await rest.stock.intraday.quote('2330');
+console.log(quote.lastPrice);
+
+const ws = new WebSocketClient({ apiKey: 'your-api-key' });
+ws.stock.on('authenticated', () => console.log('auth ok'));
+ws.stock.on('message', (raw) => {
+  const msg = JSON.parse(raw);
+  console.log(msg.event, msg.data);
+});
+ws.stock.connect();
+ws.stock.subscribe({ channel: 'trades', symbols: ['2330', '2317'] });
+```
+
+---
+
+## Migrating from v0.2.x to v0.3.0
 
 This guide helps you upgrade from v0.2.x to v0.3.0. The major change is that constructors now use options objects instead of positional string arguments, and WebSocket configuration options are now exposed.
 
@@ -78,7 +348,7 @@ const client = new RestClient({ apiKey: 'your-api-key' });
 const ws = new WebSocketClient({
   apiKey: 'your-api-key',
   reconnect: { maxAttempts: 10, initialDelayMs: 2000 },
-  healthCheck: { enabled: true, intervalMs: 15000 },
+  healthCheck: { enabled: true, pingInterval: 15000 },
 });
 ```
 

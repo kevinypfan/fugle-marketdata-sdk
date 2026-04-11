@@ -349,6 +349,17 @@ impl WebSocketClient {
                                 ConnectionEvent::Authenticated => {
                                     event_connected.store(true, Ordering::SeqCst);
                                 }
+                                // Map Unauthenticated to on_error so existing UniFFI
+                                // listeners (Java/Go/C#) get notified of credential
+                                // rejection without needing a new trait method.
+                                // To expose a dedicated callback, add `on_unauthenticated`
+                                // to the WebSocketListener trait and re-run uniffi-bindgen.
+                                ConnectionEvent::Unauthenticated { message } => {
+                                    event_listener.on_error(format!(
+                                        "Unauthenticated: {}",
+                                        message
+                                    ));
+                                }
                                 _ => {}
                             }
                         }

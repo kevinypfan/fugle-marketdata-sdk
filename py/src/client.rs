@@ -263,6 +263,28 @@ impl StockIntradayClient {
         })
     }
 
+    /// Get intraday quote for a stock symbol (synchronous, blocking).
+    ///
+    /// Sync sibling of `quote()` for callers migrating from the legacy
+    /// fugle-marketdata Python SDK. Releases the GIL during the network call.
+    #[pyo3(signature = (symbol, odd_lot=false))]
+    pub fn quote_sync(&self, py: Python<'_>, symbol: String, odd_lot: bool) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            let mut builder = intraday.quote().symbol(&symbol);
+            if odd_lot {
+                builder = builder.odd_lot(true);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(quote) => types::quote_to_dict(py, &quote),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
     /// Get ticker information for a stock symbol
     ///
     /// Args:
@@ -294,6 +316,21 @@ impl StockIntradayClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `ticker()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol))]
+    pub fn ticker_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            intraday.ticker().symbol(&symbol).send()
+        });
+        match result {
+            Ok(ticker) => types::ticker_to_dict(py, &ticker),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 
     /// Get candlestick chart data
@@ -330,6 +367,21 @@ impl StockIntradayClient {
         })
     }
 
+    /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, timeframe="1".to_string()))]
+    pub fn candles_sync(&self, py: Python<'_>, symbol: String, timeframe: String) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            intraday.candles().symbol(&symbol).timeframe(&timeframe).send()
+        });
+        match result {
+            Ok(candles) => types::candles_to_dict(py, &candles),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
     /// Get trade ticks data
     ///
     /// Args:
@@ -363,6 +415,21 @@ impl StockIntradayClient {
         })
     }
 
+    /// Sync sibling of `trades()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol))]
+    pub fn trades_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            intraday.trades().symbol(&symbol).send()
+        });
+        match result {
+            Ok(trades) => types::trades_to_dict(py, &trades),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
     /// Get volume data
     ///
     /// Args:
@@ -394,6 +461,21 @@ impl StockIntradayClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `volumes()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol))]
+    pub fn volumes_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            intraday.volumes().symbol(&symbol).send()
+        });
+        match result {
+            Ok(volumes) => types::volumes_to_dict(py, &volumes),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 
     /// Get batch ticker list for a security type
@@ -453,6 +535,46 @@ impl StockIntradayClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `tickers()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (r#type, exchange=None, market=None, industry=None, is_normal=None))]
+    pub fn tickers_sync(
+        &self,
+        py: Python<'_>,
+        r#type: String,
+        exchange: Option<String>,
+        market: Option<String>,
+        industry: Option<String>,
+        is_normal: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let intraday = stock.intraday();
+            let mut builder = intraday.tickers().typ(&r#type);
+            if let Some(e) = &exchange {
+                builder = builder.exchange(e);
+            }
+            if let Some(m) = &market {
+                builder = builder.market(m);
+            }
+            if let Some(i) = &industry {
+                builder = builder.industry(i);
+            }
+            if let Some(n) = is_normal {
+                builder = builder.is_normal(n);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(tickers) => {
+                let json_val = serde_json::to_value(&tickers)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                types::json_value_to_py(py, &json_val)
+            }
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 }
 
@@ -537,6 +659,50 @@ impl StockHistoricalClient {
         })
     }
 
+    /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fields=None, sort=None, adjusted=None))]
+    pub fn candles_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        fields: Option<String>,
+        sort: Option<String>,
+        adjusted: Option<bool>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let historical = stock.historical();
+            let mut builder = historical.candles().symbol(&symbol);
+            if let Some(f) = from_date {
+                builder = builder.from(&f);
+            }
+            if let Some(t) = to_date {
+                builder = builder.to(&t);
+            }
+            if let Some(tf) = timeframe {
+                builder = builder.timeframe(&tf);
+            }
+            if let Some(fld) = fields {
+                builder = builder.fields(&fld);
+            }
+            if let Some(s) = sort {
+                builder = builder.sort(&s);
+            }
+            if let Some(adj) = adjusted {
+                builder = builder.adjusted(adj);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(candles) => types::historical_candles_to_dict(py, &candles),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
     /// Get historical stats for a stock symbol
     ///
     /// Args:
@@ -567,6 +733,21 @@ impl StockHistoricalClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `stats()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol))]
+    pub fn stats_sync(&self, py: Python<'_>, symbol: String) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let historical = stock.historical();
+            historical.stats().symbol(&symbol).send()
+        });
+        match result {
+            Ok(stats) => types::stats_to_dict(py, &stats),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 }
 
@@ -706,6 +887,82 @@ impl StockSnapshotClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `quotes()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (market, type_filter=None))]
+    pub fn quotes_sync(
+        &self,
+        py: Python<'_>,
+        market: String,
+        type_filter: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let snapshot = stock.snapshot();
+            let mut builder = snapshot.quotes().market(&market);
+            if let Some(tf) = type_filter {
+                builder = builder.type_filter(&tf);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(quotes) => types::snapshot_quotes_to_dict(py, &quotes),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `movers()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (market, direction=None, change=None))]
+    pub fn movers_sync(
+        &self,
+        py: Python<'_>,
+        market: String,
+        direction: Option<String>,
+        change: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let snapshot = stock.snapshot();
+            let mut builder = snapshot.movers().market(&market);
+            if let Some(d) = direction {
+                builder = builder.direction(&d);
+            }
+            if let Some(c) = change {
+                builder = builder.change(&c);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(movers) => types::movers_to_dict(py, &movers),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `actives()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (market, trade=None))]
+    pub fn actives_sync(
+        &self,
+        py: Python<'_>,
+        market: String,
+        trade: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let snapshot = stock.snapshot();
+            let mut builder = snapshot.actives().market(&market);
+            if let Some(t) = trade {
+                builder = builder.trade(&t);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(actives) => types::actives_to_dict(py, &actives),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 }
 
@@ -988,6 +1245,152 @@ impl StockTechnicalClient {
             }
         })
     }
+
+    /// Sync sibling of `sma()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
+    pub fn sma_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let technical = stock.technical();
+            let mut builder = technical.sma().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if let Some(p) = period { builder = builder.period(p); }
+            builder.send()
+        });
+        match result {
+            Ok(sma) => types::technical_to_dict(py, &sma),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `rsi()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
+    pub fn rsi_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let technical = stock.technical();
+            let mut builder = technical.rsi().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if let Some(p) = period { builder = builder.period(p); }
+            builder.send()
+        });
+        match result {
+            Ok(rsi) => types::technical_to_dict(py, &rsi),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `kdj()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None))]
+    pub fn kdj_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let technical = stock.technical();
+            let mut builder = technical.kdj().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if let Some(p) = period { builder = builder.period(p); }
+            builder.send()
+        });
+        match result {
+            Ok(kdj) => types::technical_to_dict(py, &kdj),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `macd()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, fast=None, slow=None, signal=None))]
+    pub fn macd_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        fast: Option<u32>,
+        slow: Option<u32>,
+        signal: Option<u32>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let technical = stock.technical();
+            let mut builder = technical.macd().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if let Some(fst) = fast { builder = builder.fast(fst); }
+            if let Some(slw) = slow { builder = builder.slow(slw); }
+            if let Some(sig) = signal { builder = builder.signal(sig); }
+            builder.send()
+        });
+        match result {
+            Ok(macd) => types::technical_to_dict(py, &macd),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `bb()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, period=None, stddev=None))]
+    pub fn bb_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        period: Option<u32>,
+        stddev: Option<f64>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let technical = stock.technical();
+            let mut builder = technical.bb().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if let Some(p) = period { builder = builder.period(p); }
+            if let Some(sd) = stddev { builder = builder.stddev(sd); }
+            builder.send()
+        });
+        match result {
+            Ok(bb) => types::technical_to_dict(py, &bb),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
 }
 
 /// Stock corporate actions endpoints client
@@ -1151,6 +1554,81 @@ impl StockCorporateActionsClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `capital_changes()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (date=None, start_date=None, end_date=None))]
+    pub fn capital_changes_sync(
+        &self,
+        py: Python<'_>,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let corp = stock.corporate_actions();
+            let mut builder = corp.capital_changes();
+            if let Some(d) = date { builder = builder.date(&d); }
+            if let Some(sd) = start_date { builder = builder.start_date(&sd); }
+            if let Some(ed) = end_date { builder = builder.end_date(&ed); }
+            builder.send()
+        });
+        match result {
+            Ok(changes) => types::corporate_action_to_dict(py, &changes),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `dividends()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (date=None, start_date=None, end_date=None))]
+    pub fn dividends_sync(
+        &self,
+        py: Python<'_>,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let corp = stock.corporate_actions();
+            let mut builder = corp.dividends();
+            if let Some(d) = date { builder = builder.date(&d); }
+            if let Some(sd) = start_date { builder = builder.start_date(&sd); }
+            if let Some(ed) = end_date { builder = builder.end_date(&ed); }
+            builder.send()
+        });
+        match result {
+            Ok(dividends) => types::corporate_action_to_dict(py, &dividends),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `listing_applicants()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (date=None, start_date=None, end_date=None))]
+    pub fn listing_applicants_sync(
+        &self,
+        py: Python<'_>,
+        date: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let stock = inner.stock();
+            let corp = stock.corporate_actions();
+            let mut builder = corp.listing_applicants();
+            if let Some(d) = date { builder = builder.date(&d); }
+            if let Some(sd) = start_date { builder = builder.start_date(&sd); }
+            if let Some(ed) = end_date { builder = builder.end_date(&ed); }
+            builder.send()
+        });
+        match result {
+            Ok(applicants) => types::corporate_action_to_dict(py, &applicants),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 }
 
@@ -1346,6 +1824,99 @@ impl FutOptIntradayClient {
             }
         })
     }
+
+    /// Sync sibling of `quote()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, after_hours=false))]
+    pub fn quote_sync(&self, py: Python<'_>, symbol: String, after_hours: bool) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.quote().symbol(&symbol);
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            builder.send()
+        });
+        match result {
+            Ok(quote) => types::futopt_quote_to_dict(py, &quote),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `tickers()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (r#type, exchange=None, after_hours=false, contract_type=None))]
+    pub fn tickers_sync(
+        &self,
+        py: Python<'_>,
+        r#type: String,
+        exchange: Option<String>,
+        after_hours: bool,
+        contract_type: Option<String>,
+    ) -> PyResult<Py<PyAny>> {
+        let typ = parse_futopt_type(&r#type)?;
+        let ct = match contract_type.as_deref() {
+            Some(s) => Some(parse_contract_type(s)?),
+            None => None,
+        };
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.tickers().typ(typ);
+            if let Some(e) = &exchange {
+                builder = builder.exchange(e);
+            }
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            if let Some(c) = ct {
+                builder = builder.contract_type(c);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(tickers) => {
+                let json_val = serde_json::to_value(&tickers)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                types::json_value_to_py(py, &json_val)
+            }
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Sync sibling of `products()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (r#type, contract_type=None))]
+    pub fn products_sync(
+        &self,
+        py: Python<'_>,
+        r#type: String,
+        contract_type: Option<String>,
+    ) -> PyResult<Py<PyAny>> {
+        let typ = parse_futopt_type(&r#type)?;
+        let ct = match contract_type.as_deref() {
+            Some(s) => Some(parse_contract_type(s)?),
+            None => None,
+        };
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.products().typ(typ);
+            if let Some(c) = ct {
+                builder = builder.contract_type(c);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(products) => {
+                let json_val = serde_json::to_value(&products)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e)))?;
+                types::json_value_to_py(py, &json_val)
+            }
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
 }
 
 fn parse_futopt_type(s: &str) -> PyResult<marketdata_core::models::futopt::FutOptType> {
@@ -1447,6 +2018,34 @@ impl FutOptHistoricalClient {
         })
     }
 
+    /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, timeframe=None, after_hours=false))]
+    pub fn candles_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        timeframe: Option<String>,
+        after_hours: bool,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let historical = futopt.historical();
+            let mut builder = historical.candles().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if let Some(tf) = timeframe { builder = builder.timeframe(&tf); }
+            if after_hours { builder = builder.after_hours(true); }
+            builder.send()
+        });
+        match result {
+            Ok(candles) => types::futopt_historical_candles_to_dict(py, &candles),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
     /// Get daily historical data for a FutOpt contract
     ///
     /// Args:
@@ -1500,6 +2099,32 @@ impl FutOptHistoricalClient {
                 Err(e) => Err(errors::to_py_err(e)),
             }
         })
+    }
+
+    /// Sync sibling of `daily()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, from_date=None, to_date=None, after_hours=false))]
+    pub fn daily_sync(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        from_date: Option<String>,
+        to_date: Option<String>,
+        after_hours: bool,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let historical = futopt.historical();
+            let mut builder = historical.daily().symbol(&symbol);
+            if let Some(f) = from_date { builder = builder.from(&f); }
+            if let Some(t) = to_date { builder = builder.to(&t); }
+            if after_hours { builder = builder.after_hours(true); }
+            builder.send()
+        });
+        match result {
+            Ok(daily) => types::futopt_daily_to_dict(py, &daily),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
     }
 }
 
