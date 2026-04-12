@@ -169,6 +169,16 @@ pub struct WebSocketClient {
     base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
+    // Shared state for child clients — created once in constructor so that
+    // every `ws.stock` / `ws.futopt` getter access shares the same Arcs.
+    stock_callbacks: Arc<Mutex<EventCallbacks>>,
+    stock_connected: Arc<AtomicBool>,
+    stock_closed: Arc<AtomicBool>,
+    stock_command_tx: Arc<Mutex<Option<std::sync::mpsc::Sender<WsCommand>>>>,
+    futopt_callbacks: Arc<Mutex<EventCallbacks>>,
+    futopt_connected: Arc<AtomicBool>,
+    futopt_closed: Arc<AtomicBool>,
+    futopt_command_tx: Arc<Mutex<Option<std::sync::mpsc::Sender<WsCommand>>>>,
 }
 
 #[napi]
@@ -269,28 +279,50 @@ impl WebSocketClient {
             base_url: options.base_url,
             reconnect_config: reconnect_cfg,
             health_check_config: health_check_cfg,
+            stock_callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
+            stock_connected: Arc::new(AtomicBool::new(false)),
+            stock_closed: Arc::new(AtomicBool::new(false)),
+            stock_command_tx: Arc::new(Mutex::new(None)),
+            futopt_callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
+            futopt_connected: Arc::new(AtomicBool::new(false)),
+            futopt_closed: Arc::new(AtomicBool::new(false)),
+            futopt_command_tx: Arc::new(Mutex::new(None)),
         })
     }
 
-    /// Get the stock WebSocket client for real-time stock data
+    /// Get the stock WebSocket client for real-time stock data.
+    ///
+    /// Every access returns a new JS wrapper but all wrappers share the same
+    /// underlying state (callbacks, connected flag, command channel), so the
+    /// legacy `ws.stock.on(...); ws.stock.connect()` pattern works correctly.
     #[napi(getter)]
     pub fn stock(&self) -> StockWebSocketClient {
-        StockWebSocketClient::new(
+        StockWebSocketClient::from_shared(
             self.api_key.clone(),
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            Arc::clone(&self.stock_callbacks),
+            Arc::clone(&self.stock_connected),
+            Arc::clone(&self.stock_closed),
+            Arc::clone(&self.stock_command_tx),
         )
     }
 
-    /// Get the FutOpt WebSocket client for real-time futures/options data
+    /// Get the FutOpt WebSocket client for real-time futures/options data.
+    ///
+    /// Same shared-state semantics as `stock` — see its doc comment.
     #[napi(getter)]
     pub fn futopt(&self) -> FutOptWebSocketClient {
-        FutOptWebSocketClient::new(
+        FutOptWebSocketClient::from_shared(
             self.api_key.clone(),
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            Arc::clone(&self.futopt_callbacks),
+            Arc::clone(&self.futopt_connected),
+            Arc::clone(&self.futopt_closed),
+            Arc::clone(&self.futopt_command_tx),
         )
     }
 }
@@ -331,22 +363,29 @@ pub struct StockWebSocketClient {
 
 #[napi]
 impl StockWebSocketClient {
-    /// Create a new stock WebSocket client (internal use)
-    fn new(
+    /// Create from pre-existing shared state (called by WebSocketClient getter).
+    /// All mutable state lives behind Arc so multiple JS wrappers returned by
+    /// the `ws.stock` getter share the same underlying callbacks, connection
+    /// flag, and command channel.
+    fn from_shared(
         api_key: String,
         base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
+        callbacks: Arc<Mutex<EventCallbacks>>,
+        connected: Arc<AtomicBool>,
+        closed: Arc<AtomicBool>,
+        command_tx: Arc<Mutex<Option<std::sync::mpsc::Sender<WsCommand>>>>,
     ) -> Self {
         Self {
             api_key,
             base_url,
             reconnect_config,
             health_check_config,
-            callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
-            connected: Arc::new(AtomicBool::new(false)),
-            closed: Arc::new(AtomicBool::new(false)),
-            command_tx: Arc::new(Mutex::new(None)),
+            callbacks,
+            connected,
+            closed,
+            command_tx,
         }
     }
 
@@ -836,22 +875,27 @@ pub struct FutOptWebSocketClient {
 
 #[napi]
 impl FutOptWebSocketClient {
-    /// Create a new FutOpt WebSocket client (internal use)
-    fn new(
+    /// Create from pre-existing shared state (called by WebSocketClient getter).
+    /// See StockWebSocketClient::from_shared for rationale.
+    fn from_shared(
         api_key: String,
         base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
+        callbacks: Arc<Mutex<EventCallbacks>>,
+        connected: Arc<AtomicBool>,
+        closed: Arc<AtomicBool>,
+        command_tx: Arc<Mutex<Option<std::sync::mpsc::Sender<WsCommand>>>>,
     ) -> Self {
         Self {
             api_key,
             base_url,
             reconnect_config,
             health_check_config,
-            callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
-            connected: Arc::new(AtomicBool::new(false)),
-            closed: Arc::new(AtomicBool::new(false)),
-            command_tx: Arc::new(Mutex::new(None)),
+            callbacks,
+            connected,
+            closed,
+            command_tx,
         }
     }
 

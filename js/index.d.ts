@@ -1707,9 +1707,19 @@ export declare class WebSocketClient {
    * ```
    */
   constructor(options: WebSocketClientOptions)
-  /** Get the stock WebSocket client for real-time stock data */
+  /**
+   * Get the stock WebSocket client for real-time stock data.
+   *
+   * Every access returns a new JS wrapper but all wrappers share the same
+   * underlying state (callbacks, connected flag, command channel), so the
+   * legacy `ws.stock.on(...); ws.stock.connect()` pattern works correctly.
+   */
   get stock(): StockWebSocketClient
-  /** Get the FutOpt WebSocket client for real-time futures/options data */
+  /**
+   * Get the FutOpt WebSocket client for real-time futures/options data.
+   *
+   * Same shared-state semantics as `stock` — see its doc comment.
+   */
   get futopt(): FutOptWebSocketClient
 }
 
