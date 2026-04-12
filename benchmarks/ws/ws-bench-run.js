@@ -33,10 +33,11 @@ const CLIENT_NEW_PY  = path.join(BENCH_DIR, 'ws-bench-new-py.py');
 const CLIENT_OLD_PY  = path.join(BENCH_DIR, 'ws-bench-old-py.py');
 const CLIENT_NEW_CS  = path.join(BENCH_DIR, 'ws-bench-cs');
 const CLIENT_NEW_GO  = path.join(BENCH_DIR, 'ws-bench-go', 'ws-bench-go');
+const CLIENT_NEW_JAVA = path.join(BENCH_DIR, 'ws-bench-java', 'run.sh');
 
 // Determine which SDKs to benchmark based on --lang flag
 const langIdx = process.argv.indexOf('--lang');
-const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, cs, go, all
+const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, cs, go, java, all
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,8 +80,12 @@ function runClient(script, label) {
     const isPython = script.endsWith('.py');
     const isDotnet = label.includes('cs');
     const isGo = label.includes('Go') || label.includes('go');
+    const isShell = script.endsWith('.sh');
     let cmd, cmdArgs;
-    if (isGo) {
+    if (isShell) {
+      cmd = 'bash';
+      cmdArgs = [script, '--url', `ws://localhost:${PORT}`, '--timeout', '60000'];
+    } else if (isGo) {
       cmd = script;
       cmdArgs = ['--url', `ws://localhost:${PORT}`, '--timeout', '60000'];
     } else if (isDotnet) {
@@ -181,6 +186,10 @@ async function main() {
   if (LANG === 'go' || LANG === 'all') {
     pairs.push({ label: 'Go', oldScript: null, newScript: CLIENT_NEW_GO,
                  oldName: null, newName: 'rust-core (Go)', newOnly: true });
+  }
+  if (LANG === 'java' || LANG === 'all') {
+    pairs.push({ label: 'Java', oldScript: null, newScript: CLIENT_NEW_JAVA,
+                 oldName: null, newName: 'rust-core (Java)', newOnly: true });
   }
 
   const allResults = {};  // { 'JS-old': [...], 'JS-new': [...], ... }

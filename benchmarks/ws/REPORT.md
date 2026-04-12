@@ -48,14 +48,25 @@ No legacy Go SDK exists, so results are absolute (cross-language comparison only
 | Latency p99 | 10 ms |
 | CPU user | 84 ms |
 
+### Java (JDK 21)
+
+No legacy Java SDK exists, so results are absolute (cross-language comparison only).
+
+| Metric | New SDK (Rust core / UniFFI+JNA) |
+|--------|:-------------------------------:|
+| Throughput | **20,833 msg/s** |
+| Latency p50 | 336 ms |
+| Latency p99 | 517 ms |
+| CPU user | 93 ms |
+
 ### Cross-Language Comparison (New Rust-core SDK only)
 
-| Metric | JS (napi-rs) | C# (UniFFI) | Go (UniFFI) | Python (PyO3) |
-|--------|:------------:|:-----------:|:-----------:|:-------------:|
-| Throughput | 234,742 msg/s | 172,413 msg/s | 161,290 msg/s | 100,000 msg/s |
-| Latency p50 | 0 ms | 3 ms | 4 ms | 19 ms |
-| Latency p99 | 1 ms | 6 ms | 10 ms | 58 ms |
-| CPU user | 304 ms | 88 ms | 84 ms | 205 ms |
+| Metric | JS (napi-rs) | C# (UniFFI) | Go (UniFFI) | Python (PyO3) | Java (UniFFI+JNA) |
+|--------|:------------:|:-----------:|:-----------:|:-------------:|:-----------------:|
+| Throughput | 234,742 msg/s | 172,413 msg/s | 161,290 msg/s | 100,000 msg/s | 20,833 msg/s |
+| Latency p50 | 0 ms | 3 ms | 4 ms | 19 ms | 336 ms |
+| Latency p99 | 1 ms | 6 ms | 10 ms | 58 ms | 517 ms |
+| CPU user | 304 ms | 88 ms | 84 ms | 205 ms | 93 ms |
 
 ## Key Takeaways
 
@@ -76,14 +87,19 @@ No legacy Go SDK exists, so results are absolute (cross-language comparison only
    and ~69% of JS). Both use the same UniFFI `receive_timeout(5ms)` dedicated-thread
    message loop. The C#/Go gap vs JS is due to UniFFI's FFI callback overhead
    (marshalling through `RustBuffer` + P/Invoke for C#, CGO for Go) vs napi-rs's
-   `ThreadsafeFunction` which uses V8's native microtask queue. Go's slightly lower
-   throughput than C# is due to CGO call overhead on each message callback.
+   `ThreadsafeFunction` which uses V8's native microtask queue.
 
-4. **Latency is a non-issue at production rates** -- at real market data rates
-   (100-500 msg/s), all three SDKs deliver messages in <1ms. The p50/p99 differences
+4. **Java is the slowest** at 21K msg/s (~9% of JS) due to JNA's foreign callback
+   overhead. Each `onMessage` callback crosses JNA → JVM boundary with full argument
+   marshalling (StreamMessage record construction). JNA callbacks are inherently slower
+   than P/Invoke (C#) or CGO (Go) because JNA uses reflection-based dispatch.
+   At production rates (100-500 msg/s), this overhead is negligible.
+
+5. **Latency is a non-issue at production rates** -- at real market data rates
+   (100-500 msg/s), all SDKs deliver messages in <1ms. The p50/p99 differences
    only manifest under synthetic burst loads far exceeding production conditions.
 
-5. **Future optimization**: Adding a `raw_text` field to `WebSocketMessage` in the Rust
+6. **Future optimization**: Adding a `raw_text` field to `WebSocketMessage` in the Rust
    core would let the JS binding skip `serde_json::to_string` and pass the original
    frame string directly. This would eliminate the 8% throughput gap. Relevant code:
    - Parse: `core/src/websocket/message.rs` line 121
@@ -291,6 +307,7 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | `ws-bench-old-py.py` | Old SDK (Python, `fugle-marketdata@2.4.1`) benchmark client |
 | `ws-bench-cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
 | `ws-bench-go/` | New SDK (Go, UniFFI) benchmark client |
+| `ws-bench-java/` | New SDK (Java, UniFFI+JNA) benchmark client |
 | `ws-bench-run.js` | Runner: starts server, runs clients, compares results |
 | `package.json` | Dependencies: `ws`, `@fugle/marketdata@1.4.2` |
 | `REPORT.md` | This file |
