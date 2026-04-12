@@ -402,9 +402,18 @@ jobs:
       - pack-internal-nuget
       - pack-internal-go
       - pack-internal-cpp
-    # Skipped jobs are fine (e.g. publish-* skipped on prerelease channel).
-    # Only fail-out on actual failures or cancellation.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    # Gating policy differs per channel:
+    #   • Stable: all needed jobs must succeed (or be skipped) — one publish
+    #     failure is a hard stop, matching the "atomic public release" contract.
+    #   • Prerelease: ship whatever packaging jobs produced. An isolated build
+    #     failure (e.g. Python Linux wheels) shouldn't block the GitHub Release
+    #     from being created with the 5/6 languages' assets that did succeed.
+    #     The release notes will reflect partial availability.
+    if: |
+      !cancelled() && (
+        (needs.extract-version.outputs.channel == 'stable' && !contains(needs.*.result, 'failure')) ||
+        needs.extract-version.outputs.channel == 'prerelease'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write

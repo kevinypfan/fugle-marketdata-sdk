@@ -61,8 +61,11 @@ jobs:
           VERSION=$(grep -A1 '\[workspace.package\]' Cargo.toml | grep 'version' | cut -d'"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      # Pinned to v1.51.0 — the floating `@v1` tag is stuck at the 2021
+      # release and its docker-pull path is broken on current runners
+      # (`/usr/bin/docker failed with exit code 1` at action step 585).
       - name: Build wheels
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@v1.51.0
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
