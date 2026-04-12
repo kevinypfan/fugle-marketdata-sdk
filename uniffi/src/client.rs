@@ -194,6 +194,21 @@ impl StockIntradayClient {
         Ok(result.into())
     }
 
+    /// Get batch tickers for a security type (async)
+    ///
+    /// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+    pub async fn get_tickers(&self, typ: String) -> Result<Vec<Ticker>, MarketDataError> {
+        let inner = self.inner.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            inner.stock().intraday().tickers()
+                .typ(&typ)
+                .send()
+        })
+        .await
+        .map_err(|e| MarketDataError::Other { msg: e.to_string() })??;
+        Ok(result.into_iter().map(|t| t.into()).collect())
+    }
+
     // ========== Sync Methods (Blocking) ==========
 
     /// Get quote for a symbol (sync/blocking)
@@ -227,6 +242,16 @@ impl StockIntradayClient {
     pub fn volumes_sync(&self, symbol: String) -> Result<VolumesResponse, MarketDataError> {
         let result = self.inner.stock().intraday().volumes().symbol(&symbol).send()?;
         Ok(result.into())
+    }
+
+    /// Get batch tickers for a security type (sync/blocking)
+    ///
+    /// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+    pub fn tickers_sync(&self, typ: String) -> Result<Vec<Ticker>, MarketDataError> {
+        let result = self.inner.stock().intraday().tickers()
+            .typ(&typ)
+            .send()?;
+        Ok(result.into_iter().map(|t| t.into()).collect())
     }
 }
 
@@ -819,6 +844,62 @@ impl FutOptIntradayClient {
         Ok(result.into())
     }
 
+    /// Get candlestick data for a futures/options contract (async)
+    pub async fn get_candles(&self, symbol: String, timeframe: String) -> Result<IntradayCandlesResponse, MarketDataError> {
+        let inner = self.inner.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            inner.futopt().intraday().candles()
+                .symbol(&symbol)
+                .timeframe(&timeframe)
+                .send()
+        })
+        .await
+        .map_err(|e| MarketDataError::Other { msg: e.to_string() })??;
+        Ok(result.into())
+    }
+
+    /// Get trade history for a futures/options contract (async)
+    pub async fn get_trades(&self, symbol: String) -> Result<TradesResponse, MarketDataError> {
+        let inner = self.inner.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            inner.futopt().intraday().trades()
+                .symbol(&symbol)
+                .send()
+        })
+        .await
+        .map_err(|e| MarketDataError::Other { msg: e.to_string() })??;
+        Ok(result.into())
+    }
+
+    /// Get volume breakdown by price for a futures/options contract (async)
+    pub async fn get_volumes(&self, symbol: String) -> Result<VolumesResponse, MarketDataError> {
+        let inner = self.inner.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            inner.futopt().intraday().volumes()
+                .symbol(&symbol)
+                .send()
+        })
+        .await
+        .map_err(|e| MarketDataError::Other { msg: e.to_string() })??;
+        Ok(result.into())
+    }
+
+    /// Get batch tickers for futures/options (async)
+    ///
+    /// typ: "F" for futures, "O" for options
+    pub async fn get_tickers(&self, typ: String) -> Result<Vec<FutOptTicker>, MarketDataError> {
+        let futopt_type = parse_futopt_type(&typ)?;
+        let inner = self.inner.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            inner.futopt().intraday().tickers()
+                .typ(futopt_type)
+                .send()
+        })
+        .await
+        .map_err(|e| MarketDataError::Other { msg: e.to_string() })??;
+        Ok(result.into_iter().map(|t| t.into()).collect())
+    }
+
     // ========== Sync Methods (Blocking) ==========
 
     /// Get quote for a futures/options contract (sync/blocking)
@@ -846,6 +927,42 @@ impl FutOptIntradayClient {
         let futopt_type = parse_futopt_type(&typ)?;
         let result = self.inner.futopt().intraday().products().typ(futopt_type).send()?;
         Ok(result.into())
+    }
+
+    /// Get candlestick data for a contract (sync/blocking)
+    pub fn candles_sync(&self, symbol: String, timeframe: String) -> Result<IntradayCandlesResponse, MarketDataError> {
+        let result = self.inner.futopt().intraday().candles()
+            .symbol(&symbol)
+            .timeframe(&timeframe)
+            .send()?;
+        Ok(result.into())
+    }
+
+    /// Get trade history for a contract (sync/blocking)
+    pub fn trades_sync(&self, symbol: String) -> Result<TradesResponse, MarketDataError> {
+        let result = self.inner.futopt().intraday().trades()
+            .symbol(&symbol)
+            .send()?;
+        Ok(result.into())
+    }
+
+    /// Get volume breakdown by price for a contract (sync/blocking)
+    pub fn volumes_sync(&self, symbol: String) -> Result<VolumesResponse, MarketDataError> {
+        let result = self.inner.futopt().intraday().volumes()
+            .symbol(&symbol)
+            .send()?;
+        Ok(result.into())
+    }
+
+    /// Get batch tickers for futures/options (sync/blocking)
+    ///
+    /// typ: "F" for futures, "O" for options
+    pub fn tickers_sync(&self, typ: String) -> Result<Vec<FutOptTicker>, MarketDataError> {
+        let futopt_type = parse_futopt_type(&typ)?;
+        let result = self.inner.futopt().intraday().tickers()
+            .typ(futopt_type)
+            .send()?;
+        Ok(result.into_iter().map(|t| t.into()).collect())
     }
 }
 

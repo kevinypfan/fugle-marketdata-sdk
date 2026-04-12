@@ -281,6 +281,30 @@ namespace FugleMarketData
         /// <returns>Task that completes when unsubscription is confirmed</returns>
         public Task UnsubscribeAsync(string channel, string symbol) => _inner.Unsubscribe(channel, symbol);
 
+        /// <summary>
+        /// Whether the client is currently connected to the server.
+        /// </summary>
+        public bool IsConnected => _inner.IsConnected();
+
+        /// <summary>
+        /// Whether the client has been shut down.
+        /// </summary>
+        public bool IsClosed => _inner.IsClosed();
+
+        /// <summary>
+        /// Send a ping message to the server.
+        /// </summary>
+        /// <param name="state">Optional state string echoed back in the pong response</param>
+        /// <returns>Task that completes when the ping is sent</returns>
+        public Task PingAsync(string? state = null) => _inner.Ping(state);
+
+        /// <summary>
+        /// Query the server for current subscriptions.
+        /// The response arrives via the OnMessage callback.
+        /// </summary>
+        /// <returns>Task that completes when the query is sent</returns>
+        public Task QuerySubscriptionsAsync() => _inner.QuerySubscriptions();
+
         private void ThrowIfDisposed()
         {
             if (_disposed)

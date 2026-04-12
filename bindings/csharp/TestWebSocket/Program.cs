@@ -97,6 +97,16 @@ class MyListener : IWebSocketListener
     {
         Console.WriteLine($"✗ 錯誤: {errorMessage}");
     }
+
+    public void OnReconnecting(uint attempt)
+    {
+        Console.WriteLine($"⟳ 重新連線中... (第 {attempt} 次)");
+    }
+
+    public void OnReconnectFailed(uint attempts)
+    {
+        Console.WriteLine($"✗ 重新連線失敗 (已嘗試 {attempts} 次)");
+    }
 }
 
 class Program

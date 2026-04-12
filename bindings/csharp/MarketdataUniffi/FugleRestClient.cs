@@ -151,7 +151,7 @@ namespace FugleMarketData
     }
 
     /// <summary>
-    /// Stock market data client providing intraday endpoints.
+    /// Stock market data client providing access to all stock data categories.
     /// </summary>
     public sealed class StockClient
     {
@@ -166,6 +166,26 @@ namespace FugleMarketData
         /// Access intraday (real-time) stock data endpoints.
         /// </summary>
         public StockIntradayClient Intraday => new StockIntradayClient(_inner.Intraday());
+
+        /// <summary>
+        /// Access historical stock data endpoints.
+        /// </summary>
+        public StockHistoricalClient Historical => new StockHistoricalClient(_inner.Historical());
+
+        /// <summary>
+        /// Access market-wide snapshot endpoints (quotes, movers, actives).
+        /// </summary>
+        public StockSnapshotClient Snapshot => new StockSnapshotClient(_inner.Snapshot());
+
+        /// <summary>
+        /// Access technical indicator endpoints (SMA, RSI, KDJ, MACD, BB).
+        /// </summary>
+        public StockTechnicalClient Technical => new StockTechnicalClient(_inner.Technical());
+
+        /// <summary>
+        /// Access corporate actions endpoints (capital changes, dividends, IPO).
+        /// </summary>
+        public StockCorporateActionsClient CorporateActions => new StockCorporateActionsClient(_inner.CorporateActions());
     }
 
     /// <summary>
@@ -224,6 +244,14 @@ namespace FugleMarketData
         public Task<uniffi.marketdata_uniffi.VolumesResponse> GetVolumesAsync(string symbol)
             => _inner.GetVolumes(symbol);
 
+        /// <summary>
+        /// Get batch tickers for a security type (async).
+        /// </summary>
+        /// <param name="type">Security type (e.g., "EQUITY", "INDEX", "ETF")</param>
+        /// <returns>List of tickers matching the type filter</returns>
+        public Task<System.Collections.Generic.List<uniffi.marketdata_uniffi.Ticker>> GetTickersAsync(string type)
+            => _inner.GetTickers(type);
+
         // ========== Sync Methods (Blocking) ==========
 
         /// <summary>
@@ -266,6 +294,279 @@ namespace FugleMarketData
         /// <returns>VolumesResponse with volume at each price level</returns>
         public uniffi.marketdata_uniffi.VolumesResponse GetVolumes(string symbol)
             => _inner.VolumesSync(symbol);
+
+        /// <summary>
+        /// Get batch tickers for a security type (blocking).
+        /// </summary>
+        public System.Collections.Generic.List<uniffi.marketdata_uniffi.Ticker> GetTickers(string type)
+            => _inner.TickersSync(type);
+    }
+
+    /// <summary>
+    /// Stock historical data endpoints.
+    /// </summary>
+    public sealed class StockHistoricalClient
+    {
+        private readonly uniffi.marketdata_uniffi.StockHistoricalClient _inner;
+
+        internal StockHistoricalClient(uniffi.marketdata_uniffi.StockHistoricalClient inner)
+        {
+            _inner = inner;
+        }
+
+        // ========== Async Methods ==========
+
+        /// <summary>
+        /// Get historical candles for a stock symbol (async).
+        /// </summary>
+        /// <param name="symbol">Stock symbol (e.g., "2330")</param>
+        /// <param name="from">Start date in YYYY-MM-DD format (optional)</param>
+        /// <param name="to">End date in YYYY-MM-DD format (optional)</param>
+        /// <param name="timeframe">Timeframe: "D" (day), "W" (week), "M" (month), or "1","5","10","15","30","60" (optional)</param>
+        public Task<uniffi.marketdata_uniffi.HistoricalCandlesResponse> GetCandlesAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null)
+            => _inner.GetCandles(symbol, from, to, timeframe);
+
+        /// <summary>
+        /// Get historical stats for a stock symbol (async).
+        /// </summary>
+        /// <param name="symbol">Stock symbol (e.g., "2330")</param>
+        public Task<uniffi.marketdata_uniffi.StatsResponse> GetStatsAsync(string symbol)
+            => _inner.GetStats(symbol);
+
+        // ========== Sync Methods ==========
+
+        /// <summary>
+        /// Get historical candles for a stock symbol (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.HistoricalCandlesResponse GetCandles(
+            string symbol, string? from = null, string? to = null, string? timeframe = null)
+            => _inner.CandlesSync(symbol, from, to, timeframe);
+
+        /// <summary>
+        /// Get historical stats for a stock symbol (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.StatsResponse GetStats(string symbol)
+            => _inner.StatsSync(symbol);
+    }
+
+    /// <summary>
+    /// Stock snapshot endpoints for market-wide data.
+    /// </summary>
+    public sealed class StockSnapshotClient
+    {
+        private readonly uniffi.marketdata_uniffi.StockSnapshotClient _inner;
+
+        internal StockSnapshotClient(uniffi.marketdata_uniffi.StockSnapshotClient inner)
+        {
+            _inner = inner;
+        }
+
+        // ========== Async Methods ==========
+
+        /// <summary>
+        /// Get market-wide snapshot quotes (async).
+        /// </summary>
+        /// <param name="market">Market code: TSE, OTC, ESB, TIB, PSB</param>
+        /// <param name="typeFilter">Optional filter: ALL, ALLBUT0999, COMMONSTOCK</param>
+        public Task<uniffi.marketdata_uniffi.SnapshotQuotesResponse> GetQuotesAsync(
+            string market, string? typeFilter = null)
+            => _inner.GetQuotes(market, typeFilter);
+
+        /// <summary>
+        /// Get top movers (gainers/losers) in a market (async).
+        /// </summary>
+        /// <param name="market">Market code: TSE, OTC</param>
+        /// <param name="direction">"up" for gainers, "down" for losers (optional)</param>
+        /// <param name="change">"percent" or "value" (optional)</param>
+        public Task<uniffi.marketdata_uniffi.MoversResponse> GetMoversAsync(
+            string market, string? direction = null, string? change = null)
+            => _inner.GetMovers(market, direction, change);
+
+        /// <summary>
+        /// Get most actively traded stocks (async).
+        /// </summary>
+        /// <param name="market">Market code: TSE, OTC</param>
+        /// <param name="trade">"volume" or "value" (optional)</param>
+        public Task<uniffi.marketdata_uniffi.ActivesResponse> GetActivesAsync(
+            string market, string? trade = null)
+            => _inner.GetActives(market, trade);
+
+        // ========== Sync Methods ==========
+
+        /// <summary>
+        /// Get market-wide snapshot quotes (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.SnapshotQuotesResponse GetQuotes(
+            string market, string? typeFilter = null)
+            => _inner.QuotesSync(market, typeFilter);
+
+        /// <summary>
+        /// Get top movers (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.MoversResponse GetMovers(
+            string market, string? direction = null, string? change = null)
+            => _inner.MoversSync(market, direction, change);
+
+        /// <summary>
+        /// Get most actively traded stocks (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.ActivesResponse GetActives(
+            string market, string? trade = null)
+            => _inner.ActivesSync(market, trade);
+    }
+
+    /// <summary>
+    /// Stock technical indicator endpoints.
+    /// </summary>
+    public sealed class StockTechnicalClient
+    {
+        private readonly uniffi.marketdata_uniffi.StockTechnicalClient _inner;
+
+        internal StockTechnicalClient(uniffi.marketdata_uniffi.StockTechnicalClient inner)
+        {
+            _inner = inner;
+        }
+
+        // ========== Async Methods ==========
+
+        /// <summary>
+        /// Get Simple Moving Average (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.SmaResponse> GetSmaAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.GetSma(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get Relative Strength Index (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.RsiResponse> GetRsiAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.GetRsi(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get KDJ Stochastic Oscillator (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.KdjResponse> GetKdjAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.GetKdj(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get MACD indicator (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.MacdResponse> GetMacdAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null,
+            uint? fast = null, uint? slow = null, uint? signal = null)
+            => _inner.GetMacd(symbol, from, to, timeframe, fast, slow, signal);
+
+        /// <summary>
+        /// Get Bollinger Bands (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.BbResponse> GetBbAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null,
+            uint? period = null, double? stddev = null)
+            => _inner.GetBb(symbol, from, to, timeframe, period, stddev);
+
+        // ========== Sync Methods ==========
+
+        /// <summary>
+        /// Get Simple Moving Average (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.SmaResponse GetSma(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.SmaSync(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get Relative Strength Index (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.RsiResponse GetRsi(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.RsiSync(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get KDJ Stochastic Oscillator (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.KdjResponse GetKdj(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, uint? period = null)
+            => _inner.KdjSync(symbol, from, to, timeframe, period);
+
+        /// <summary>
+        /// Get MACD indicator (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.MacdResponse GetMacd(
+            string symbol, string? from = null, string? to = null, string? timeframe = null,
+            uint? fast = null, uint? slow = null, uint? signal = null)
+            => _inner.MacdSync(symbol, from, to, timeframe, fast, slow, signal);
+
+        /// <summary>
+        /// Get Bollinger Bands (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.BbResponse GetBb(
+            string symbol, string? from = null, string? to = null, string? timeframe = null,
+            uint? period = null, double? stddev = null)
+            => _inner.BbSync(symbol, from, to, timeframe, period, stddev);
+    }
+
+    /// <summary>
+    /// Stock corporate actions endpoints.
+    /// </summary>
+    public sealed class StockCorporateActionsClient
+    {
+        private readonly uniffi.marketdata_uniffi.StockCorporateActionsClient _inner;
+
+        internal StockCorporateActionsClient(uniffi.marketdata_uniffi.StockCorporateActionsClient inner)
+        {
+            _inner = inner;
+        }
+
+        // ========== Async Methods ==========
+
+        /// <summary>
+        /// Get capital structure changes (async).
+        /// </summary>
+        /// <param name="date">Specific date in YYYY-MM-DD (optional)</param>
+        /// <param name="startDate">Range start date (optional)</param>
+        /// <param name="endDate">Range end date (optional)</param>
+        public Task<uniffi.marketdata_uniffi.CapitalChangesResponse> GetCapitalChangesAsync(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.GetCapitalChanges(date, startDate, endDate);
+
+        /// <summary>
+        /// Get dividend announcements (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.DividendsResponse> GetDividendsAsync(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.GetDividends(date, startDate, endDate);
+
+        /// <summary>
+        /// Get IPO listing applicants (async).
+        /// </summary>
+        public Task<uniffi.marketdata_uniffi.ListingApplicantsResponse> GetListingApplicantsAsync(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.GetListingApplicants(date, startDate, endDate);
+
+        // ========== Sync Methods ==========
+
+        /// <summary>
+        /// Get capital structure changes (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.CapitalChangesResponse GetCapitalChanges(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.CapitalChangesSync(date, startDate, endDate);
+
+        /// <summary>
+        /// Get dividend announcements (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.DividendsResponse GetDividends(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.DividendsSync(date, startDate, endDate);
+
+        /// <summary>
+        /// Get IPO listing applicants (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.ListingApplicantsResponse GetListingApplicants(
+            string? date = null, string? startDate = null, string? endDate = null)
+            => _inner.ListingApplicantsSync(date, startDate, endDate);
     }
 
     /// <summary>
@@ -284,6 +585,11 @@ namespace FugleMarketData
         /// Access intraday (real-time) FutOpt data endpoints.
         /// </summary>
         public FutOptIntradayClient Intraday => new FutOptIntradayClient(_inner.Intraday());
+
+        /// <summary>
+        /// Access historical FutOpt data endpoints.
+        /// </summary>
+        public FutOptHistoricalClient Historical => new FutOptHistoricalClient(_inner.Historical());
     }
 
     /// <summary>
@@ -326,6 +632,35 @@ namespace FugleMarketData
         public Task<uniffi.marketdata_uniffi.ProductsResponse> GetProductsAsync(string type)
             => _inner.GetProducts(type);
 
+        /// <summary>
+        /// Get candlestick data for a futures/options contract (async).
+        /// </summary>
+        /// <param name="symbol">Contract symbol</param>
+        /// <param name="timeframe">Candle timeframe: "1", "5", "10", "15", "30", "60" (minutes)</param>
+        public Task<uniffi.marketdata_uniffi.IntradayCandlesResponse> GetCandlesAsync(string symbol, string timeframe)
+            => _inner.GetCandles(symbol, timeframe);
+
+        /// <summary>
+        /// Get trade history for a futures/options contract (async).
+        /// </summary>
+        /// <param name="symbol">Contract symbol</param>
+        public Task<uniffi.marketdata_uniffi.TradesResponse> GetTradesAsync(string symbol)
+            => _inner.GetTrades(symbol);
+
+        /// <summary>
+        /// Get volume breakdown by price for a futures/options contract (async).
+        /// </summary>
+        /// <param name="symbol">Contract symbol</param>
+        public Task<uniffi.marketdata_uniffi.VolumesResponse> GetVolumesAsync(string symbol)
+            => _inner.GetVolumes(symbol);
+
+        /// <summary>
+        /// Get batch tickers for futures/options (async).
+        /// </summary>
+        /// <param name="type">Product type: "F" for futures, "O" for options</param>
+        public Task<System.Collections.Generic.List<uniffi.marketdata_uniffi.FutOptTicker>> GetTickersAsync(string type)
+            => _inner.GetTickers(type);
+
         // ========== Sync Methods (Blocking) ==========
 
         /// <summary>
@@ -353,5 +688,83 @@ namespace FugleMarketData
         /// <returns>ProductsResponse with available contracts</returns>
         public uniffi.marketdata_uniffi.ProductsResponse GetProducts(string type)
             => _inner.ProductsSync(type);
+
+        /// <summary>
+        /// Get candlestick data for a futures/options contract (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.IntradayCandlesResponse GetCandles(string symbol, string timeframe)
+            => _inner.CandlesSync(symbol, timeframe);
+
+        /// <summary>
+        /// Get trade history for a futures/options contract (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.TradesResponse GetTrades(string symbol)
+            => _inner.TradesSync(symbol);
+
+        /// <summary>
+        /// Get volume breakdown by price for a futures/options contract (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.VolumesResponse GetVolumes(string symbol)
+            => _inner.VolumesSync(symbol);
+
+        /// <summary>
+        /// Get batch tickers for futures/options (blocking).
+        /// </summary>
+        public System.Collections.Generic.List<uniffi.marketdata_uniffi.FutOptTicker> GetTickers(string type)
+            => _inner.TickersSync(type);
+    }
+
+    /// <summary>
+    /// FutOpt historical data endpoints.
+    /// </summary>
+    public sealed class FutOptHistoricalClient
+    {
+        private readonly uniffi.marketdata_uniffi.FutOptHistoricalClient _inner;
+
+        internal FutOptHistoricalClient(uniffi.marketdata_uniffi.FutOptHistoricalClient inner)
+        {
+            _inner = inner;
+        }
+
+        // ========== Async Methods ==========
+
+        /// <summary>
+        /// Get historical candles for a futures/options contract (async).
+        /// </summary>
+        /// <param name="symbol">Contract symbol</param>
+        /// <param name="from">Start date in YYYY-MM-DD format (optional)</param>
+        /// <param name="to">End date in YYYY-MM-DD format (optional)</param>
+        /// <param name="timeframe">Timeframe (optional)</param>
+        /// <param name="afterHours">True for after-hours session</param>
+        public Task<uniffi.marketdata_uniffi.FutOptHistoricalCandlesResponse> GetCandlesAsync(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, bool afterHours = false)
+            => _inner.GetCandles(symbol, from, to, timeframe, afterHours);
+
+        /// <summary>
+        /// Get daily historical data for a futures/options contract (async).
+        /// </summary>
+        /// <param name="symbol">Contract symbol</param>
+        /// <param name="from">Start date in YYYY-MM-DD format (optional)</param>
+        /// <param name="to">End date in YYYY-MM-DD format (optional)</param>
+        /// <param name="afterHours">True for after-hours session</param>
+        public Task<uniffi.marketdata_uniffi.FutOptDailyResponse> GetDailyAsync(
+            string symbol, string? from = null, string? to = null, bool afterHours = false)
+            => _inner.GetDaily(symbol, from, to, afterHours);
+
+        // ========== Sync Methods ==========
+
+        /// <summary>
+        /// Get historical candles for a futures/options contract (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.FutOptHistoricalCandlesResponse GetCandles(
+            string symbol, string? from = null, string? to = null, string? timeframe = null, bool afterHours = false)
+            => _inner.CandlesSync(symbol, from, to, timeframe, afterHours);
+
+        /// <summary>
+        /// Get daily historical data for a futures/options contract (blocking).
+        /// </summary>
+        public uniffi.marketdata_uniffi.FutOptDailyResponse GetDaily(
+            string symbol, string? from = null, string? to = null, bool afterHours = false)
+            => _inner.DailySync(symbol, from, to, afterHours);
     }
 }

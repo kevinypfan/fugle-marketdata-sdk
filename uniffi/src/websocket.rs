@@ -238,6 +238,11 @@ impl WebSocketClient {
     pub fn is_connected(&self) -> bool {
         self.connected.load(Ordering::SeqCst)
     }
+
+    /// Check if the client has been shut down
+    pub fn is_closed(&self) -> bool {
+        self.shutdown.load(Ordering::SeqCst)
+    }
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -425,6 +430,37 @@ impl WebSocketClient {
             // Build key for unsubscribe
             let key = format!("{}:{}", channel, symbol);
             ws.unsubscribe(&key).await?;
+            Ok(())
+        } else {
+            Err(MarketDataError::WebSocketError {
+                msg: "Not connected".to_string(),
+            })
+        }
+    }
+
+    /// Send a ping message to the server
+    ///
+    /// # Arguments
+    /// * `state` - Optional state string echoed back in the pong response
+    pub async fn ping(&self, state: Option<String>) -> Result<(), MarketDataError> {
+        let guard = self.inner.lock().await;
+        if let Some(ref ws) = *guard {
+            let request = marketdata_core::WebSocketRequest::ping(state);
+            ws.send(request).await?;
+            Ok(())
+        } else {
+            Err(MarketDataError::WebSocketError {
+                msg: "Not connected".to_string(),
+            })
+        }
+    }
+
+    /// Query the server for current subscriptions
+    pub async fn query_subscriptions(&self) -> Result<(), MarketDataError> {
+        let guard = self.inner.lock().await;
+        if let Some(ref ws) = *guard {
+            let request = marketdata_core::WebSocketRequest::subscriptions();
+            ws.send(request).await?;
             Ok(())
         } else {
             Err(MarketDataError::WebSocketError {
