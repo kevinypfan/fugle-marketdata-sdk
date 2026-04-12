@@ -1,6 +1,6 @@
 node_modules/
 ws-benchmark-results.json
-ws-bench-cs/bin/
-ws-bench-cs/obj/
-ws-bench-go/ws-bench-go
-ws-bench-java/*.class
+cs/bin/
+cs/obj/
+go/ws-bench-go
+java/*.class

@@ -27,13 +27,13 @@ const PORT   = 8765;
 
 const BENCH_DIR = __dirname;
 const SERVER_SCRIPT  = path.join(BENCH_DIR, 'ws-mock-server.js');
-const CLIENT_NEW_JS  = path.join(BENCH_DIR, 'ws-bench-new.js');
-const CLIENT_OLD_JS  = path.join(BENCH_DIR, 'ws-bench-old.js');
-const CLIENT_NEW_PY  = path.join(BENCH_DIR, 'ws-bench-new-py.py');
-const CLIENT_OLD_PY  = path.join(BENCH_DIR, 'ws-bench-old-py.py');
-const CLIENT_NEW_CS  = path.join(BENCH_DIR, 'ws-bench-cs');
-const CLIENT_NEW_GO  = path.join(BENCH_DIR, 'ws-bench-go', 'ws-bench-go');
-const CLIENT_NEW_JAVA = path.join(BENCH_DIR, 'ws-bench-java', 'run.sh');
+const CLIENT_NEW_JS  = path.join(BENCH_DIR, 'js', 'bench-new.js');
+const CLIENT_OLD_JS  = path.join(BENCH_DIR, 'js', 'bench-old.js');
+const CLIENT_NEW_PY  = path.join(BENCH_DIR, 'py', 'bench-new.py');
+const CLIENT_OLD_PY  = path.join(BENCH_DIR, 'py', 'bench-old.py');
+const CLIENT_NEW_CS  = path.join(BENCH_DIR, 'cs');
+const CLIENT_NEW_GO  = path.join(BENCH_DIR, 'go', 'ws-bench-go');
+const CLIENT_NEW_JAVA = path.join(BENCH_DIR, 'java', 'run.sh');
 
 // Determine which SDKs to benchmark based on --lang flag
 const langIdx = process.argv.indexOf('--lang');
@@ -78,9 +78,9 @@ function startServer() {
 function runClient(script, label) {
   return new Promise((resolve, reject) => {
     const isPython = script.endsWith('.py');
-    const isDotnet = label.includes('cs');
-    const isGo = label.includes('Go') || label.includes('go');
     const isShell = script.endsWith('.sh');
+    const isDotnet = script.includes('/cs') || script.includes('\\cs');
+    const isGo = !isShell && !isPython && !isDotnet && !script.endsWith('.js');
     let cmd, cmdArgs;
     if (isShell) {
       cmd = 'bash';
@@ -231,7 +231,7 @@ async function main() {
         await sleep(300);
         console.log(`  Running new SDK (${pair.newName})...`);
         try {
-          const result = await runClient(pair.newScript, `${pair.label}-new-cs`);
+          const result = await runClient(pair.newScript, `${pair.label}-new`);
           allResults[newKey].push(result);
           console.log(`  New: ${fmt(result.msgs_per_sec)} msg/s, p50=${fmt(result.latency_p50_ms)}ms, p99=${fmt(result.latency_p99_ms)}ms`);
         } catch (e) {

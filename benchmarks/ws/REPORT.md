@@ -301,13 +301,13 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | File | Description |
 |------|-------------|
 | `ws-mock-server.js` | Mock Fugle WebSocket server with rate control |
-| `ws-bench-new.js` | New SDK (JS) benchmark client |
-| `ws-bench-old.js` | Old SDK (JS, `@fugle/marketdata@1.4.2`) benchmark client |
-| `ws-bench-new-py.py` | New SDK (Python) benchmark client |
-| `ws-bench-old-py.py` | Old SDK (Python, `fugle-marketdata@2.4.1`) benchmark client |
-| `ws-bench-cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
-| `ws-bench-go/` | New SDK (Go, UniFFI) benchmark client |
-| `ws-bench-java/` | New SDK (Java, UniFFI+JNA) benchmark client |
+| `js/bench-new.js` | New SDK (JS) benchmark client |
+| `js/bench-old.js` | Old SDK (JS, `@fugle/marketdata@1.4.2`) benchmark client |
+| `py/bench-new.py` | New SDK (Python) benchmark client |
+| `py/bench-old.py` | Old SDK (Python, `fugle-marketdata@2.4.1`) benchmark client |
+| `cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
+| `go/` | New SDK (Go, UniFFI) benchmark client |
+| `java/` | New SDK (Java, UniFFI+JNA) benchmark client |
 | `ws-bench-run.js` | Runner: starts server, runs clients, compares results |
 | `package.json` | Dependencies: `ws`, `@fugle/marketdata@1.4.2` |
 | `REPORT.md` | This file |

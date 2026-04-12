@@ -17,7 +17,7 @@ import threading
 import time
 
 # Add the py directory to path so we can import the built module
-SDK_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'py')
+SDK_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'py')
 sys.path.insert(0, SDK_DIR)
 
 from marketdata_py import WebSocketClient

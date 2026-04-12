@@ -10,7 +10,7 @@
  *   node ws-bench-new.js --url ws://localhost:8765 --timeout 30000
  */
 
-const { WebSocketClient } = require('../../js/index.js');
+const { WebSocketClient } = require('../../../js/index.js');
 
 // ---------------------------------------------------------------------------
 // CLI
