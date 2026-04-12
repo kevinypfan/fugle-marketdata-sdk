@@ -1,6 +1,6 @@
 # WebSocket Benchmark Report
 
-Rust-core SDK vs legacy pure-JS / pure-Python SDKs.
+Rust-core SDK vs legacy pure-JS / pure-Python SDKs, plus cross-language comparison.
 
 Benchmark date: 2026-04-12
 Hardware: Apple Silicon (macOS), localhost loopback
@@ -26,6 +26,26 @@ Hardware: Apple Silicon (macOS), localhost loopback
 | Latency p99 | 372 ms | 58 ms | **-84%** |
 | CPU user | 1,091 ms | 205 ms | -81% |
 
+### C# (.NET 8)
+
+No legacy C# SDK exists, so results are absolute (cross-language comparison only).
+
+| Metric | New SDK (Rust core / UniFFI) |
+|--------|:---------------------------:|
+| Throughput | **172,413 msg/s** |
+| Latency p50 | 3 ms |
+| Latency p99 | 6 ms |
+| CPU user | 88 ms |
+
+### Cross-Language Comparison (New Rust-core SDK only)
+
+| Metric | JS (napi-rs) | C# (UniFFI) | Python (PyO3) |
+|--------|:------------:|:-----------:|:-------------:|
+| Throughput | 234,742 msg/s | 172,413 msg/s | 100,000 msg/s |
+| Latency p50 | 0 ms | 3 ms | 19 ms |
+| Latency p99 | 1 ms | 6 ms | 58 ms |
+| CPU user | 304 ms | 88 ms | 205 ms |
+
 ## Key Takeaways
 
 1. **Python binding benefits enormously from Rust core** -- 4x throughput, 10x lower
@@ -41,11 +61,17 @@ Hardware: Apple Silicon (macOS), localhost loopback
    passes the raw WebSocket frame string straight to the callback with zero intermediate
    processing (the C++ `ws` addon is already very fast).
 
-3. **Latency is a non-issue for both** -- at real market data rates (100-500 msg/s),
-   both SDKs deliver messages in <1ms. The p50/p99 differences only manifest under
-   synthetic burst loads far exceeding production conditions.
+3. **C# binding ranks second** at 172K msg/s (73% of JS, 1.7x Python). The UniFFI
+   binding uses a dedicated thread with `receive_timeout(5ms)` to forward messages via
+   the `WebSocketListener` foreign callback interface. The remaining gap vs JS is due
+   to UniFFI's FFI callback overhead (marshalling through `RustBuffer` + P/Invoke) vs
+   napi-rs's `ThreadsafeFunction` which uses V8's native microtask queue.
 
-4. **Future optimization**: Adding a `raw_text` field to `WebSocketMessage` in the Rust
+4. **Latency is a non-issue at production rates** -- at real market data rates
+   (100-500 msg/s), all three SDKs deliver messages in <1ms. The p50/p99 differences
+   only manifest under synthetic burst loads far exceeding production conditions.
+
+5. **Future optimization**: Adding a `raw_text` field to `WebSocketMessage` in the Rust
    core would let the JS binding skip `serde_json::to_string` and pass the original
    frame string directly. This would eliminate the 8% throughput gap. Relevant code:
    - Parse: `core/src/websocket/message.rs` line 121
@@ -128,6 +154,14 @@ New:  server -> tokio-tungstenite (Rust) -> serde_json::from_str (Rust)
         -> mpsc -> PyO3 dict conversion -> callback (receives dict directly)
 ```
 
+**C# (.NET)**:
+```
+New:  server -> tokio-tungstenite (Rust) -> serde_json::from_str (Rust)
+        -> mpsc -> dedicated thread receive_timeout(5ms)
+        -> StreamMessage conversion -> UniFFI foreign callback (P/Invoke)
+        -> C# IWebSocketListener.OnMessage -> System.Text.Json parse
+```
+
 ## How to Run
 
 ### Prerequisites
@@ -137,6 +171,8 @@ New:  server -> tokio-tungstenite (Rust) -> serde_json::from_str (Rust)
 - **JS SDK built**: run `cd js && npm run build` first (produces `js/index.js` + native `.node` binary)
 - **Python SDK built**: run `cd py && maturin develop --release` first (produces `marketdata_py` module)
 - **Old Python SDK installed**: `pip install fugle-marketdata==2.4.1`
+- **.NET 8.0** (for C# benchmark client)
+- **UniFFI native library built**: run `cd uniffi && cargo build --release` first
 
 ### Quick Start
 
@@ -155,7 +191,10 @@ node ws-bench-run.js 10000 0 1000 3 --lang js
 # Full benchmark — Python only
 node ws-bench-run.js 10000 0 1000 3 --lang py
 
-# Full benchmark — both JS and Python
+# Full benchmark — C# only
+node ws-bench-run.js 10000 0 1000 3 --lang cs
+
+# Full benchmark — all three languages (JS + Python + C#)
 node ws-bench-run.js 10000 0 1000 3 --lang all
 
 # Heavy burst (50K messages)
@@ -168,7 +207,7 @@ node ws-bench-run.js 5000 500 1000 3
 ### Arguments
 
 ```
-node ws-bench-run.js [count] [rate] [warmup] [runs] [--lang js|py|all]
+node ws-bench-run.js [count] [rate] [warmup] [runs] [--lang js|py|cs|all]
 
   count    Number of measured data messages (default: 10000)
   rate     Messages per second, 0 = burst (default: 0)
@@ -230,6 +269,7 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | `ws-bench-old.js` | Old SDK (JS, `@fugle/marketdata@1.4.2`) benchmark client |
 | `ws-bench-new-py.py` | New SDK (Python) benchmark client |
 | `ws-bench-old-py.py` | Old SDK (Python, `fugle-marketdata@2.4.1`) benchmark client |
+| `ws-bench-cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
 | `ws-bench-run.js` | Runner: starts server, runs clients, compares results |
 | `package.json` | Dependencies: `ws`, `@fugle/marketdata@1.4.2` |
 | `REPORT.md` | This file |
@@ -246,4 +286,4 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | Transport | localhost loopback (no network latency) |
 | Old JS SDK | `@fugle/marketdata@1.4.2` (C++ `ws` addon) |
 | Old Py SDK | `fugle-marketdata@2.4.1` (pure Python `websocket-client`) |
-| New SDK | Rust core (`tokio-tungstenite` + `serde_json`) with napi-rs (JS) / PyO3 (Py) bindings |
+| New SDK | Rust core (`tokio-tungstenite` + `serde_json`) with napi-rs (JS) / PyO3 (Py) / UniFFI (C#) bindings |
