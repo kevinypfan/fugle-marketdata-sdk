@@ -130,7 +130,13 @@ jobs:
   pack-internal-python:
     name: Package internal Python wheels
     needs: [extract-version, build-python]
-    if: needs.extract-version.outputs.channel == 'prerelease'
+    # Lenient gate — runs whenever build-python attempted to run (even with
+    # partial matrix failures). Downloads whatever wheel-* artifacts exist,
+    # so internal users still get wheels for the platforms that did build.
+    if: |
+      !cancelled() &&
+      needs.extract-version.outputs.channel == 'prerelease' &&
+      needs.build-python.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - name: Download wheels from build-python
@@ -139,9 +145,12 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
           path: ./dist
+        # Continue even if some matrix entries failed to produce wheels —
+        # `download-artifact` returns success when pattern matches zero
+        # artifacts (it just downloads nothing).
 
       - name: List wheels
-        run: ls -la dist/
+        run: ls -la dist/ || echo "(no wheels available)"
 
       - name: Upload as internal artifact
         uses: actions/upload-artifact@v4
@@ -149,11 +158,16 @@ jobs:
           name: internal-python
           path: dist/*.whl
           retention-days: 5
+          if-no-files-found: warn
 
   pack-internal-nodejs:
     name: Package internal Node.js tarball (fat, all platforms)
     needs: [extract-version, build-nodejs]
-    if: needs.extract-version.outputs.channel == 'prerelease'
+    # Lenient gate — same rationale as pack-internal-python above.
+    if: |
+      !cancelled() &&
+      needs.extract-version.outputs.channel == 'prerelease' &&
+      needs.build-nodejs.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

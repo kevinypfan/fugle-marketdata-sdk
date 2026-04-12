@@ -23,10 +23,17 @@ on:
 jobs:
   resolve-version:
     name: Resolve Version
-    # Only run after a successful prerelease (tag contains '-').
+    # Fire after any non-cancelled prerelease run (tag contains '-').
+    # The upstream release.yml may report `failure` even when a partial
+    # Release was successfully published — e.g. a single non-critical
+    # wheel build failing but the other 5 languages all green. We still
+    # want to smoke-test whatever assets actually made it to the Release
+    # page, so we accept both `success` and `failure` conclusions. If
+    # no Release was created at all, the `gh release download` in each
+    # smoke job will fail fast with a clear error.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.conclusion != 'cancelled' &&
        startsWith(github.event.workflow_run.head_branch, 'v') &&
        contains(github.event.workflow_run.head_branch, '-'))
     runs-on: ubuntu-latest
