@@ -92,16 +92,18 @@ jobs:
     needs: [extract-version, build-nodejs]
     if: needs.extract-version.outputs.channel == 'stable'
     uses: ./.github/workflows/publish-nodejs.yml
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    # `secrets: inherit` bypasses compile-time validation of required secrets
+    # on forks that don't have NPM_TOKEN configured. The `if:` gate keeps this
+    # job from actually running on prerelease channel, so the missing secret
+    # never matters at runtime.
+    secrets: inherit
 
   publish-nuget:
     name: Publish to NuGet
     needs: [extract-version, build-uniffi]
     if: needs.extract-version.outputs.channel == 'stable'
     uses: ./.github/workflows/publish-nuget.yml
-    secrets:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    secrets: inherit
 
   # Java runs on both channels — it's already on GitHub Packages with
   # GITHUB_TOKEN auth, no public registry involved even for stable releases.
