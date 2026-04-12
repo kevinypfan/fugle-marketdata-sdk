@@ -159,6 +159,9 @@ pub struct WebSocketClient {
     shutdown: Arc<AtomicBool>,
     reconnect_config: Option<marketdata_core::ReconnectionConfig>,
     health_check_config: Option<marketdata_core::HealthCheckConfig>,
+    /// Tokio runtime for sync wrappers (C++ feature). Kept alive for background tasks.
+    #[cfg(feature = "cpp")]
+    sync_runtime: std::sync::Mutex<Option<tokio::runtime::Runtime>>,
 }
 
 impl WebSocketClient {
@@ -181,6 +184,8 @@ impl WebSocketClient {
             shutdown: Arc::new(AtomicBool::new(false)),
             reconnect_config,
             health_check_config,
+            #[cfg(feature = "cpp")]
+            sync_runtime: std::sync::Mutex::new(None),
         })
     }
 }
@@ -543,7 +548,7 @@ impl WebSocketClient {
 }
 
 /// Sync (blocking) wrappers for C++ compatibility.
-/// When the `cpp` feature is enabled, async methods are stripped and only these remain.
+/// Uses a persistent tokio runtime stored in the client to keep background tasks alive.
 #[cfg(feature = "cpp")]
 #[uniffi::export]
 impl WebSocketClient {
@@ -551,42 +556,64 @@ impl WebSocketClient {
     pub fn connect_sync(&self) -> Result<(), MarketDataError> {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
-        rt.block_on(self.connect_impl())
+        let result = rt.block_on(self.connect_impl());
+        // Store runtime to keep background tasks alive
+        if let Ok(mut guard) = self.sync_runtime.lock() {
+            *guard = Some(rt);
+        }
+        result
     }
 
     /// Subscribe to a channel for a symbol (blocking).
     pub fn subscribe_sync(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
-        rt.block_on(self.subscribe_impl(channel, symbol))
+        let guard = self.sync_runtime.lock().unwrap();
+        if let Some(ref rt) = *guard {
+            rt.block_on(self.subscribe_impl(channel, symbol))
+        } else {
+            Err(MarketDataError::WebSocketError { msg: "Not connected (call connect_sync first)".to_string() })
+        }
     }
 
     /// Unsubscribe from a channel for a symbol (blocking).
     pub fn unsubscribe_sync(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
-        rt.block_on(self.unsubscribe_impl(channel, symbol))
+        let guard = self.sync_runtime.lock().unwrap();
+        if let Some(ref rt) = *guard {
+            rt.block_on(self.unsubscribe_impl(channel, symbol))
+        } else {
+            Err(MarketDataError::WebSocketError { msg: "Not connected".to_string() })
+        }
     }
 
     /// Send a ping message (blocking).
     pub fn ping_sync(&self, state: Option<String>) -> Result<(), MarketDataError> {
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
-        rt.block_on(self.ping_impl(state))
+        let guard = self.sync_runtime.lock().unwrap();
+        if let Some(ref rt) = *guard {
+            rt.block_on(self.ping_impl(state))
+        } else {
+            Err(MarketDataError::WebSocketError { msg: "Not connected".to_string() })
+        }
     }
 
     /// Query server subscriptions (blocking).
     pub fn query_subscriptions_sync(&self) -> Result<(), MarketDataError> {
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
-        rt.block_on(self.query_subscriptions_impl())
+        let guard = self.sync_runtime.lock().unwrap();
+        if let Some(ref rt) = *guard {
+            rt.block_on(self.query_subscriptions_impl())
+        } else {
+            Err(MarketDataError::WebSocketError { msg: "Not connected".to_string() })
+        }
     }
 
     /// Disconnect from the WebSocket server (blocking).
     pub fn disconnect_sync(&self) {
-        let rt = tokio::runtime::Runtime::new().ok();
-        if let Some(rt) = rt {
+        let guard = self.sync_runtime.lock().unwrap();
+        if let Some(ref rt) = *guard {
             rt.block_on(self.disconnect_impl());
+        }
+        drop(guard);
+        // Drop runtime to clean up
+        if let Ok(mut guard) = self.sync_runtime.lock() {
+            *guard = None;
         }
     }
 }

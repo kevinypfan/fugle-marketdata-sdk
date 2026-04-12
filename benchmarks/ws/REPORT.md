@@ -58,14 +58,25 @@ No legacy Java SDK exists, so results are absolute (cross-language comparison on
 | Latency p99 | 512 ms |
 | CPU user | 98 ms |
 
+### C++ (C++20)
+
+No legacy C++ SDK exists, so results are absolute (cross-language comparison only).
+
+| Metric | New SDK (Rust core / UniFFI+C++) |
+|--------|:-------------------------------:|
+| Throughput | **161,290 msg/s** |
+| Latency p50 | 0 ms |
+| Latency p99 | 3 ms |
+| CPU user | 81 ms |
+
 ### Cross-Language Comparison (New Rust-core SDK only)
 
-| Metric | JS (napi-rs) | C# (UniFFI) | Go (UniFFI) | Python (PyO3) | Java (UniFFI+JNA) |
-|--------|:------------:|:-----------:|:-----------:|:-------------:|:-----------------:|
-| Throughput | 185,185 msg/s | 175,438 msg/s | 158,730 msg/s | 104,166 msg/s | 21,097 msg/s |
-| Latency p50 | 0 ms | 2 ms | 4 ms | 18 ms | 339 ms |
-| Latency p99 | 1 ms | 4 ms | 11 ms | 55 ms | 512 ms |
-| CPU user | 71 ms | 92 ms | 86 ms | 199 ms | 98 ms |
+| Metric | JS (napi-rs) | C# (UniFFI) | C++ (UniFFI) | Go (UniFFI) | Python (PyO3) | Java (UniFFI+JNA) |
+|--------|:------------:|:-----------:|:------------:|:-----------:|:-------------:|:-----------------:|
+| Throughput | 185,185 msg/s | 175,438 msg/s | 161,290 msg/s | 158,730 msg/s | 104,166 msg/s | 21,097 msg/s |
+| Latency p50 | 0 ms | 2 ms | 0 ms | 4 ms | 18 ms | 339 ms |
+| Latency p99 | 1 ms | 4 ms | 3 ms | 11 ms | 55 ms | 512 ms |
+| CPU user | 71 ms | 92 ms | 81 ms | 86 ms | 199 ms | 98 ms |
 
 ## Key Takeaways
 
@@ -307,6 +318,7 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | `cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
 | `go/` | New SDK (Go, UniFFI) benchmark client |
 | `java/` | New SDK (Java, UniFFI+JNA) benchmark client |
+| `cpp/` | New SDK (C++, UniFFI) benchmark client |
 | `ws-bench-run.js` | Runner: starts server, runs clients, compares results |
 | `package.json` | Dependencies: `ws`, `@fugle/marketdata@1.4.2` |
 | `REPORT.md` | This file |

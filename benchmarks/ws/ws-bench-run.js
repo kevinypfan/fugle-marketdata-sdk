@@ -34,10 +34,11 @@ const CLIENT_OLD_PY  = path.join(BENCH_DIR, 'py', 'bench-old.py');
 const CLIENT_NEW_CS  = path.join(BENCH_DIR, 'cs');
 const CLIENT_NEW_GO  = path.join(BENCH_DIR, 'go', 'ws-bench-go');
 const CLIENT_NEW_JAVA = path.join(BENCH_DIR, 'java', 'run.sh');
+const CLIENT_NEW_CPP  = path.join(BENCH_DIR, 'cpp', 'run.sh');
 
 // Determine which SDKs to benchmark based on --lang flag
 const langIdx = process.argv.indexOf('--lang');
-const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, cs, go, java, all
+const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, cs, go, java, cpp, all
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -190,6 +191,10 @@ async function main() {
   if (LANG === 'java' || LANG === 'all') {
     pairs.push({ label: 'Java', oldScript: null, newScript: CLIENT_NEW_JAVA,
                  oldName: null, newName: 'rust-core (Java)', newOnly: true });
+  }
+  if (LANG === 'cpp' || LANG === 'all') {
+    pairs.push({ label: 'C++', oldScript: null, newScript: CLIENT_NEW_CPP,
+                 oldName: null, newName: 'rust-core (C++)', newOnly: true });
   }
 
   const allResults = {};  // { 'JS-old': [...], 'JS-new': [...], ... }

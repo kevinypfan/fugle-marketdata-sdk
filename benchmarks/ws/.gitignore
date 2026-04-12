@@ -4,3 +4,6 @@ cs/bin/
 cs/obj/
 go/ws-bench-go
 java/*.class
+cpp/ws-bench-cpp
+cpp/libmarketdata_uniffi.dylib
+cpp/libmarketdata_uniffi.so
