@@ -8,7 +8,12 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    environment: release  # Required for trusted publishing - must match PyPI config
+    # NOTE: PyPI trusted publishing requires `environment: release` configured
+    # in the repo. The fork (kevinypfan) doesn't have that environment, and
+    # GitHub validates environment references at workflow startup even when
+    # the job is skipped via `if:` — causing `startup_failure` for any release
+    # triggered from the fork. Re-add this line before merging upstream:
+    #   environment: release
     permissions:
       id-token: write  # CRITICAL: Required for OIDC token generation
       contents: read
