@@ -205,7 +205,9 @@ func TestOptionFunctions(t *testing.T) {
 // Mock listener for WebSocket tests
 type mockListener struct{}
 
-func (m *mockListener) OnConnected(exchange string) {}
-func (m *mockListener) OnMessage(payload []byte)     {}
-func (m *mockListener) OnError(error string)         {}
-func (m *mockListener) OnDisconnected()              {}
+func (m *mockListener) OnConnected()                      {}
+func (m *mockListener) OnDisconnected()                   {}
+func (m *mockListener) OnMessage(message StreamMessage)   {}
+func (m *mockListener) OnError(errorMessage string)       {}
+func (m *mockListener) OnReconnecting(attempt uint32)     {}
+func (m *mockListener) OnReconnectFailed(attempts uint32) {}

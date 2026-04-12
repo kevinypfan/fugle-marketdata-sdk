@@ -210,6 +210,31 @@ func (sc *StreamingClient) IsConnected() bool {
 	return sc.client.IsConnected()
 }
 
+// IsClosed returns true if the WebSocket client has been shut down
+func (sc *StreamingClient) IsClosed() bool {
+	return sc.client.IsClosed()
+}
+
+// Ping sends a ping message to the server.
+// The optional state string will be echoed back in the pong response.
+func (sc *StreamingClient) Ping(state *string) error {
+	err := sc.client.Ping(state)
+	if err != nil {
+		return fmt.Errorf("ping failed: %v", err)
+	}
+	return nil
+}
+
+// QuerySubscriptions sends a query to the server for current subscriptions.
+// The response arrives via the Messages() channel.
+func (sc *StreamingClient) QuerySubscriptions() error {
+	err := sc.client.QuerySubscriptions()
+	if err != nil {
+		return fmt.Errorf("query subscriptions failed: %v", err)
+	}
+	return nil
+}
+
 // Close disconnects and closes all channels
 func (sc *StreamingClient) Close() error {
 	sc.client.Disconnect()

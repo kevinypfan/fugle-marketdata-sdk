@@ -387,6 +387,15 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_config()
+		})
+		if checksum != 19180 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_config: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_endpoint()
 		})
 		if checksum != 15148 {
@@ -450,6 +459,24 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_candles_sync()
+		})
+		if checksum != 60136 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_candles_sync: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_candles()
+		})
+		if checksum != 62970 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_candles: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_products()
 		})
 		if checksum != 61510 {
@@ -477,6 +504,33 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_tickers()
+		})
+		if checksum != 29913 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_tickers: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_trades()
+		})
+		if checksum != 3561 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_trades: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_volumes()
+		})
+		if checksum != 5062 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_get_volumes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_products_sync()
 		})
 		if checksum != 8976 {
@@ -500,6 +554,33 @@ func uniffiCheckChecksums() {
 		if checksum != 53319 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_ticker_sync: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_tickers_sync()
+		})
+		if checksum != 55649 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_tickers_sync: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_trades_sync()
+		})
+		if checksum != 987 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_trades_sync: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_volumes_sync()
+		})
+		if checksum != 25987 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_futoptintradayclient_volumes_sync: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -693,6 +774,15 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_stockintradayclient_get_tickers()
+		})
+		if checksum != 24176 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_stockintradayclient_get_tickers: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_stockintradayclient_get_trades()
 		})
 		if checksum != 48306 {
@@ -725,6 +815,15 @@ func uniffiCheckChecksums() {
 		if checksum != 22635 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_stockintradayclient_ticker_sync: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_stockintradayclient_tickers_sync()
+		})
+		if checksum != 3916 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_stockintradayclient_tickers_sync: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -909,11 +1008,38 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_is_closed()
+		})
+		if checksum != 15116 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_is_closed: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_is_connected()
 		})
 		if checksum != 53625 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_is_connected: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_ping()
+		})
+		if checksum != 13903 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_ping: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions()
+		})
+		if checksum != 5989 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -972,6 +1098,24 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_websocketlistener_on_reconnecting()
+		})
+		if checksum != 63646 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketlistener_on_reconnecting: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_method_websocketlistener_on_reconnect_failed()
+		})
+		if checksum != 36342 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketlistener_on_reconnect_failed: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new()
 		})
 		if checksum != 36225 {
@@ -981,11 +1125,29 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_config()
+		})
+		if checksum != 8956 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_config: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint()
 		})
 		if checksum != 35702 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url()
+		})
+		if checksum != 63549 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url: UniFFI API checksum mismatch")
 		}
 	}
 }
@@ -1506,6 +1668,10 @@ func (_ FfiDestroyerFutOptHistoricalClient) Destroy(value *FutOptHistoricalClien
 
 // FutOpt intraday endpoints with typed model returns
 type FutOptIntradayClientInterface interface {
+	// Get candlestick data for a contract (sync/blocking)
+	CandlesSync(symbol string, timeframe string) (IntradayCandlesResponse, *MarketDataError)
+	// Get candlestick data for a futures/options contract (async)
+	GetCandles(symbol string, timeframe string) (IntradayCandlesResponse, *MarketDataError)
 	// Get available products list (async)
 	//
 	// typ: "F" for futures, "O" for options
@@ -1516,17 +1682,83 @@ type FutOptIntradayClientInterface interface {
 	GetQuote(symbol string, afterHours bool) (FutOptQuote, *MarketDataError)
 	// Get ticker info for a contract (async)
 	GetTicker(symbol string, afterHours bool) (FutOptTicker, *MarketDataError)
+	// Get batch tickers for futures/options (async)
+	//
+	// typ: "F" for futures, "O" for options
+	GetTickers(typ string) ([]FutOptTicker, *MarketDataError)
+	// Get trade history for a futures/options contract (async)
+	GetTrades(symbol string) (TradesResponse, *MarketDataError)
+	// Get volume breakdown by price for a futures/options contract (async)
+	GetVolumes(symbol string) (VolumesResponse, *MarketDataError)
 	// Get available products list (sync/blocking)
 	ProductsSync(typ string) (ProductsResponse, *MarketDataError)
 	// Get quote for a futures/options contract (sync/blocking)
 	QuoteSync(symbol string, afterHours bool) (FutOptQuote, *MarketDataError)
 	// Get ticker info for a contract (sync/blocking)
 	TickerSync(symbol string, afterHours bool) (FutOptTicker, *MarketDataError)
+	// Get batch tickers for futures/options (sync/blocking)
+	//
+	// typ: "F" for futures, "O" for options
+	TickersSync(typ string) ([]FutOptTicker, *MarketDataError)
+	// Get trade history for a contract (sync/blocking)
+	TradesSync(symbol string) (TradesResponse, *MarketDataError)
+	// Get volume breakdown by price for a contract (sync/blocking)
+	VolumesSync(symbol string) (VolumesResponse, *MarketDataError)
 }
 
 // FutOpt intraday endpoints with typed model returns
 type FutOptIntradayClient struct {
 	ffiObject FfiObject
+}
+
+// Get candlestick data for a contract (sync/blocking)
+func (_self *FutOptIntradayClient) CandlesSync(symbol string, timeframe string) (IntradayCandlesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_candles_sync(
+				_pointer, FfiConverterStringINSTANCE.Lower(symbol), FfiConverterStringINSTANCE.Lower(timeframe), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue IntradayCandlesResponse
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterIntradayCandlesResponseINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Get candlestick data for a futures/options contract (async)
+func (_self *FutOptIntradayClient) GetCandles(symbol string, timeframe string) (IntradayCandlesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	res, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) RustBufferI {
+			res := C.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(handle, status)
+			return GoRustBuffer{
+				inner: res,
+			}
+		},
+		// liftFn
+		func(ffi RustBufferI) IntradayCandlesResponse {
+			return FfiConverterIntradayCandlesResponseINSTANCE.Lift(ffi)
+		},
+		C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_get_candles(
+			_pointer, FfiConverterStringINSTANCE.Lower(symbol), FfiConverterStringINSTANCE.Lower(timeframe)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_rust_buffer(handle)
+		},
+	)
+
+	return res, err
 }
 
 // Get available products list (async)
@@ -1629,6 +1861,104 @@ func (_self *FutOptIntradayClient) GetTicker(symbol string, afterHours bool) (Fu
 	return res, err
 }
 
+// Get batch tickers for futures/options (async)
+//
+// typ: "F" for futures, "O" for options
+func (_self *FutOptIntradayClient) GetTickers(typ string) ([]FutOptTicker, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	res, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) RustBufferI {
+			res := C.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(handle, status)
+			return GoRustBuffer{
+				inner: res,
+			}
+		},
+		// liftFn
+		func(ffi RustBufferI) []FutOptTicker {
+			return FfiConverterSequenceFutOptTickerINSTANCE.Lift(ffi)
+		},
+		C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_get_tickers(
+			_pointer, FfiConverterStringINSTANCE.Lower(typ)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_rust_buffer(handle)
+		},
+	)
+
+	return res, err
+}
+
+// Get trade history for a futures/options contract (async)
+func (_self *FutOptIntradayClient) GetTrades(symbol string) (TradesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	res, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) RustBufferI {
+			res := C.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(handle, status)
+			return GoRustBuffer{
+				inner: res,
+			}
+		},
+		// liftFn
+		func(ffi RustBufferI) TradesResponse {
+			return FfiConverterTradesResponseINSTANCE.Lift(ffi)
+		},
+		C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_get_trades(
+			_pointer, FfiConverterStringINSTANCE.Lower(symbol)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_rust_buffer(handle)
+		},
+	)
+
+	return res, err
+}
+
+// Get volume breakdown by price for a futures/options contract (async)
+func (_self *FutOptIntradayClient) GetVolumes(symbol string) (VolumesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	res, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) RustBufferI {
+			res := C.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(handle, status)
+			return GoRustBuffer{
+				inner: res,
+			}
+		},
+		// liftFn
+		func(ffi RustBufferI) VolumesResponse {
+			return FfiConverterVolumesResponseINSTANCE.Lift(ffi)
+		},
+		C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_get_volumes(
+			_pointer, FfiConverterStringINSTANCE.Lower(symbol)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_rust_buffer(handle)
+		},
+	)
+
+	return res, err
+}
+
 // Get available products list (sync/blocking)
 func (_self *FutOptIntradayClient) ProductsSync(typ string) (ProductsResponse, *MarketDataError) {
 	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
@@ -1680,6 +2010,62 @@ func (_self *FutOptIntradayClient) TickerSync(symbol string, afterHours bool) (F
 		return _uniffiDefaultValue, _uniffiErr
 	} else {
 		return FfiConverterFutOptTickerINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Get batch tickers for futures/options (sync/blocking)
+//
+// typ: "F" for futures, "O" for options
+func (_self *FutOptIntradayClient) TickersSync(typ string) ([]FutOptTicker, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_tickers_sync(
+				_pointer, FfiConverterStringINSTANCE.Lower(typ), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue []FutOptTicker
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterSequenceFutOptTickerINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Get trade history for a contract (sync/blocking)
+func (_self *FutOptIntradayClient) TradesSync(symbol string) (TradesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_trades_sync(
+				_pointer, FfiConverterStringINSTANCE.Lower(symbol), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue TradesResponse
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterTradesResponseINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Get volume breakdown by price for a contract (sync/blocking)
+func (_self *FutOptIntradayClient) VolumesSync(symbol string) (VolumesResponse, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*FutOptIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_marketdata_uniffi_fn_method_futoptintradayclient_volumes_sync(
+				_pointer, FfiConverterStringINSTANCE.Lower(symbol), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue VolumesResponse
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterVolumesResponseINSTANCE.Lift(_uniffiRV), _uniffiErr
 	}
 }
 func (object *FutOptIntradayClient) Destroy() {
@@ -2366,6 +2752,10 @@ type StockIntradayClientInterface interface {
 	//
 	// Returns typed Ticker model with stock metadata.
 	GetTicker(symbol string) (Ticker, *MarketDataError)
+	// Get batch tickers for a security type (async)
+	//
+	// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+	GetTickers(typ string) ([]Ticker, *MarketDataError)
 	// Get trade history for a symbol (async)
 	//
 	// Returns typed TradesResponse with list of trades.
@@ -2378,6 +2768,10 @@ type StockIntradayClientInterface interface {
 	QuoteSync(symbol string) (Quote, *MarketDataError)
 	// Get ticker info for a symbol (sync/blocking)
 	TickerSync(symbol string) (Ticker, *MarketDataError)
+	// Get batch tickers for a security type (sync/blocking)
+	//
+	// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+	TickersSync(typ string) ([]Ticker, *MarketDataError)
 	// Get trade history for a symbol (sync/blocking)
 	TradesSync(symbol string) (TradesResponse, *MarketDataError)
 	// Get volume breakdown for a symbol (sync/blocking)
@@ -2514,6 +2908,40 @@ func (_self *StockIntradayClient) GetTicker(symbol string) (Ticker, *MarketDataE
 	return res, err
 }
 
+// Get batch tickers for a security type (async)
+//
+// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+func (_self *StockIntradayClient) GetTickers(typ string) ([]Ticker, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*StockIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	res, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) RustBufferI {
+			res := C.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(handle, status)
+			return GoRustBuffer{
+				inner: res,
+			}
+		},
+		// liftFn
+		func(ffi RustBufferI) []Ticker {
+			return FfiConverterSequenceTickerINSTANCE.Lift(ffi)
+		},
+		C.uniffi_marketdata_uniffi_fn_method_stockintradayclient_get_tickers(
+			_pointer, FfiConverterStringINSTANCE.Lower(typ)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_rust_buffer(handle)
+		},
+	)
+
+	return res, err
+}
+
 // Get trade history for a symbol (async)
 //
 // Returns typed TradesResponse with list of trades.
@@ -2615,6 +3043,26 @@ func (_self *StockIntradayClient) TickerSync(symbol string) (Ticker, *MarketData
 		return _uniffiDefaultValue, _uniffiErr
 	} else {
 		return FfiConverterTickerINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Get batch tickers for a security type (sync/blocking)
+//
+// typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+func (_self *StockIntradayClient) TickersSync(typ string) ([]Ticker, *MarketDataError) {
+	_pointer := _self.ffiObject.incrementPointer("*StockIntradayClient")
+	defer _self.ffiObject.decrementPointer()
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_marketdata_uniffi_fn_method_stockintradayclient_tickers_sync(
+				_pointer, FfiConverterStringINSTANCE.Lower(typ), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue []Ticker
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterSequenceTickerINSTANCE.Lift(_uniffiRV), _uniffiErr
 	}
 }
 
@@ -3302,8 +3750,17 @@ type WebSocketClientInterface interface {
 	//
 	// Gracefully closes the connection and stops the message forwarding task.
 	Disconnect()
+	// Check if the client has been shut down
+	IsClosed() bool
 	// Check if the client is currently connected
 	IsConnected() bool
+	// Send a ping message to the server
+	//
+	// # Arguments
+	// * `state` - Optional state string echoed back in the pong response
+	Ping(state *string) *MarketDataError
+	// Query the server for current subscriptions
+	QuerySubscriptions() *MarketDataError
 	// Subscribe to a channel for a symbol
 	//
 	// # Arguments
@@ -3345,6 +3802,20 @@ func NewWebSocketClient(apiKey string, listener WebSocketListener) *WebSocketCli
 	}))
 }
 
+// Create a new WebSocket client with full configuration
+//
+// # Arguments
+// * `api_key` - Fugle API key for authentication
+// * `listener` - Callback interface for receiving WebSocket events
+// * `endpoint` - The market data endpoint (Stock or FutOpt)
+// * `reconnect_config` - Optional reconnection configuration
+// * `health_check_config` - Optional health check configuration
+func WebSocketClientNewWithConfig(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint, reconnectConfig *ReconnectConfigRecord, healthCheckConfig *HealthCheckConfigRecord) *WebSocketClient {
+	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_config(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), FfiConverterWebSocketEndpointINSTANCE.Lower(endpoint), FfiConverterOptionalReconnectConfigRecordINSTANCE.Lower(reconnectConfig), FfiConverterOptionalHealthCheckConfigRecordINSTANCE.Lower(healthCheckConfig), _uniffiStatus)
+	}))
+}
+
 // Create a new WebSocket client for a specific endpoint
 //
 // # Arguments
@@ -3354,6 +3825,13 @@ func NewWebSocketClient(apiKey string, listener WebSocketListener) *WebSocketCli
 func WebSocketClientNewWithEndpoint(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint) *WebSocketClient {
 	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
 		return C.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_endpoint(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), FfiConverterWebSocketEndpointINSTANCE.Lower(endpoint), _uniffiStatus)
+	}))
+}
+
+// Create a new WebSocket client with full configuration including custom base URL
+func WebSocketClientNewWithUrl(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint, baseUrl string, reconnectConfig *ReconnectConfigRecord, healthCheckConfig *HealthCheckConfigRecord) *WebSocketClient {
+	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), FfiConverterWebSocketEndpointINSTANCE.Lower(endpoint), FfiConverterStringINSTANCE.Lower(baseUrl), FfiConverterOptionalReconnectConfigRecordINSTANCE.Lower(reconnectConfig), FfiConverterOptionalHealthCheckConfigRecordINSTANCE.Lower(healthCheckConfig), _uniffiStatus)
 	}))
 }
 
@@ -3421,6 +3899,16 @@ func (_self *WebSocketClient) Disconnect() {
 
 }
 
+// Check if the client has been shut down
+func (_self *WebSocketClient) IsClosed() bool {
+	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_marketdata_uniffi_fn_method_websocketclient_is_closed(
+			_pointer, _uniffiStatus)
+	}))
+}
+
 // Check if the client is currently connected
 func (_self *WebSocketClient) IsConnected() bool {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
@@ -3429,6 +3917,65 @@ func (_self *WebSocketClient) IsConnected() bool {
 		return C.uniffi_marketdata_uniffi_fn_method_websocketclient_is_connected(
 			_pointer, _uniffiStatus)
 	}))
+}
+
+// Send a ping message to the server
+//
+// # Arguments
+// * `state` - Optional state string echoed back in the pong response
+func (_self *WebSocketClient) Ping(state *string) *MarketDataError {
+	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
+	defer _self.ffiObject.decrementPointer()
+	_, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) struct{} {
+			C.ffi_marketdata_uniffi_rust_future_complete_void(handle, status)
+			return struct{}{}
+		},
+		// liftFn
+		func(_ struct{}) struct{} { return struct{}{} },
+		C.uniffi_marketdata_uniffi_fn_method_websocketclient_ping(
+			_pointer, FfiConverterOptionalStringINSTANCE.Lower(state)),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_void(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_void(handle)
+		},
+	)
+
+	return err
+}
+
+// Query the server for current subscriptions
+func (_self *WebSocketClient) QuerySubscriptions() *MarketDataError {
+	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
+	defer _self.ffiObject.decrementPointer()
+	_, err := uniffiRustCallAsync[MarketDataError](
+		FfiConverterMarketDataErrorINSTANCE,
+		// completeFn
+		func(handle C.uint64_t, status *C.RustCallStatus) struct{} {
+			C.ffi_marketdata_uniffi_rust_future_complete_void(handle, status)
+			return struct{}{}
+		},
+		// liftFn
+		func(_ struct{}) struct{} { return struct{}{} },
+		C.uniffi_marketdata_uniffi_fn_method_websocketclient_query_subscriptions(
+			_pointer),
+		// pollFn
+		func(handle C.uint64_t, continuation C.UniffiRustFutureContinuationCallback, data C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_poll_void(handle, continuation, data)
+		},
+		// freeFn
+		func(handle C.uint64_t) {
+			C.ffi_marketdata_uniffi_rust_future_free_void(handle)
+		},
+	)
+
+	return err
 }
 
 // Subscribe to a channel for a symbol
@@ -3661,6 +4208,28 @@ func (_self *WebSocketListenerImpl) OnError(errorMessage string) {
 		return false
 	})
 }
+
+// Called when a reconnection attempt starts
+func (_self *WebSocketListenerImpl) OnReconnecting(attempt uint32) {
+	_pointer := _self.ffiObject.incrementPointer("WebSocketListener")
+	defer _self.ffiObject.decrementPointer()
+	rustCall(func(_uniffiStatus *C.RustCallStatus) bool {
+		C.uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnecting(
+			_pointer, FfiConverterUint32INSTANCE.Lower(attempt), _uniffiStatus)
+		return false
+	})
+}
+
+// Called when all reconnection attempts are exhausted
+func (_self *WebSocketListenerImpl) OnReconnectFailed(attempts uint32) {
+	_pointer := _self.ffiObject.incrementPointer("WebSocketListener")
+	defer _self.ffiObject.decrementPointer()
+	rustCall(func(_uniffiStatus *C.RustCallStatus) bool {
+		C.uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnect_failed(
+			_pointer, FfiConverterUint32INSTANCE.Lower(attempts), _uniffiStatus)
+		return false
+	})
+}
 func (object *WebSocketListenerImpl) Destroy() {
 	runtime.SetFinalizer(object, nil)
 	object.ffiObject.destroy()
@@ -3819,11 +4388,41 @@ func marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod3(uni
 
 }
 
+//export marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod4
+func marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod4(uniffiHandle C.uint64_t, attempt C.uint32_t, uniffiOutReturn *C.void, callStatus *C.RustCallStatus) {
+	handle := uint64(uniffiHandle)
+	uniffiObj, ok := FfiConverterWebSocketListenerINSTANCE.handleMap.tryGet(handle)
+	if !ok {
+		panic(fmt.Errorf("no callback in handle map: %d", handle))
+	}
+
+	uniffiObj.OnReconnecting(
+		FfiConverterUint32INSTANCE.Lift(attempt),
+	)
+
+}
+
+//export marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod5
+func marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod5(uniffiHandle C.uint64_t, attempts C.uint32_t, uniffiOutReturn *C.void, callStatus *C.RustCallStatus) {
+	handle := uint64(uniffiHandle)
+	uniffiObj, ok := FfiConverterWebSocketListenerINSTANCE.handleMap.tryGet(handle)
+	if !ok {
+		panic(fmt.Errorf("no callback in handle map: %d", handle))
+	}
+
+	uniffiObj.OnReconnectFailed(
+		FfiConverterUint32INSTANCE.Lift(attempts),
+	)
+
+}
+
 var UniffiVTableCallbackInterfaceWebSocketListenerINSTANCE = C.UniffiVTableCallbackInterfaceWebSocketListener{
-	onConnected:    (C.UniffiCallbackInterfaceWebSocketListenerMethod0)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod0),
-	onDisconnected: (C.UniffiCallbackInterfaceWebSocketListenerMethod1)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod1),
-	onMessage:      (C.UniffiCallbackInterfaceWebSocketListenerMethod2)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod2),
-	onError:        (C.UniffiCallbackInterfaceWebSocketListenerMethod3)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod3),
+	onConnected:       (C.UniffiCallbackInterfaceWebSocketListenerMethod0)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod0),
+	onDisconnected:    (C.UniffiCallbackInterfaceWebSocketListenerMethod1)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod1),
+	onMessage:         (C.UniffiCallbackInterfaceWebSocketListenerMethod2)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod2),
+	onError:           (C.UniffiCallbackInterfaceWebSocketListenerMethod3)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod3),
+	onReconnecting:    (C.UniffiCallbackInterfaceWebSocketListenerMethod4)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod4),
+	onReconnectFailed: (C.UniffiCallbackInterfaceWebSocketListenerMethod5)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerMethod5),
 
 	uniffiFree: (C.UniffiCallbackInterfaceFree)(C.marketdata_uniffi_cgo_dispatchCallbackInterfaceWebSocketListenerFree),
 }
@@ -4879,6 +5478,56 @@ func (c FfiConverterFutOptTotalStats) Write(writer io.Writer, value FutOptTotalS
 type FfiDestroyerFutOptTotalStats struct{}
 
 func (_ FfiDestroyerFutOptTotalStats) Destroy(value FutOptTotalStats) {
+	value.Destroy()
+}
+
+// Health check configuration record for FFI
+//
+// All fields are optional — zero/false values mean "use default".
+type HealthCheckConfigRecord struct {
+	// Whether health check is enabled (default: false)
+	Enabled bool
+	// Interval between ping messages in milliseconds (default: 30000, min: 5000)
+	IntervalMs uint64
+	// Maximum missed pongs before disconnect (default: 2, min: 1)
+	MaxMissedPongs uint64
+}
+
+func (r *HealthCheckConfigRecord) Destroy() {
+	FfiDestroyerBool{}.Destroy(r.Enabled)
+	FfiDestroyerUint64{}.Destroy(r.IntervalMs)
+	FfiDestroyerUint64{}.Destroy(r.MaxMissedPongs)
+}
+
+type FfiConverterHealthCheckConfigRecord struct{}
+
+var FfiConverterHealthCheckConfigRecordINSTANCE = FfiConverterHealthCheckConfigRecord{}
+
+func (c FfiConverterHealthCheckConfigRecord) Lift(rb RustBufferI) HealthCheckConfigRecord {
+	return LiftFromRustBuffer[HealthCheckConfigRecord](c, rb)
+}
+
+func (c FfiConverterHealthCheckConfigRecord) Read(reader io.Reader) HealthCheckConfigRecord {
+	return HealthCheckConfigRecord{
+		FfiConverterBoolINSTANCE.Read(reader),
+		FfiConverterUint64INSTANCE.Read(reader),
+		FfiConverterUint64INSTANCE.Read(reader),
+	}
+}
+
+func (c FfiConverterHealthCheckConfigRecord) Lower(value HealthCheckConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[HealthCheckConfigRecord](c, value)
+}
+
+func (c FfiConverterHealthCheckConfigRecord) Write(writer io.Writer, value HealthCheckConfigRecord) {
+	FfiConverterBoolINSTANCE.Write(writer, value.Enabled)
+	FfiConverterUint64INSTANCE.Write(writer, value.IntervalMs)
+	FfiConverterUint64INSTANCE.Write(writer, value.MaxMissedPongs)
+}
+
+type FfiDestroyerHealthCheckConfigRecord struct{}
+
+func (_ FfiDestroyerHealthCheckConfigRecord) Destroy(value HealthCheckConfigRecord) {
 	value.Destroy()
 }
 
@@ -5983,6 +6632,56 @@ func (c FfiConverterQuote) Write(writer io.Writer, value Quote) {
 type FfiDestroyerQuote struct{}
 
 func (_ FfiDestroyerQuote) Destroy(value Quote) {
+	value.Destroy()
+}
+
+// Reconnection configuration record for FFI
+//
+// All fields are optional — zero/false values mean "use default".
+type ReconnectConfigRecord struct {
+	// Maximum reconnection attempts (default: 5, min: 1)
+	MaxAttempts uint32
+	// Initial reconnection delay in milliseconds (default: 1000, min: 100)
+	InitialDelayMs uint64
+	// Maximum reconnection delay in milliseconds (default: 60000)
+	MaxDelayMs uint64
+}
+
+func (r *ReconnectConfigRecord) Destroy() {
+	FfiDestroyerUint32{}.Destroy(r.MaxAttempts)
+	FfiDestroyerUint64{}.Destroy(r.InitialDelayMs)
+	FfiDestroyerUint64{}.Destroy(r.MaxDelayMs)
+}
+
+type FfiConverterReconnectConfigRecord struct{}
+
+var FfiConverterReconnectConfigRecordINSTANCE = FfiConverterReconnectConfigRecord{}
+
+func (c FfiConverterReconnectConfigRecord) Lift(rb RustBufferI) ReconnectConfigRecord {
+	return LiftFromRustBuffer[ReconnectConfigRecord](c, rb)
+}
+
+func (c FfiConverterReconnectConfigRecord) Read(reader io.Reader) ReconnectConfigRecord {
+	return ReconnectConfigRecord{
+		FfiConverterUint32INSTANCE.Read(reader),
+		FfiConverterUint64INSTANCE.Read(reader),
+		FfiConverterUint64INSTANCE.Read(reader),
+	}
+}
+
+func (c FfiConverterReconnectConfigRecord) Lower(value ReconnectConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[ReconnectConfigRecord](c, value)
+}
+
+func (c FfiConverterReconnectConfigRecord) Write(writer io.Writer, value ReconnectConfigRecord) {
+	FfiConverterUint32INSTANCE.Write(writer, value.MaxAttempts)
+	FfiConverterUint64INSTANCE.Write(writer, value.InitialDelayMs)
+	FfiConverterUint64INSTANCE.Write(writer, value.MaxDelayMs)
+}
+
+type FfiDestroyerReconnectConfigRecord struct{}
+
+func (_ FfiDestroyerReconnectConfigRecord) Destroy(value ReconnectConfigRecord) {
 	value.Destroy()
 }
 
@@ -7869,6 +8568,80 @@ func (_ FfiDestroyerOptionalFutOptTotalStats) Destroy(value *FutOptTotalStats) {
 	}
 }
 
+type FfiConverterOptionalHealthCheckConfigRecord struct{}
+
+var FfiConverterOptionalHealthCheckConfigRecordINSTANCE = FfiConverterOptionalHealthCheckConfigRecord{}
+
+func (c FfiConverterOptionalHealthCheckConfigRecord) Lift(rb RustBufferI) *HealthCheckConfigRecord {
+	return LiftFromRustBuffer[*HealthCheckConfigRecord](c, rb)
+}
+
+func (_ FfiConverterOptionalHealthCheckConfigRecord) Read(reader io.Reader) *HealthCheckConfigRecord {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterHealthCheckConfigRecordINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalHealthCheckConfigRecord) Lower(value *HealthCheckConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[*HealthCheckConfigRecord](c, value)
+}
+
+func (_ FfiConverterOptionalHealthCheckConfigRecord) Write(writer io.Writer, value *HealthCheckConfigRecord) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterHealthCheckConfigRecordINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalHealthCheckConfigRecord struct{}
+
+func (_ FfiDestroyerOptionalHealthCheckConfigRecord) Destroy(value *HealthCheckConfigRecord) {
+	if value != nil {
+		FfiDestroyerHealthCheckConfigRecord{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalReconnectConfigRecord struct{}
+
+var FfiConverterOptionalReconnectConfigRecordINSTANCE = FfiConverterOptionalReconnectConfigRecord{}
+
+func (c FfiConverterOptionalReconnectConfigRecord) Lift(rb RustBufferI) *ReconnectConfigRecord {
+	return LiftFromRustBuffer[*ReconnectConfigRecord](c, rb)
+}
+
+func (_ FfiConverterOptionalReconnectConfigRecord) Read(reader io.Reader) *ReconnectConfigRecord {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterReconnectConfigRecordINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalReconnectConfigRecord) Lower(value *ReconnectConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[*ReconnectConfigRecord](c, value)
+}
+
+func (_ FfiConverterOptionalReconnectConfigRecord) Write(writer io.Writer, value *ReconnectConfigRecord) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterReconnectConfigRecordINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalReconnectConfigRecord struct{}
+
+func (_ FfiDestroyerOptionalReconnectConfigRecord) Destroy(value *ReconnectConfigRecord) {
+	if value != nil {
+		FfiDestroyerReconnectConfigRecord{}.Destroy(*value)
+	}
+}
+
 type FfiConverterOptionalTotalStats struct{}
 
 var FfiConverterOptionalTotalStatsINSTANCE = FfiConverterOptionalTotalStats{}
@@ -8278,6 +9051,49 @@ type FfiDestroyerSequenceFutOptPriceLevel struct{}
 func (FfiDestroyerSequenceFutOptPriceLevel) Destroy(sequence []FutOptPriceLevel) {
 	for _, value := range sequence {
 		FfiDestroyerFutOptPriceLevel{}.Destroy(value)
+	}
+}
+
+type FfiConverterSequenceFutOptTicker struct{}
+
+var FfiConverterSequenceFutOptTickerINSTANCE = FfiConverterSequenceFutOptTicker{}
+
+func (c FfiConverterSequenceFutOptTicker) Lift(rb RustBufferI) []FutOptTicker {
+	return LiftFromRustBuffer[[]FutOptTicker](c, rb)
+}
+
+func (c FfiConverterSequenceFutOptTicker) Read(reader io.Reader) []FutOptTicker {
+	length := readInt32(reader)
+	if length == 0 {
+		return nil
+	}
+	result := make([]FutOptTicker, 0, length)
+	for i := int32(0); i < length; i++ {
+		result = append(result, FfiConverterFutOptTickerINSTANCE.Read(reader))
+	}
+	return result
+}
+
+func (c FfiConverterSequenceFutOptTicker) Lower(value []FutOptTicker) C.RustBuffer {
+	return LowerIntoRustBuffer[[]FutOptTicker](c, value)
+}
+
+func (c FfiConverterSequenceFutOptTicker) Write(writer io.Writer, value []FutOptTicker) {
+	if len(value) > math.MaxInt32 {
+		panic("[]FutOptTicker is too large to fit into Int32")
+	}
+
+	writeInt32(writer, int32(len(value)))
+	for _, item := range value {
+		FfiConverterFutOptTickerINSTANCE.Write(writer, item)
+	}
+}
+
+type FfiDestroyerSequenceFutOptTicker struct{}
+
+func (FfiDestroyerSequenceFutOptTicker) Destroy(sequence []FutOptTicker) {
+	for _, value := range sequence {
+		FfiDestroyerFutOptTicker{}.Destroy(value)
 	}
 }
 
@@ -8754,6 +9570,49 @@ func (FfiDestroyerSequenceSnapshotQuote) Destroy(sequence []SnapshotQuote) {
 	}
 }
 
+type FfiConverterSequenceTicker struct{}
+
+var FfiConverterSequenceTickerINSTANCE = FfiConverterSequenceTicker{}
+
+func (c FfiConverterSequenceTicker) Lift(rb RustBufferI) []Ticker {
+	return LiftFromRustBuffer[[]Ticker](c, rb)
+}
+
+func (c FfiConverterSequenceTicker) Read(reader io.Reader) []Ticker {
+	length := readInt32(reader)
+	if length == 0 {
+		return nil
+	}
+	result := make([]Ticker, 0, length)
+	for i := int32(0); i < length; i++ {
+		result = append(result, FfiConverterTickerINSTANCE.Read(reader))
+	}
+	return result
+}
+
+func (c FfiConverterSequenceTicker) Lower(value []Ticker) C.RustBuffer {
+	return LowerIntoRustBuffer[[]Ticker](c, value)
+}
+
+func (c FfiConverterSequenceTicker) Write(writer io.Writer, value []Ticker) {
+	if len(value) > math.MaxInt32 {
+		panic("[]Ticker is too large to fit into Int32")
+	}
+
+	writeInt32(writer, int32(len(value)))
+	for _, item := range value {
+		FfiConverterTickerINSTANCE.Write(writer, item)
+	}
+}
+
+type FfiDestroyerSequenceTicker struct{}
+
+func (FfiDestroyerSequenceTicker) Destroy(sequence []Ticker) {
+	for _, value := range sequence {
+		FfiDestroyerTicker{}.Destroy(value)
+	}
+}
+
 type FfiConverterSequenceTrade struct{}
 
 var FfiConverterSequenceTradeINSTANCE = FfiConverterSequenceTrade{}
@@ -8971,6 +9830,23 @@ func NewRestClientWithSdkToken(sdkToken string) (*RestClient, *MarketDataError) 
 func NewWebsocketClient(apiKey string, listener WebSocketListener) *WebSocketClient {
 	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
 		return C.uniffi_marketdata_uniffi_fn_func_new_websocket_client(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), _uniffiStatus)
+	}))
+}
+
+// Create a new WebSocket client with full configuration
+//
+// # Arguments
+// * `api_key` - Fugle API key for authentication
+// * `listener` - Callback interface for receiving WebSocket events
+// * `endpoint` - The market data endpoint (Stock or FutOpt)
+// * `reconnect_config` - Optional reconnection configuration
+// * `health_check_config` - Optional health check configuration
+//
+// # Returns
+// A WebSocketClient instance wrapped in Arc for thread-safe access
+func NewWebsocketClientWithConfig(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint, reconnectConfig *ReconnectConfigRecord, healthCheckConfig *HealthCheckConfigRecord) *WebSocketClient {
+	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_func_new_websocket_client_with_config(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), FfiConverterWebSocketEndpointINSTANCE.Lower(endpoint), FfiConverterOptionalReconnectConfigRecordINSTANCE.Lower(reconnectConfig), FfiConverterOptionalHealthCheckConfigRecordINSTANCE.Lower(healthCheckConfig), _uniffiStatus)
 	}))
 }
 

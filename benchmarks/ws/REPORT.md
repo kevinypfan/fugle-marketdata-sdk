@@ -37,14 +37,25 @@ No legacy C# SDK exists, so results are absolute (cross-language comparison only
 | Latency p99 | 6 ms |
 | CPU user | 88 ms |
 
+### Go
+
+No legacy Go SDK exists, so results are absolute (cross-language comparison only).
+
+| Metric | New SDK (Rust core / UniFFI) |
+|--------|:---------------------------:|
+| Throughput | **161,290 msg/s** |
+| Latency p50 | 4 ms |
+| Latency p99 | 10 ms |
+| CPU user | 84 ms |
+
 ### Cross-Language Comparison (New Rust-core SDK only)
 
-| Metric | JS (napi-rs) | C# (UniFFI) | Python (PyO3) |
-|--------|:------------:|:-----------:|:-------------:|
-| Throughput | 234,742 msg/s | 172,413 msg/s | 100,000 msg/s |
-| Latency p50 | 0 ms | 3 ms | 19 ms |
-| Latency p99 | 1 ms | 6 ms | 58 ms |
-| CPU user | 304 ms | 88 ms | 205 ms |
+| Metric | JS (napi-rs) | C# (UniFFI) | Go (UniFFI) | Python (PyO3) |
+|--------|:------------:|:-----------:|:-----------:|:-------------:|
+| Throughput | 234,742 msg/s | 172,413 msg/s | 161,290 msg/s | 100,000 msg/s |
+| Latency p50 | 0 ms | 3 ms | 4 ms | 19 ms |
+| Latency p99 | 1 ms | 6 ms | 10 ms | 58 ms |
+| CPU user | 304 ms | 88 ms | 84 ms | 205 ms |
 
 ## Key Takeaways
 
@@ -61,11 +72,12 @@ No legacy C# SDK exists, so results are absolute (cross-language comparison only
    passes the raw WebSocket frame string straight to the callback with zero intermediate
    processing (the C++ `ws` addon is already very fast).
 
-3. **C# binding ranks second** at 172K msg/s (73% of JS, 1.7x Python). The UniFFI
-   binding uses a dedicated thread with `receive_timeout(5ms)` to forward messages via
-   the `WebSocketListener` foreign callback interface. The remaining gap vs JS is due
-   to UniFFI's FFI callback overhead (marshalling through `RustBuffer` + P/Invoke) vs
-   napi-rs's `ThreadsafeFunction` which uses V8's native microtask queue.
+3. **C# and Go bindings rank 2nd and 3rd** at 172K and 161K msg/s respectively (~73%
+   and ~69% of JS). Both use the same UniFFI `receive_timeout(5ms)` dedicated-thread
+   message loop. The C#/Go gap vs JS is due to UniFFI's FFI callback overhead
+   (marshalling through `RustBuffer` + P/Invoke for C#, CGO for Go) vs napi-rs's
+   `ThreadsafeFunction` which uses V8's native microtask queue. Go's slightly lower
+   throughput than C# is due to CGO call overhead on each message callback.
 
 4. **Latency is a non-issue at production rates** -- at real market data rates
    (100-500 msg/s), all three SDKs deliver messages in <1ms. The p50/p99 differences
@@ -160,6 +172,14 @@ New:  server -> tokio-tungstenite (Rust) -> serde_json::from_str (Rust)
         -> mpsc -> dedicated thread receive_timeout(5ms)
         -> StreamMessage conversion -> UniFFI foreign callback (P/Invoke)
         -> C# IWebSocketListener.OnMessage -> System.Text.Json parse
+```
+
+**Go**:
+```
+New:  server -> tokio-tungstenite (Rust) -> serde_json::from_str (Rust)
+        -> mpsc -> dedicated thread receive_timeout(5ms)
+        -> StreamMessage conversion -> UniFFI foreign callback (CGO)
+        -> Go WebSocketListener.OnMessage -> encoding/json unmarshal
 ```
 
 ## How to Run
@@ -270,6 +290,7 @@ python3 ws-bench-new-py.py --url ws://localhost:8765 --timeout 30
 | `ws-bench-new-py.py` | New SDK (Python) benchmark client |
 | `ws-bench-old-py.py` | Old SDK (Python, `fugle-marketdata@2.4.1`) benchmark client |
 | `ws-bench-cs/` | New SDK (C#, UniFFI) benchmark client (.NET 8 project) |
+| `ws-bench-go/` | New SDK (Go, UniFFI) benchmark client |
 | `ws-bench-run.js` | Runner: starts server, runs clients, compares results |
 | `package.json` | Dependencies: `ws`, `@fugle/marketdata@1.4.2` |
 | `REPORT.md` | This file |

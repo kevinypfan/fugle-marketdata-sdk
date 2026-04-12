@@ -120,23 +120,27 @@ func NewFugleWebSocketClient(listener WebSocketListener, opts ...Option) (*Strea
 	var client *WebSocketClient
 
 	if cfg.apiKey != "" {
-		if cfg.reconnect != nil || cfg.healthCheck != nil {
-			var reconnectRecord *ReconnectConfigRecord
-			if cfg.reconnect != nil {
-				reconnectRecord = &ReconnectConfigRecord{
-					MaxAttempts:    cfg.reconnect.MaxAttempts,
-					InitialDelayMs: cfg.reconnect.InitialDelayMs,
-					MaxDelayMs:     cfg.reconnect.MaxDelayMs,
-				}
+		var reconnectRecord *ReconnectConfigRecord
+		if cfg.reconnect != nil {
+			reconnectRecord = &ReconnectConfigRecord{
+				MaxAttempts:    cfg.reconnect.MaxAttempts,
+				InitialDelayMs: cfg.reconnect.InitialDelayMs,
+				MaxDelayMs:     cfg.reconnect.MaxDelayMs,
 			}
-			var healthCheckRecord *HealthCheckConfigRecord
-			if cfg.healthCheck != nil {
-				healthCheckRecord = &HealthCheckConfigRecord{
-					Enabled:        cfg.healthCheck.Enabled,
-					IntervalMs:     cfg.healthCheck.IntervalMs,
-					MaxMissedPongs: cfg.healthCheck.MaxMissedPongs,
-				}
+		}
+		var healthCheckRecord *HealthCheckConfigRecord
+		if cfg.healthCheck != nil {
+			healthCheckRecord = &HealthCheckConfigRecord{
+				Enabled:        cfg.healthCheck.Enabled,
+				IntervalMs:     cfg.healthCheck.IntervalMs,
+				MaxMissedPongs: cfg.healthCheck.MaxMissedPongs,
 			}
+		}
+
+		if cfg.baseUrl != "" {
+			// Use custom base URL constructor
+			client = WebSocketClientNewWithUrl(cfg.apiKey, channelListener, cfg.endpoint, cfg.baseUrl, reconnectRecord, healthCheckRecord)
+		} else if cfg.reconnect != nil || cfg.healthCheck != nil {
 			client = WebSocketClientNewWithConfig(cfg.apiKey, channelListener, cfg.endpoint, reconnectRecord, healthCheckRecord)
 		} else if cfg.endpoint == WebSocketEndpointStock {
 			client = NewWebSocketClient(cfg.apiKey, channelListener)
@@ -144,12 +148,8 @@ func NewFugleWebSocketClient(listener WebSocketListener, opts ...Option) (*Strea
 			client = WebSocketClientNewWithEndpoint(cfg.apiKey, channelListener, cfg.endpoint)
 		}
 	} else {
-		// TODO: Add UniFFI constructors for bearer_token and sdk_token authentication
-		// For now, return error indicating feature not yet supported
 		return nil, errors.New("bearer token and SDK token authentication not yet supported for WebSocket client")
 	}
-
-	_ = cfg.baseUrl
 
 	return &StreamingClient{
 		client:   client,
