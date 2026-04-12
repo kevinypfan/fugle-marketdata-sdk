@@ -3,6 +3,7 @@ package tw.com.fugle.marketdata.generated;
 
 import java.nio.ByteBuffer;
 
+// public class TestForOptionals {}
 public enum FfiConverterOptionalTypeReconnectConfigRecord implements FfiConverterRustBuffer<ReconnectConfigRecord> {
   INSTANCE;
 
@@ -33,5 +34,6 @@ public enum FfiConverterOptionalTypeReconnectConfigRecord implements FfiConverte
     }
   }
 }
+
 
 

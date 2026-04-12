@@ -59,27 +59,27 @@ public class RestClientTest {
     }
 
     @Test
-    @DisplayName("StockClientWrapper type exists")
+    @DisplayName("FugleRestClient.StockClientWrapper type exists")
     void stockClientWrapperTypeExists() {
-        assertNotNull(StockClientWrapper.class);
+        assertNotNull(FugleRestClient.StockClientWrapper.class);
     }
 
     @Test
-    @DisplayName("FutOptClientWrapper type exists")
+    @DisplayName("FugleRestClient.FutOptClientWrapper type exists")
     void futOptClientWrapperTypeExists() {
-        assertNotNull(FutOptClientWrapper.class);
+        assertNotNull(FugleRestClient.FutOptClientWrapper.class);
     }
 
     @Test
-    @DisplayName("IntradayStockClientWrapper type exists")
-    void intradayStockClientWrapperTypeExists() {
-        assertNotNull(IntradayStockClientWrapper.class);
+    @DisplayName("FugleRestClient.StockIntradayClientWrapper type exists")
+    void stockIntradayClientWrapperTypeExists() {
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class);
     }
 
     @Test
-    @DisplayName("IntradayFutOptClientWrapper type exists")
-    void intradayFutOptClientWrapperTypeExists() {
-        assertNotNull(IntradayFutOptClientWrapper.class);
+    @DisplayName("FugleRestClient.FutOptIntradayClientWrapper type exists")
+    void futOptIntradayClientWrapperTypeExists() {
+        assertNotNull(FugleRestClient.FutOptIntradayClientWrapper.class);
     }
 
     // ========== API Shape Tests ==========
@@ -97,7 +97,7 @@ public class RestClientTest {
     void hasStockMethod() throws NoSuchMethodException {
         Method method = FugleRestClient.class.getMethod("stock");
         assertNotNull(method);
-        assertEquals(StockClientWrapper.class, method.getReturnType());
+        assertEquals(FugleRestClient.StockClientWrapper.class, method.getReturnType());
     }
 
     @Test
@@ -105,7 +105,7 @@ public class RestClientTest {
     void hasFutOptMethod() throws NoSuchMethodException {
         Method method = FugleRestClient.class.getMethod("futopt");
         assertNotNull(method);
-        assertEquals(FutOptClientWrapper.class, method.getReturnType());
+        assertEquals(FugleRestClient.FutOptClientWrapper.class, method.getReturnType());
     }
 
     @Test
@@ -133,43 +133,43 @@ public class RestClientTest {
     }
 
     @Test
-    @DisplayName("IntradayStockClientWrapper has sync methods")
+    @DisplayName("FugleRestClient.StockIntradayClientWrapper has sync methods")
     void intradayStockHasSyncMethods() throws NoSuchMethodException {
-        assertNotNull(IntradayStockClientWrapper.class.getMethod("getQuote", String.class));
-        assertNotNull(IntradayStockClientWrapper.class.getMethod("getTicker", String.class));
-        assertNotNull(IntradayStockClientWrapper.class.getMethod("getTrades", String.class));
-        assertNotNull(IntradayStockClientWrapper.class.getMethod("getCandles", String.class, String.class));
-        assertNotNull(IntradayStockClientWrapper.class.getMethod("getVolumes", String.class));
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class.getMethod("getQuote", String.class));
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class.getMethod("getTicker", String.class));
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class.getMethod("getTrades", String.class));
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class.getMethod("getCandles", String.class, String.class));
+        assertNotNull(FugleRestClient.StockIntradayClientWrapper.class.getMethod("getVolumes", String.class));
     }
 
     @Test
-    @DisplayName("IntradayStockClientWrapper has async methods")
+    @DisplayName("FugleRestClient.StockIntradayClientWrapper has async methods")
     void intradayStockHasAsyncMethods() throws NoSuchMethodException {
-        Method getQuoteAsync = IntradayStockClientWrapper.class.getMethod("getQuoteAsync", String.class);
+        Method getQuoteAsync = FugleRestClient.StockIntradayClientWrapper.class.getMethod("getQuoteAsync", String.class);
         assertNotNull(getQuoteAsync);
         assertEquals(CompletableFuture.class, getQuoteAsync.getReturnType());
 
-        Method getTickerAsync = IntradayStockClientWrapper.class.getMethod("getTickerAsync", String.class);
+        Method getTickerAsync = FugleRestClient.StockIntradayClientWrapper.class.getMethod("getTickerAsync", String.class);
         assertNotNull(getTickerAsync);
         assertEquals(CompletableFuture.class, getTickerAsync.getReturnType());
     }
 
     @Test
-    @DisplayName("IntradayFutOptClientWrapper has sync methods")
+    @DisplayName("FugleRestClient.FutOptIntradayClientWrapper has sync methods")
     void intradayFutOptHasSyncMethods() throws NoSuchMethodException {
-        assertNotNull(IntradayFutOptClientWrapper.class.getMethod("getQuote", String.class));
-        assertNotNull(IntradayFutOptClientWrapper.class.getMethod("getTicker", String.class));
-        assertNotNull(IntradayFutOptClientWrapper.class.getMethod("getProducts"));
+        assertNotNull(FugleRestClient.FutOptIntradayClientWrapper.class.getMethod("getQuote", String.class));
+        assertNotNull(FugleRestClient.FutOptIntradayClientWrapper.class.getMethod("getTicker", String.class));
+        assertNotNull(FugleRestClient.FutOptIntradayClientWrapper.class.getMethod("getProducts"));
     }
 
     @Test
-    @DisplayName("IntradayFutOptClientWrapper has async methods")
+    @DisplayName("FugleRestClient.FutOptIntradayClientWrapper has async methods")
     void intradayFutOptHasAsyncMethods() throws NoSuchMethodException {
-        Method getQuoteAsync = IntradayFutOptClientWrapper.class.getMethod("getQuoteAsync", String.class);
+        Method getQuoteAsync = FugleRestClient.FutOptIntradayClientWrapper.class.getMethod("getQuoteAsync", String.class);
         assertNotNull(getQuoteAsync);
         assertEquals(CompletableFuture.class, getQuoteAsync.getReturnType());
 
-        Method getProductsAsync = IntradayFutOptClientWrapper.class.getMethod("getProductsAsync");
+        Method getProductsAsync = FugleRestClient.FutOptIntradayClientWrapper.class.getMethod("getProductsAsync");
         assertNotNull(getProductsAsync);
         assertEquals(CompletableFuture.class, getProductsAsync.getReturnType());
     }
@@ -209,7 +209,7 @@ public class RestClientTest {
     }
 
     @Test
-    @DisplayName("Client stock() returns StockClientWrapper")
+    @DisplayName("Client stock() returns FugleRestClient.StockClientWrapper")
     void stockReturnsWrapper() {
         assumeNativeLibraryAvailable();
 
@@ -217,12 +217,12 @@ public class RestClientTest {
                 .apiKey("test-api-key")
                 .build()) {
             assertNotNull(client.stock());
-            assertInstanceOf(StockClientWrapper.class, client.stock());
+            assertInstanceOf(FugleRestClient.StockClientWrapper.class, client.stock());
         }
     }
 
     @Test
-    @DisplayName("Client futopt() returns FutOptClientWrapper")
+    @DisplayName("Client futopt() returns FugleRestClient.FutOptClientWrapper")
     void futOptReturnsWrapper() {
         assumeNativeLibraryAvailable();
 
@@ -230,12 +230,12 @@ public class RestClientTest {
                 .apiKey("test-api-key")
                 .build()) {
             assertNotNull(client.futopt());
-            assertInstanceOf(FutOptClientWrapper.class, client.futopt());
+            assertInstanceOf(FugleRestClient.FutOptClientWrapper.class, client.futopt());
         }
     }
 
     @Test
-    @DisplayName("StockClient intraday() returns IntradayStockClientWrapper")
+    @DisplayName("StockClient intraday() returns FugleRestClient.StockIntradayClientWrapper")
     void intradayReturnsWrapper() {
         assumeNativeLibraryAvailable();
 
@@ -243,7 +243,7 @@ public class RestClientTest {
                 .apiKey("test-api-key")
                 .build()) {
             assertNotNull(client.stock().intraday());
-            assertInstanceOf(IntradayStockClientWrapper.class, client.stock().intraday());
+            assertInstanceOf(FugleRestClient.StockIntradayClientWrapper.class, client.stock().intraday());
         }
     }
 

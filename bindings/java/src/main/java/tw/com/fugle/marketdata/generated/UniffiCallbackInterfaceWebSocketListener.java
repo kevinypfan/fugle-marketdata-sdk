@@ -102,13 +102,13 @@ public class UniffiCallbackInterfaceWebSocketListener {
             UniffiHelpers.uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn);
         }
     }
-
+    
     public static class onReconnecting implements UniffiCallbackInterfaceWebSocketListenerMethod4 {
         public static final onReconnecting INSTANCE = new onReconnecting();
         private onReconnecting() {}
 
         @Override
-        public void callback(long uniffiHandle,Integer attempt,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
+        public void callback(long uniffiHandle,int attempt,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
             var uniffiObj = FfiConverterTypeWebSocketListener.INSTANCE.handleMap.get(uniffiHandle);
             Supplier<Void> makeCall = () -> {
                 uniffiObj.onReconnecting(
@@ -120,13 +120,13 @@ public class UniffiCallbackInterfaceWebSocketListener {
             UniffiHelpers.uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn);
         }
     }
-
+    
     public static class onReconnectFailed implements UniffiCallbackInterfaceWebSocketListenerMethod5 {
         public static final onReconnectFailed INSTANCE = new onReconnectFailed();
         private onReconnectFailed() {}
 
         @Override
-        public void callback(long uniffiHandle,Integer attempts,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
+        public void callback(long uniffiHandle,int attempts,Pointer uniffiOutReturn,UniffiRustCallStatus uniffiCallStatus) {
             var uniffiObj = FfiConverterTypeWebSocketListener.INSTANCE.handleMap.get(uniffiHandle);
             Supplier<Void> makeCall = () -> {
                 uniffiObj.onReconnectFailed(

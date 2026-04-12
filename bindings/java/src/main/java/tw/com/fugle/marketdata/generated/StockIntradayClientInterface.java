@@ -43,6 +43,13 @@ public interface StockIntradayClientInterface {
     public CompletableFuture<Ticker> getTicker(String symbol) ;
     
     /**
+     * Get batch tickers for a security type (async)
+     *
+     * typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+     */
+    public CompletableFuture<List<Ticker>> getTickers(String typ) ;
+    
+    /**
      * Get trade history for a symbol (async)
      *
      * Returns typed TradesResponse with list of trades.
@@ -65,6 +72,13 @@ public interface StockIntradayClientInterface {
      * Get ticker info for a symbol (sync/blocking)
      */
     public Ticker tickerSync(String symbol) throws MarketDataException;
+    
+    /**
+     * Get batch tickers for a security type (sync/blocking)
+     *
+     * typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+     */
+    public List<Ticker> tickersSync(String typ) throws MarketDataException;
     
     /**
      * Get trade history for a symbol (sync/blocking)

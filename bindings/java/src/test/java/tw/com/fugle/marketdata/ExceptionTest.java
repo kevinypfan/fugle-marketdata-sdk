@@ -89,50 +89,25 @@ public class ExceptionTest {
     void fugleExceptionHasUnwrapMethod() throws NoSuchMethodException {
         Method method = FugleException.class.getMethod("unwrap", Throwable.class);
         assertNotNull(method);
-        assertEquals(Void.class, method.getReturnType());
-    }
-
-    @Test
-    @DisplayName("ApiException has getStatusCode() method")
-    void apiExceptionHasGetStatusCode() throws NoSuchMethodException {
-        Method method = ApiException.class.getMethod("getStatusCode");
-        assertNotNull(method);
-        assertEquals(int.class, method.getReturnType());
-    }
-
-    @Test
-    @DisplayName("RateLimitException has getRetryAfterSeconds() method")
-    void rateLimitExceptionHasGetRetryAfterSeconds() throws NoSuchMethodException {
-        Method method = RateLimitException.class.getMethod("getRetryAfterSeconds");
-        assertNotNull(method);
-        assertEquals(Long.class, method.getReturnType());
+        assertEquals(FugleException.class, method.getReturnType());
     }
 
     // ========== Behavior Tests ==========
 
     @Test
-    @DisplayName("ApiException stores status code")
-    void apiExceptionStoresStatusCode() {
-        ApiException ex = new ApiException("Not found", 404);
-        assertEquals(404, ex.getStatusCode());
+    @DisplayName("ApiException stores message")
+    void apiExceptionStoresMessage() {
+        ApiException ex = new ApiException("Not found");
         assertEquals("Not found", ex.getMessage());
     }
 
     @Test
-    @DisplayName("RateLimitException stores retry after")
-    void rateLimitExceptionStoresRetryAfter() {
-        RateLimitException ex = new RateLimitException("Rate limit", 429, 60L);
-        assertEquals(429, ex.getStatusCode());
-        assertEquals(60L, ex.getRetryAfterSeconds());
-        assertEquals("Rate limit", ex.getMessage());
-    }
-
-    @Test
-    @DisplayName("RateLimitException handles null retry after")
-    void rateLimitExceptionHandlesNullRetryAfter() {
-        RateLimitException ex = new RateLimitException("Rate limit", 429, null);
-        assertEquals(429, ex.getStatusCode());
-        assertNull(ex.getRetryAfterSeconds());
+    @DisplayName("ApiException stores cause")
+    void apiExceptionStoresCause() {
+        Exception cause = new Exception("root");
+        ApiException ex = new ApiException("wrapped", cause);
+        assertEquals("wrapped", ex.getMessage());
+        assertEquals(cause, ex.getCause());
     }
 
     @Test
@@ -143,32 +118,31 @@ public class ExceptionTest {
     }
 
     @Test
-    @DisplayName("FugleException.from() wraps generic exceptions")
-    void fromWrapsGenericExceptions() {
+    @DisplayName("FugleException.unwrap() wraps generic exceptions")
+    void unwrapWrapsGenericExceptions() {
         Exception cause = new Exception("Original error");
-        RuntimeException wrapped = FugleException.from(cause);
+        FugleException wrapped = FugleException.unwrap(cause);
 
         assertInstanceOf(FugleException.class, wrapped);
-        assertEquals("Original error", wrapped.getMessage());
         assertEquals(cause, wrapped.getCause());
     }
 
     @Test
-    @DisplayName("FugleException.from() preserves FugleException")
-    void fromPreservesFugleException() {
+    @DisplayName("FugleException.unwrap() preserves FugleException")
+    void unwrapPreservesFugleException() {
         FugleException original = new FugleException("Already wrapped");
-        RuntimeException result = FugleException.from(original);
+        FugleException result = FugleException.unwrap(original);
 
         assertSame(original, result);
     }
 
     @Test
-    @DisplayName("FugleException.from() preserves RuntimeException subclasses")
-    void fromPreservesRuntimeException() {
+    @DisplayName("FugleException.unwrap() wraps RuntimeException subclasses")
+    void unwrapWrapsRuntimeException() {
         IllegalArgumentException original = new IllegalArgumentException("Invalid arg");
-        RuntimeException result = FugleException.from(original);
+        FugleException result = FugleException.unwrap(original);
 
-        assertSame(original, result);
+        assertInstanceOf(FugleException.class, result);
     }
 
     @Test

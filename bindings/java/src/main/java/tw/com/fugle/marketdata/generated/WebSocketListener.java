@@ -53,16 +53,16 @@ public interface WebSocketListener {
      * Called when an error occurs
      */
     public void onError(String errorMessage);
-
+    
     /**
      * Called when a reconnection attempt starts
      */
-    public void onReconnecting(int attempt);
-
+    public void onReconnecting(Integer attempt);
+    
     /**
      * Called when all reconnection attempts are exhausted
      */
-    public void onReconnectFailed(int attempts);
-
+    public void onReconnectFailed(Integer attempts);
+    
 }
 

@@ -3,6 +3,7 @@ package tw.com.fugle.marketdata.generated;
 
 import java.nio.ByteBuffer;
 
+// public class TestForOptionals {}
 public enum FfiConverterOptionalTypeHealthCheckConfigRecord implements FfiConverterRustBuffer<HealthCheckConfigRecord> {
   INSTANCE;
 
@@ -33,5 +34,6 @@ public enum FfiConverterOptionalTypeHealthCheckConfigRecord implements FfiConver
     }
   }
 }
+
 
 

@@ -129,6 +129,38 @@ public class MarketdataUniffi {
 
   
     /**
+     * Create a new WebSocket client with full configuration
+     *
+     * # Arguments
+     * * `api_key` - Fugle API key for authentication
+     * * `listener` - Callback interface for receiving WebSocket events
+     * * `endpoint` - The market data endpoint (Stock or FutOpt)
+     * * `reconnect_config` - Optional reconnection configuration
+     * * `health_check_config` - Optional health check configuration
+     *
+     * # Returns
+     * A WebSocketClient instance wrapped in Arc for thread-safe access
+     */public static WebSocketClient newWebsocketClientWithConfig(String apiKey, WebSocketListener listener, WebSocketEndpoint endpoint, ReconnectConfigRecord reconnectConfig, HealthCheckConfigRecord healthCheckConfig)  {
+            try {
+                return FfiConverterTypeWebSocketClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_func_new_websocket_client_with_config(
+            FfiConverterString.INSTANCE.lower(apiKey), FfiConverterTypeWebSocketListener.INSTANCE.lower(listener), FfiConverterTypeWebSocketEndpoint.INSTANCE.lower(endpoint), FfiConverterOptionalTypeReconnectConfigRecord.INSTANCE.lower(reconnectConfig), FfiConverterOptionalTypeHealthCheckConfigRecord.INSTANCE.lower(healthCheckConfig), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Create a new WebSocket client for a specific endpoint
      *
      * # Arguments

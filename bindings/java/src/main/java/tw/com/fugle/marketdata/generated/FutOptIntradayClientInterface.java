@@ -12,6 +12,16 @@ import com.sun.jna.ptr.*;
 public interface FutOptIntradayClientInterface {
     
     /**
+     * Get candlestick data for a contract (sync/blocking)
+     */
+    public IntradayCandlesResponse candlesSync(String symbol, String timeframe) throws MarketDataException;
+    
+    /**
+     * Get candlestick data for a futures/options contract (async)
+     */
+    public CompletableFuture<IntradayCandlesResponse> getCandles(String symbol, String timeframe) ;
+    
+    /**
      * Get available products list (async)
      *
      * typ: "F" for futures, "O" for options
@@ -31,6 +41,23 @@ public interface FutOptIntradayClientInterface {
     public CompletableFuture<FutOptTicker> getTicker(String symbol, Boolean afterHours) ;
     
     /**
+     * Get batch tickers for futures/options (async)
+     *
+     * typ: "F" for futures, "O" for options
+     */
+    public CompletableFuture<List<FutOptTicker>> getTickers(String typ) ;
+    
+    /**
+     * Get trade history for a futures/options contract (async)
+     */
+    public CompletableFuture<TradesResponse> getTrades(String symbol) ;
+    
+    /**
+     * Get volume breakdown by price for a futures/options contract (async)
+     */
+    public CompletableFuture<VolumesResponse> getVolumes(String symbol) ;
+    
+    /**
      * Get available products list (sync/blocking)
      */
     public ProductsResponse productsSync(String typ) throws MarketDataException;
@@ -44,6 +71,23 @@ public interface FutOptIntradayClientInterface {
      * Get ticker info for a contract (sync/blocking)
      */
     public FutOptTicker tickerSync(String symbol, Boolean afterHours) throws MarketDataException;
+    
+    /**
+     * Get batch tickers for futures/options (sync/blocking)
+     *
+     * typ: "F" for futures, "O" for options
+     */
+    public List<FutOptTicker> tickersSync(String typ) throws MarketDataException;
+    
+    /**
+     * Get trade history for a contract (sync/blocking)
+     */
+    public TradesResponse tradesSync(String symbol) throws MarketDataException;
+    
+    /**
+     * Get volume breakdown by price for a contract (sync/blocking)
+     */
+    public VolumesResponse volumesSync(String symbol) throws MarketDataException;
     
 }
 

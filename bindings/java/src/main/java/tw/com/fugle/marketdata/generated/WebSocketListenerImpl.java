@@ -232,96 +232,96 @@ public class WebSocketListenerImpl implements AutoCloseable, WebSocketListener {
     @Override
     public void onError(String errorMessage)  {
             try {
-
+                
     callWithPointer(it -> {
         try {
-
+    
     UniffiHelpers.uniffiRustCall( _status -> {
         UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketlistener_on_error(
             it, FfiConverterString.INSTANCE.lower(errorMessage), _status);
     });
-
+    
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     })
     ;
             } catch (RuntimeException _e) {
-
-
+                
+                
                 if (InternalException.class.isInstance(_e.getCause())) {
                     throw (InternalException)_e.getCause();
                 }
                 throw _e;
             }
     }
+    
 
-
-
+  
     /**
      * Called when a reconnection attempt starts
      */
     @Override
-    public void onReconnecting(int attempt)  {
+    public void onReconnecting(Integer attempt)  {
             try {
-
+                
     callWithPointer(it -> {
         try {
-
+    
     UniffiHelpers.uniffiRustCall( _status -> {
         UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnecting(
             it, FfiConverterInteger.INSTANCE.lower(attempt), _status);
     });
-
+    
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     })
     ;
             } catch (RuntimeException _e) {
-
-
+                
+                
                 if (InternalException.class.isInstance(_e.getCause())) {
                     throw (InternalException)_e.getCause();
                 }
                 throw _e;
             }
     }
+    
 
-
-
+  
     /**
      * Called when all reconnection attempts are exhausted
      */
     @Override
-    public void onReconnectFailed(int attempts)  {
+    public void onReconnectFailed(Integer attempts)  {
             try {
-
+                
     callWithPointer(it -> {
         try {
-
+    
     UniffiHelpers.uniffiRustCall( _status -> {
         UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnect_failed(
             it, FfiConverterInteger.INSTANCE.lower(attempts), _status);
     });
-
+    
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     })
     ;
             } catch (RuntimeException _e) {
-
-
+                
+                
                 if (InternalException.class.isInstance(_e.getCause())) {
                     throw (InternalException)_e.getCause();
                 }
                 throw _e;
             }
     }
+    
 
-
-
+  
 
   
 }

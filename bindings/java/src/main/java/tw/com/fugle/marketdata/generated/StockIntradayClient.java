@@ -227,6 +227,32 @@ public class StockIntradayClient implements AutoCloseable, StockIntradayClientIn
 
   
     /**
+     * Get batch tickers for a security type (async)
+     *
+     * typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+     */
+    @Override
+    
+    public CompletableFuture<List<Ticker>> getTickers(String typ){
+        return UniffiAsyncHelpers.uniffiRustCallAsync(
+        callWithPointer(thisPtr -> {
+            return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockintradayclient_get_tickers(
+                thisPtr,
+                FfiConverterString.INSTANCE.lower(typ)
+            );
+        }),
+        (future, callback, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_poll_rust_buffer(future, callback, continuation),
+        (future, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_complete_rust_buffer(future, continuation),
+        (future) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_free_rust_buffer(future),
+        // lift function
+        (it) -> FfiConverterSequenceTypeTicker.INSTANCE.lift(it),
+        // Error FFI converter
+        new MarketDataExceptionErrorHandler()
+    );
+    }
+
+  
+    /**
      * Get trade history for a symbol (async)
      *
      * Returns typed TradesResponse with list of trades.
@@ -328,6 +354,44 @@ public class StockIntradayClient implements AutoCloseable, StockIntradayClientIn
     UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
         return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockintradayclient_ticker_sync(
             it, FfiConverterString.INSTANCE.lower(symbol), _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                if (MarketDataException.class.isInstance(_e.getCause())) {
+                    throw (MarketDataException)_e.getCause();
+                }
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Get batch tickers for a security type (sync/blocking)
+     *
+     * typ: Security type (e.g., "EQUITY", "INDEX", "ETF")
+     */
+    @Override
+    public List<Ticker> tickersSync(String typ) throws MarketDataException {
+            try {
+                return FfiConverterSequenceTypeTicker.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_stockintradayclient_tickers_sync(
+            it, FfiConverterString.INSTANCE.lower(typ), _status);
     });
     
         } catch (Exception e) {

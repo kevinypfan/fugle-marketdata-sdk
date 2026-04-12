@@ -179,6 +179,34 @@ public class FugleRestClient implements AutoCloseable {
         public StockIntradayClientWrapper intraday() {
             return intradayClient;
         }
+
+        /**
+         * Get the historical data client.
+         */
+        public StockHistoricalClient historical() {
+            return stockClient.historical();
+        }
+
+        /**
+         * Get the snapshot (market-wide) data client.
+         */
+        public StockSnapshotClient snapshot() {
+            return stockClient.snapshot();
+        }
+
+        /**
+         * Get the technical indicators client.
+         */
+        public StockTechnicalClient technical() {
+            return stockClient.technical();
+        }
+
+        /**
+         * Get the corporate actions client.
+         */
+        public StockCorporateActionsClient corporateActions() {
+            return stockClient.corporateActions();
+        }
     }
 
     /**
@@ -198,6 +226,13 @@ public class FugleRestClient implements AutoCloseable {
          */
         public FutOptIntradayClientWrapper intraday() {
             return intradayClient;
+        }
+
+        /**
+         * Get the historical data client.
+         */
+        public FutOptHistoricalClient historical() {
+            return futOptClient.historical();
         }
     }
 

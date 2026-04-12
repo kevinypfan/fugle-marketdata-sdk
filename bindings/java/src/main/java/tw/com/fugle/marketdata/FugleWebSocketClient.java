@@ -115,6 +115,39 @@ public class FugleWebSocketClient implements AutoCloseable {
     }
 
     /**
+     * Check if the client has been shut down.
+     */
+    public boolean isClosed() {
+        try {
+            return webSocketClient.isClosed();
+        } catch (Exception e) {
+            throw FugleException.unwrap(e);
+        }
+    }
+
+    /**
+     * Send a ping message to the server.
+     *
+     * @param state Optional state string echoed back in the pong response (nullable)
+     * @return CompletableFuture that completes when the ping is sent
+     */
+    public CompletableFuture<Void> ping(String state) {
+        return webSocketClient.ping(state)
+                .exceptionally(e -> { throw FugleException.unwrap(e); });
+    }
+
+    /**
+     * Query the server for current subscriptions.
+     * The response arrives via the message callback or pull queue.
+     *
+     * @return CompletableFuture that completes when the query is sent
+     */
+    public CompletableFuture<Void> querySubscriptions() {
+        return webSocketClient.querySubscriptions()
+                .exceptionally(e -> { throw FugleException.unwrap(e); });
+    }
+
+    /**
      * Subscribe to a channel for a symbol.
      *
      * @param channel Channel name (e.g., "trades", "candles", "books")
@@ -415,9 +448,16 @@ public class FugleWebSocketClient implements AutoCloseable {
                     );
                 }
 
-                WebSocketClient client = WebSocketClient.newWithConfig(
-                    apiKey, effectiveListener, endpoint, reconnectRecord, healthCheckRecord
-                );
+                WebSocketClient client;
+                if (baseUrl != null) {
+                    client = WebSocketClient.newWithUrl(
+                        apiKey, effectiveListener, endpoint, baseUrl, reconnectRecord, healthCheckRecord
+                    );
+                } else {
+                    client = WebSocketClient.newWithConfig(
+                        apiKey, effectiveListener, endpoint, reconnectRecord, healthCheckRecord
+                    );
+                }
 
                 return new FugleWebSocketClient(client, messageQueue, errorQueue);
             } else {
@@ -464,12 +504,12 @@ public class FugleWebSocketClient implements AutoCloseable {
         }
 
         @Override
-        public void onReconnecting(int attempt) {
+        public void onReconnecting(Integer attempt) {
             // No action needed in pull mode
         }
 
         @Override
-        public void onReconnectFailed(int attempts) {
+        public void onReconnectFailed(Integer attempts) {
             errorQueue.offer("All " + attempts + " reconnection attempts exhausted");
         }
     }

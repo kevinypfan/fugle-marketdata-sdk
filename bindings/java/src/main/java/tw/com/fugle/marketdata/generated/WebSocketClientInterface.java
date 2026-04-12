@@ -34,9 +34,27 @@ public interface WebSocketClientInterface {
     public CompletableFuture<Void> disconnect();
     
     /**
+     * Check if the client has been shut down
+     */
+    public Boolean isClosed();
+    
+    /**
      * Check if the client is currently connected
      */
     public Boolean isConnected();
+    
+    /**
+     * Send a ping message to the server
+     *
+     * # Arguments
+     * * `state` - Optional state string echoed back in the pong response
+     */
+    public CompletableFuture<Void> ping(String state) ;
+    
+    /**
+     * Query the server for current subscriptions
+     */
+    public CompletableFuture<Void> querySubscriptions() ;
     
     /**
      * Subscribe to a channel for a symbol

@@ -240,6 +240,12 @@ public class WebSocketClientTest {
 
             @Override
             public void onError(String errorMessage) {}
+
+            @Override
+            public void onReconnecting(Integer attempt) {}
+
+            @Override
+            public void onReconnectFailed(Integer attempts) {}
         };
 
         try (FugleWebSocketClient client = FugleWebSocketClient.builder()
@@ -288,6 +294,12 @@ public class WebSocketClientTest {
 
             @Override
             public void onError(String errorMessage) {}
+
+            @Override
+            public void onReconnecting(Integer attempt) {}
+
+            @Override
+            public void onReconnectFailed(Integer attempts) {}
         };
 
         try (FugleWebSocketClient client = FugleWebSocketClient.builder()
@@ -416,6 +428,12 @@ public class WebSocketClientTest {
             public void onError(String errorMessage) {
                 System.err.println("Error: " + errorMessage);
             }
+
+            @Override
+            public void onReconnecting(Integer attempt) {}
+
+            @Override
+            public void onReconnectFailed(Integer attempts) {}
         };
 
         try (FugleWebSocketClient client = FugleWebSocketClient.builder()

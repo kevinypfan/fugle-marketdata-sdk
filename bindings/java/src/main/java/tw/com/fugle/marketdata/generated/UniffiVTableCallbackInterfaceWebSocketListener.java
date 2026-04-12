@@ -18,7 +18,7 @@ public class UniffiVTableCallbackInterfaceWebSocketListener extends Structure {
     public UniffiVTableCallbackInterfaceWebSocketListener() {
         super();
     }
-
+    
     public UniffiVTableCallbackInterfaceWebSocketListener(
         UniffiCallbackInterfaceWebSocketListenerMethod0 onConnected,
         UniffiCallbackInterfaceWebSocketListenerMethod1 onDisconnected,
@@ -47,13 +47,13 @@ public class UniffiVTableCallbackInterfaceWebSocketListener extends Structure {
             UniffiCallbackInterfaceWebSocketListenerMethod5 onReconnectFailed,
             UniffiCallbackInterfaceFree uniffiFree
         ) {
-            super(onConnected,
-            onDisconnected,
-            onMessage,
-            onError,
-            onReconnecting,
-            onReconnectFailed,
-            uniffiFree
+            super(onConnected,        
+            onDisconnected,        
+            onMessage,        
+            onError,        
+            onReconnecting,        
+            onReconnectFailed,        
+            uniffiFree        
             );
         }
     }
@@ -69,6 +69,42 @@ public class UniffiVTableCallbackInterfaceWebSocketListener extends Structure {
     }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

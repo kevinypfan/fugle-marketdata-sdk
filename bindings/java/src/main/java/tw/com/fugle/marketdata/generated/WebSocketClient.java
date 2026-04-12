@@ -183,6 +183,39 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
 
   
     /**
+     * Check if the client has been shut down
+     */
+    @Override
+    public Boolean isClosed()  {
+            try {
+                return FfiConverterBoolean.INSTANCE.lift(
+    callWithPointer(it -> {
+        try {
+    
+            return
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketclient_is_closed(
+            it, _status);
+    });
+    
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Check if the client is currently connected
      */
     @Override
@@ -213,6 +246,57 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
             }
     }
     
+
+  
+    /**
+     * Send a ping message to the server
+     *
+     * # Arguments
+     * * `state` - Optional state string echoed back in the pong response
+     */
+    @Override
+    
+    public CompletableFuture<Void> ping(String state){
+        return UniffiAsyncHelpers.uniffiRustCallAsync(
+        callWithPointer(thisPtr -> {
+            return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketclient_ping(
+                thisPtr,
+                FfiConverterOptionalString.INSTANCE.lower(state)
+            );
+        }),
+        (future, callback, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_poll_void(future, callback, continuation),
+        (future, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_complete_void(future, continuation),
+        (future) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_free_void(future),
+        // lift function
+        () -> {},
+        // Error FFI converter
+        new MarketDataExceptionErrorHandler()
+    );
+    }
+
+  
+    /**
+     * Query the server for current subscriptions
+     */
+    @Override
+    
+    public CompletableFuture<Void> querySubscriptions(){
+        return UniffiAsyncHelpers.uniffiRustCallAsync(
+        callWithPointer(thisPtr -> {
+            return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_method_websocketclient_query_subscriptions(
+                thisPtr
+                
+            );
+        }),
+        (future, callback, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_poll_void(future, callback, continuation),
+        (future, continuation) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_complete_void(future, continuation),
+        (future) -> UniffiLib.INSTANCE.ffi_marketdata_uniffi_rust_future_free_void(future),
+        // lift function
+        () -> {},
+        // Error FFI converter
+        new MarketDataExceptionErrorHandler()
+    );
+    }
 
   
     /**
@@ -299,17 +383,17 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     })
     );
             } catch (RuntimeException _e) {
-
-
+                
+                
                 if (InternalException.class.isInstance(_e.getCause())) {
                     throw (InternalException)_e.getCause();
                 }
                 throw _e;
             }
     }
+    
 
-
-
+  
     /**
      * Create a new WebSocket client for a specific endpoint
      *
@@ -323,6 +407,28 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     UniffiHelpers.uniffiRustCall( _status -> {
         return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_endpoint(
             FfiConverterString.INSTANCE.lower(apiKey), FfiConverterTypeWebSocketListener.INSTANCE.lower(listener), FfiConverterTypeWebSocketEndpoint.INSTANCE.lower(endpoint), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Create a new WebSocket client with full configuration including custom base URL
+     */public static WebSocketClient newWithUrl(String apiKey, WebSocketListener listener, WebSocketEndpoint endpoint, String baseUrl, ReconnectConfigRecord reconnectConfig, HealthCheckConfigRecord healthCheckConfig)  {
+            try {
+                return FfiConverterTypeWebSocketClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(
+            FfiConverterString.INSTANCE.lower(apiKey), FfiConverterTypeWebSocketListener.INSTANCE.lower(listener), FfiConverterTypeWebSocketEndpoint.INSTANCE.lower(endpoint), FfiConverterString.INSTANCE.lower(baseUrl), FfiConverterOptionalTypeReconnectConfigRecord.INSTANCE.lower(reconnectConfig), FfiConverterOptionalTypeHealthCheckConfigRecord.INSTANCE.lower(healthCheckConfig), _status);
     })
     );
             } catch (RuntimeException _e) {

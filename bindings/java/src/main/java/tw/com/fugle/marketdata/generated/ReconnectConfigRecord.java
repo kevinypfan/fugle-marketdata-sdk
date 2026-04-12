@@ -11,31 +11,40 @@ import java.util.Objects;
  * All fields are optional — zero/false values mean "use default".
  */
 public class ReconnectConfigRecord {
+    /**
+     * Maximum reconnection attempts (default: 5, min: 1)
+     */
     private Integer maxAttempts;
+    /**
+     * Initial reconnection delay in milliseconds (default: 1000, min: 100)
+     */
     private Long initialDelayMs;
+    /**
+     * Maximum reconnection delay in milliseconds (default: 60000)
+     */
     private Long maxDelayMs;
 
     public ReconnectConfigRecord(
-        Integer maxAttempts,
-        Long initialDelayMs,
+        Integer maxAttempts, 
+        Long initialDelayMs, 
         Long maxDelayMs
     ) {
-
+        
         this.maxAttempts = maxAttempts;
-
+        
         this.initialDelayMs = initialDelayMs;
-
+        
         this.maxDelayMs = maxDelayMs;
     }
-
+    
     public Integer maxAttempts() {
         return this.maxAttempts;
     }
-
+    
     public Long initialDelayMs() {
         return this.initialDelayMs;
     }
-
+    
     public Long maxDelayMs() {
         return this.maxDelayMs;
     }
@@ -49,19 +58,19 @@ public class ReconnectConfigRecord {
         this.maxDelayMs = maxDelayMs;
     }
 
-
-
+    
+    
     @Override
     public boolean equals(Object other) {
         if (other instanceof ReconnectConfigRecord) {
             ReconnectConfigRecord t = (ReconnectConfigRecord) other;
             return (
-              Objects.equals(maxAttempts, t.maxAttempts) &&
-
-              Objects.equals(initialDelayMs, t.initialDelayMs) &&
-
+              Objects.equals(maxAttempts, t.maxAttempts) && 
+              
+              Objects.equals(initialDelayMs, t.initialDelayMs) && 
+              
               Objects.equals(maxDelayMs, t.maxDelayMs)
-
+              
             );
         };
         return false;
