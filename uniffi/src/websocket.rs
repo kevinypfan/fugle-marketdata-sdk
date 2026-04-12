@@ -342,13 +342,18 @@ impl WebSocketClient {
         // Notify listener
         self.listener.on_connected();
 
-        // Spawn task to forward messages to listener
+        // Spawn dedicated thread for message forwarding (not tokio spawn_blocking)
+        // Using a dedicated thread avoids per-message spawn_blocking overhead and
+        // eliminates the 100ms polling timeout, delivering messages immediately.
         let listener = Arc::clone(&self.listener);
         let shutdown = Arc::clone(&self.shutdown);
         let connected = Arc::clone(&self.connected);
-        tokio::spawn(async move {
-            run_message_loop(receiver, listener, shutdown, connected).await;
-        });
+        std::thread::Builder::new()
+            .name("ws_message_loop".to_string())
+            .spawn(move || {
+                run_message_loop_blocking(receiver, listener, shutdown, connected);
+            })
+            .ok();
 
         // Spawn thread to monitor state events and forward to listener
         let event_listener = Arc::clone(&self.listener);
@@ -522,12 +527,12 @@ impl WebSocketClient {
     }
 }
 
-/// Background task that forwards messages from core MessageReceiver to listener
+/// Dedicated thread that forwards messages from core MessageReceiver to listener.
 ///
-/// The core WebSocket exposes `pub fn messages(&self) -> Arc<MessageReceiver>`
-/// (see core/src/websocket/connection.rs:279). MessageReceiver has blocking
-/// `receive()` method, so we use spawn_blocking for async context.
-async fn run_message_loop(
+/// Uses a short `receive_timeout` to allow periodic shutdown checks, but runs on
+/// a dedicated thread (not tokio spawn_blocking) to avoid per-message task overhead.
+/// The timeout is kept short (5ms) so messages are delivered with minimal latency.
+fn run_message_loop_blocking(
     receiver: Arc<MessageReceiver>,
     listener: Arc<dyn WebSocketListener>,
     shutdown: Arc<AtomicBool>,
@@ -536,46 +541,28 @@ async fn run_message_loop(
     use std::time::Duration;
 
     loop {
-        // Check for shutdown signal
         if shutdown.load(Ordering::SeqCst) {
             break;
         }
 
-        // Use spawn_blocking since MessageReceiver::receive_timeout() is blocking
-        let receiver_clone = Arc::clone(&receiver);
-        let result = tokio::task::spawn_blocking(move || {
-            // Use timeout to allow periodic shutdown checks
-            receiver_clone.receive_timeout(Duration::from_millis(100))
-        })
-        .await;
-
-        match result {
-            Ok(Ok(Some(ws_msg))) => {
-                // Convert core WebSocketMessage to UniFFI StreamMessage
+        match receiver.receive_timeout(Duration::from_millis(5)) {
+            Ok(Some(ws_msg)) => {
                 let stream_msg = StreamMessage::from(ws_msg);
                 listener.on_message(stream_msg);
             }
-            Ok(Ok(None)) => {
-                // Timeout, continue loop (allows shutdown check)
+            Ok(None) => {
+                // Timeout — loop back to check shutdown
                 continue;
             }
-            Ok(Err(e)) => {
-                // Channel closed or error
-                listener.on_error(e.to_string());
-                break;
-            }
-            Err(e) => {
-                // Task join error
-                listener.on_error(format!("Task join error: {}", e));
+            Err(_) => {
+                // Channel closed
                 break;
             }
         }
     }
 
-    // Update connected state
     connected.store(false, Ordering::SeqCst);
 
-    // Only call on_disconnected if not already called by disconnect()
     if !shutdown.load(Ordering::SeqCst) {
         listener.on_disconnected();
     }
