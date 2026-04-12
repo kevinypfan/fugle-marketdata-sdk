@@ -4,7 +4,11 @@ on:
   workflow_call:
     secrets:
       NPM_TOKEN:
-        required: true
+        # Marked optional so forks without NPM_TOKEN (kevinypfan) can still
+        # validate release.yml — this job is gated by `if: channel == stable`
+        # upstream and is never actually invoked on a fork. The `npm publish`
+        # step will fail at runtime if NPM_TOKEN is absent, which is fine.
+        required: false
   workflow_dispatch:
     # Manual trigger requires NPM_TOKEN in repository secrets
 

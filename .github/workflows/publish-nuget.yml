@@ -4,7 +4,9 @@ on:
   workflow_call:
     secrets:
       NUGET_API_KEY:
-        required: true
+        # See publish-nodejs.yml — optional for fork compatibility, the
+        # stable publish path is gated by `if: channel == stable` upstream.
+        required: false
   workflow_dispatch:
     inputs:
       dry-run:
