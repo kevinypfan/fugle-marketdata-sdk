@@ -1574,6 +1574,17 @@ static class _UniFFILib
     );
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(
+        RustBuffer @apiKey,
+        IntPtr @listener,
+        RustBuffer @endpoint,
+        RustBuffer @baseUrl,
+        RustBuffer @reconnectConfig,
+        RustBuffer @healthCheckConfig,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr uniffi_marketdata_uniffi_fn_method_websocketclient_connect(
         IntPtr @ptr
     );
@@ -2256,6 +2267,9 @@ static class _UniFFILib
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern ushort uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint();
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern ushort uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern uint ffi_marketdata_uniffi_uniffi_contract_version();
@@ -3148,6 +3162,16 @@ static class _UniFFILib
             {
                 throw new UniffiContractChecksumException(
                     $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint` checksum `35702`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum =
+                _UniFFILib.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url();
+            if (checksum != 63549)
+            {
+                throw new UniffiContractChecksumException(
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url` checksum `63549`, library returned `{checksum}`"
                 );
             }
         }
@@ -8160,6 +8184,38 @@ public class WebSocketClient : IWebSocketClient, IDisposable
                         FfiConverterString.INSTANCE.Lower(@apiKey),
                         FfiConverterTypeWebSocketListener.INSTANCE.Lower(@listener),
                         FfiConverterTypeWebSocketEndpoint.INSTANCE.Lower(@endpoint),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
+    /// Create a new WebSocket client with full configuration including custom base URL
+    /// </summary>
+    public static WebSocketClient NewWithUrl(
+        string @apiKey,
+        WebSocketListener @listener,
+        WebSocketEndpoint @endpoint,
+        string @baseUrl,
+        ReconnectConfigRecord? @reconnectConfig,
+        HealthCheckConfigRecord? @healthCheckConfig
+    )
+    {
+        return new WebSocketClient(
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(
+                        FfiConverterString.INSTANCE.Lower(@apiKey),
+                        FfiConverterTypeWebSocketListener.INSTANCE.Lower(@listener),
+                        FfiConverterTypeWebSocketEndpoint.INSTANCE.Lower(@endpoint),
+                        FfiConverterString.INSTANCE.Lower(@baseUrl),
+                        FfiConverterOptionalTypeReconnectConfigRecord.INSTANCE.Lower(
+                            @reconnectConfig
+                        ),
+                        FfiConverterOptionalTypeHealthCheckConfigRecord.INSTANCE.Lower(
+                            @healthCheckConfig
+                        ),
                         ref _status
                     )
             )

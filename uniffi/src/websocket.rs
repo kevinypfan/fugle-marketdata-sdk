@@ -153,6 +153,7 @@ pub struct WebSocketClient {
     inner: Arc<Mutex<Option<CoreWebSocketClient>>>,
     listener: Arc<dyn WebSocketListener>,
     api_key: String,
+    base_url: Option<String>,
     endpoint: WebSocketEndpoint,
     connected: Arc<AtomicBool>,
     shutdown: Arc<AtomicBool>,
@@ -168,11 +169,13 @@ impl WebSocketClient {
         endpoint: WebSocketEndpoint,
         reconnect_config: Option<marketdata_core::ReconnectionConfig>,
         health_check_config: Option<marketdata_core::HealthCheckConfig>,
+        base_url: Option<String>,
     ) -> Arc<Self> {
         Arc::new(Self {
             inner: Arc::new(Mutex::new(None)),
             listener,
             api_key,
+            base_url,
             endpoint,
             connected: Arc::new(AtomicBool::new(false)),
             shutdown: Arc::new(AtomicBool::new(false)),
@@ -191,7 +194,7 @@ impl WebSocketClient {
     /// * `listener` - Callback interface for receiving WebSocket events
     #[uniffi::constructor]
     pub fn new(api_key: String, listener: Arc<dyn WebSocketListener>) -> Arc<Self> {
-        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock, None, None)
+        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock, None, None, None)
     }
 
     /// Create a new WebSocket client for a specific endpoint
@@ -206,7 +209,7 @@ impl WebSocketClient {
         listener: Arc<dyn WebSocketListener>,
         endpoint: WebSocketEndpoint,
     ) -> Arc<Self> {
-        Self::new_internal(api_key, listener, endpoint, None, None)
+        Self::new_internal(api_key, listener, endpoint, None, None, None)
     }
 
     /// Create a new WebSocket client with full configuration
@@ -231,6 +234,27 @@ impl WebSocketClient {
             endpoint,
             reconnect_config.map(|c| c.to_core()),
             health_check_config.map(|c| c.to_core()),
+            None,
+        )
+    }
+
+    /// Create a new WebSocket client with full configuration including custom base URL
+    #[uniffi::constructor]
+    pub fn new_with_url(
+        api_key: String,
+        listener: Arc<dyn WebSocketListener>,
+        endpoint: WebSocketEndpoint,
+        base_url: String,
+        reconnect_config: Option<ReconnectConfigRecord>,
+        health_check_config: Option<HealthCheckConfigRecord>,
+    ) -> Arc<Self> {
+        Self::new_internal(
+            api_key,
+            listener,
+            endpoint,
+            reconnect_config.map(|c| c.to_core()),
+            health_check_config.map(|c| c.to_core()),
+            Some(base_url),
         )
     }
 
@@ -259,10 +283,18 @@ impl WebSocketClient {
         // Create auth request
         let auth = AuthRequest::with_api_key(&self.api_key);
 
-        // Create connection config based on endpoint
-        let config = match self.endpoint {
-            WebSocketEndpoint::Stock => ConnectionConfig::fugle_stock(auth),
-            WebSocketEndpoint::FutOpt => ConnectionConfig::fugle_futopt(auth),
+        // Create connection config based on endpoint (with optional custom base URL)
+        let config = if let Some(ref url) = self.base_url {
+            let ws_url = match self.endpoint {
+                WebSocketEndpoint::Stock => format!("{}/stock/streaming", url),
+                WebSocketEndpoint::FutOpt => format!("{}/futopt/streaming", url),
+            };
+            ConnectionConfig::new(ws_url, auth)
+        } else {
+            match self.endpoint {
+                WebSocketEndpoint::Stock => ConnectionConfig::fugle_stock(auth),
+                WebSocketEndpoint::FutOpt => ConnectionConfig::fugle_futopt(auth),
+            }
         };
 
         // Create core WebSocket client with optional reconnection/health-check config

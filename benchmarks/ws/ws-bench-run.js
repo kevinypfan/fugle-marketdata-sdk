@@ -31,10 +31,11 @@ const CLIENT_NEW_JS  = path.join(BENCH_DIR, 'ws-bench-new.js');
 const CLIENT_OLD_JS  = path.join(BENCH_DIR, 'ws-bench-old.js');
 const CLIENT_NEW_PY  = path.join(BENCH_DIR, 'ws-bench-new-py.py');
 const CLIENT_OLD_PY  = path.join(BENCH_DIR, 'ws-bench-old-py.py');
+const CLIENT_NEW_CS  = path.join(BENCH_DIR, 'ws-bench-cs');
 
 // Determine which SDKs to benchmark based on --lang flag
 const langIdx = process.argv.indexOf('--lang');
-const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, all
+const LANG = langIdx !== -1 ? process.argv[langIdx + 1] : 'all';  // js, py, cs, all
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,8 +76,12 @@ function startServer() {
 function runClient(script, label) {
   return new Promise((resolve, reject) => {
     const isPython = script.endsWith('.py');
+    const isDotnet = label.includes('cs');
     let cmd, cmdArgs;
-    if (isPython) {
+    if (isDotnet) {
+      cmd = 'dotnet';
+      cmdArgs = ['run', '--project', script, '--configuration', 'Release', '--', '--url', `ws://localhost:${PORT}`, '--timeout', '60000'];
+    } else if (isPython) {
       cmd = 'python3';
       cmdArgs = [script, '--url', `ws://localhost:${PORT}`, '--timeout', '60'];
     } else {
@@ -164,13 +169,17 @@ async function main() {
     pairs.push({ label: 'Python', oldScript: CLIENT_OLD_PY, newScript: CLIENT_NEW_PY,
                  oldName: 'fugle-marketdata@2.4.1', newName: 'rust-core (Py)' });
   }
+  if (LANG === 'cs' || LANG === 'all') {
+    pairs.push({ label: 'C#', oldScript: null, newScript: CLIENT_NEW_CS,
+                 oldName: null, newName: 'rust-core (C#)', newOnly: true });
+  }
 
   const allResults = {};  // { 'JS-old': [...], 'JS-new': [...], ... }
 
   for (const pair of pairs) {
     const oldKey = `${pair.label}-old`;
     const newKey = `${pair.label}-new`;
-    allResults[oldKey] = [];
+    if (!pair.newOnly) allResults[oldKey] = [];
     allResults[newKey] = [];
 
     console.log(`\n${'~'.repeat(64)}`);
@@ -180,8 +189,8 @@ async function main() {
     for (let run = 1; run <= RUNS; run++) {
       console.log(`\n--- ${pair.label} Run ${run}/${RUNS} ---`);
 
-      // Old SDK
-      {
+      // Old SDK (skip for new-only benchmarks like C#)
+      if (!pair.newOnly) {
         console.log(`  Starting server for old ${pair.label} SDK...`);
         const server = await startServer();
         await sleep(300);
@@ -204,7 +213,7 @@ async function main() {
         await sleep(300);
         console.log(`  Running new SDK (${pair.newName})...`);
         try {
-          const result = await runClient(pair.newScript, `${pair.label}-new`);
+          const result = await runClient(pair.newScript, `${pair.label}-new-cs`);
           allResults[newKey].push(result);
           console.log(`  New: ${fmt(result.msgs_per_sec)} msg/s, p50=${fmt(result.latency_p50_ms)}ms, p99=${fmt(result.latency_p99_ms)}ms`);
         } catch (e) {
@@ -224,9 +233,30 @@ async function main() {
   console.log('='.repeat(64));
 
   for (const pair of pairs) {
-    const oldRuns = allResults[`${pair.label}-old`];
     const newRuns = allResults[`${pair.label}-new`];
 
+    if (pair.newOnly) {
+      // New-only benchmark (e.g., C#): just show absolute numbers
+      if (newRuns.length === 0) {
+        console.log(`\n  ${pair.label}: No successful runs.`);
+        continue;
+      }
+      const nTput = median(newRuns.map(r => r.msgs_per_sec));
+      const nP50  = median(newRuns.map(r => r.latency_p50_ms));
+      const nP99  = median(newRuns.map(r => r.latency_p99_ms));
+      const nCpu  = median(newRuns.map(r => r.cpu_user_ms));
+
+      console.log(`\n  --- ${pair.label} (new SDK only — no legacy SDK to compare) ---`);
+      console.log(`  ${'Metric'.padEnd(24)} ${'New SDK'.padStart(12)}`);
+      console.log('  ' + '-'.repeat(36));
+      console.log(`  ${'Throughput (msg/s)'.padEnd(24)} ${fmt(nTput).padStart(12)}`);
+      console.log(`  ${'Latency p50 (ms)'.padEnd(24)} ${fmt(nP50).padStart(12)}`);
+      console.log(`  ${'Latency p99 (ms)'.padEnd(24)} ${fmt(nP99).padStart(12)}`);
+      console.log(`  ${'CPU user (ms)'.padEnd(24)} ${fmt(nCpu).padStart(12)}`);
+      continue;
+    }
+
+    const oldRuns = allResults[`${pair.label}-old`];
     if (oldRuns.length === 0 || newRuns.length === 0) {
       console.log(`\n  ${pair.label}: Not enough successful runs to compare.`);
       continue;

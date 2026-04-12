@@ -220,13 +220,27 @@ namespace FugleMarketData
                         );
                     }
 
-                    _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithConfig(
-                        options.ApiKey,
-                        adapter,
-                        uniffiEndpoint,
-                        reconnectRecord,
-                        healthCheckRecord
-                    );
+                    if (!string.IsNullOrEmpty(options.BaseUrl))
+                    {
+                        _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithUrl(
+                            options.ApiKey,
+                            adapter,
+                            uniffiEndpoint,
+                            options.BaseUrl,
+                            reconnectRecord,
+                            healthCheckRecord
+                        );
+                    }
+                    else
+                    {
+                        _inner = uniffi.marketdata_uniffi.WebSocketClient.NewWithConfig(
+                            options.ApiKey,
+                            adapter,
+                            uniffiEndpoint,
+                            reconnectRecord,
+                            healthCheckRecord
+                        );
+                    }
                 }
                 else
                 {
@@ -240,12 +254,6 @@ namespace FugleMarketData
 
                 _reconnectOptions = options.Reconnect;
                 _healthCheckOptions = options.HealthCheck;
-
-                // TODO: Apply BaseUrl when UniFFI WebSocketClient exposes base_url() setter
-                if (!string.IsNullOrEmpty(options.BaseUrl))
-                {
-                    // BaseUrl configuration will be implemented when core library supports it
-                }
             }
             catch (uniffi.marketdata_uniffi.MarketDataException ex)
             {
