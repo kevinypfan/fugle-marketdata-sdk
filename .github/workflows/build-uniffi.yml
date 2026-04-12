@@ -24,58 +24,30 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Default-feature matrix — always runs, powers C#/Java/Go publish paths
+  # and the Go internal tarball. Produces uniffi-default-<target> artifacts.
   build:
-    name: Build UniFFI (${{ matrix.target }} / ${{ matrix.features }})
-    # Skip cpp matrix entries unless the caller requested them. The default
-    # matrix entries (features=default) always run — they power the C#/Java/Go
-    # publish paths and the Go internal tarball.
-    if: ${{ matrix.features != 'cpp' || inputs.include_cpp }}
+    name: Build UniFFI default (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          # ---- default feature (public + internal release) ----
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             lib: libmarketdata_uniffi.so
             rid: linux-x64
-            features: default
           - os: macos-latest
             target: aarch64-apple-darwin
             lib: libmarketdata_uniffi.dylib
             rid: osx-arm64
-            features: default
           - os: macos-latest
             target: x86_64-apple-darwin
             lib: libmarketdata_uniffi.dylib
             rid: osx-x64
-            features: default
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             lib: marketdata_uniffi.dll
             rid: win-x64
-            features: default
-          # ---- cpp feature (internal release only; gated by `if` above) ----
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            lib: libmarketdata_uniffi.so
-            rid: linux-x64
-            features: cpp
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            lib: libmarketdata_uniffi.dylib
-            rid: osx-arm64
-            features: cpp
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            lib: libmarketdata_uniffi.dylib
-            rid: osx-x64
-            features: cpp
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            lib: marketdata_uniffi.dll
-            rid: win-x64
-            features: cpp
 
     runs-on: ${{ matrix.os }}
 
@@ -87,38 +59,85 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # Separate cache key per feature set — cargo incremental artifacts are
-      # invalidated by feature flag changes, so sharing a key would thrash.
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
-          shared-key: uniffi-${{ matrix.features }}-release
+          shared-key: uniffi-default-release
 
-      - name: Build UniFFI cdylib (default features)
-        if: matrix.features == 'default'
+      - name: Build UniFFI cdylib
         run: cargo build --release -p marketdata-uniffi --target ${{ matrix.target }}
 
+      - name: Upload native library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uniffi-default-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ matrix.lib }}
+          retention-days: 5
+
+  # cpp-feature matrix — only runs on internal release channel. Produces
+  # uniffi-cpp-<target> artifacts + one uniffi-cpp-headers artifact (the C++
+  # bindings are platform-independent, so bindgen runs once on Linux x64).
+  #
+  # Separate rust-cache shared-key avoids thrashing against the default build
+  # (feature flags invalidate cargo incremental artifacts).
+  build-cpp:
+    name: Build UniFFI cpp (${{ matrix.target }})
+    if: ${{ inputs.include_cpp }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            lib: libmarketdata_uniffi.so
+            rid: linux-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            lib: libmarketdata_uniffi.dylib
+            rid: osx-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            lib: libmarketdata_uniffi.dylib
+            rid: osx-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            lib: marketdata_uniffi.dll
+            rid: win-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          shared-key: uniffi-cpp-release
+
       - name: Build UniFFI cdylib (cpp feature)
-        if: matrix.features == 'cpp'
         run: cargo build --release -p marketdata-uniffi --features cpp --target ${{ matrix.target }}
 
       - name: Upload native library artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uniffi-${{ matrix.features }}-${{ matrix.target }}
+          name: uniffi-cpp-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ matrix.lib }}
           retention-days: 5
 
-      # Generate C++ headers once — the output is platform-independent, so we
-      # only run bindgen on a single matrix entry (Linux x64 cpp build) and
-      # ship the same header tarball to all 4 platform-specific C++ tarballs.
+      # Generate C++ headers once — output is platform-independent.
       - name: Install uniffi-bindgen-cpp
-        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        if: matrix.rid == 'linux-x64'
         run: cargo install uniffi-bindgen-cpp --git https://github.com/NordSecurity/uniffi-bindgen-cpp --tag v0.7.0+v0.28.3
 
       - name: Generate C++ bindings
-        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        if: matrix.rid == 'linux-x64'
         run: |
           mkdir -p bindings/cpp
           uniffi-bindgen-cpp \
@@ -126,7 +145,7 @@ jobs:
             -o bindings/cpp/
 
       - name: Upload C++ header artifact
-        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        if: matrix.rid == 'linux-x64'
         uses: actions/upload-artifact@v4
         with:
           name: uniffi-cpp-headers
