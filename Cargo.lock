@@ -966,7 +966,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "marketdata-core"
-version = "0.2.0"
+version = "0.2.0-rc.0"
 dependencies = [
  "anyhow",
  "criterion",
@@ -985,7 +985,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-js"
-version = "0.2.0"
+version = "0.2.0-rc.0"
 dependencies = [
  "marketdata-core",
  "napi",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-py"
-version = "0.2.0"
+version = "0.2.0-rc.0"
 dependencies = [
  "marketdata-core",
  "pyo3",
@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-uniffi"
-version = "0.2.0"
+version = "0.2.0-rc.0"
 dependencies = [
  "marketdata-core",
  "serde_json",
