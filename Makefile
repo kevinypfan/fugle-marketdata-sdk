@@ -1,5 +1,24 @@
 .PHONY: all clean python-dev python-release nodejs-dev nodejs-release csharp-dev csharp-release gen-bindings gen-csharp gen-go gen-java build-csharp build-go build-java test test-python test-nodejs test-csharp test-go test-java
 
+# ============================================================
+# Platform detection — picks the right dylib extension for the
+# current host so UniFFI bindgen targets resolve on macOS, Linux,
+# and Windows (MSYS/Cygwin) without per-target shell hacks.
+# ============================================================
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	LIB_EXT := dylib
+	LIB_PREFIX := lib
+else ifeq ($(UNAME_S),Linux)
+	LIB_EXT := so
+	LIB_PREFIX := lib
+else
+	# MINGW*, MSYS*, CYGWIN* on Windows
+	LIB_EXT := dll
+	LIB_PREFIX :=
+endif
+UNIFFI_LIB := target/release/$(LIB_PREFIX)marketdata_uniffi.$(LIB_EXT)
+
 # Default: Build all bindings in order (Python -> Node.js -> C#)
 all: python-release nodejs-release csharp-release
 
@@ -37,20 +56,22 @@ gen-bindings: gen-csharp gen-go gen-java gen-cpp
 gen-cpp:
 	cargo build -p marketdata-uniffi --features cpp --release
 	mkdir -p bindings/cpp
-	uniffi-bindgen-cpp --library target/release/libmarketdata_uniffi.dylib -o bindings/cpp/
+	uniffi-bindgen-cpp --library $(UNIFFI_LIB) -o bindings/cpp/
 	@echo "C++ bindings generated successfully (sync-only API)"
 
 # Generate C# bindings from UniFFI (library mode - proc-macro approach)
-# Post-processes generated file to make types public for consumer access
+# Post-processes generated file to make types public for consumer access.
+# Uses `sed -i.bak ... && rm *.bak` for BSD/GNU compatibility (macOS + Linux CI).
 gen-csharp:
 	cargo build -p marketdata-uniffi --release
-	uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.dylib -o bindings/csharp/MarketdataUniffi/
+	uniffi-bindgen-cs --library $(UNIFFI_LIB) -o bindings/csharp/MarketdataUniffi/
 	@echo "Post-processing: making generated types public..."
-	sed -i '' 's/^internal record /public record /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i '' 's/^internal interface /public interface /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i '' 's/^internal class /public class /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i '' 's/^internal enum /public enum /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i '' 's/^internal static class MarketdataUniffiMethods/public static class MarketdataUniffiMethods/g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i.bak 's/^internal record /public record /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i.bak 's/^internal interface /public interface /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i.bak 's/^internal class /public class /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i.bak 's/^internal enum /public enum /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	sed -i.bak 's/^internal static class MarketdataUniffiMethods/public static class MarketdataUniffiMethods/g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
+	rm -f bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs.bak
 	@echo "C# bindings generated successfully"
 
 # ============================================================
@@ -61,7 +82,7 @@ gen-csharp:
 gen-go:
 	cargo build -p marketdata-uniffi --release
 	mkdir -p bindings/go/marketdata
-	uniffi-bindgen-go --library target/release/libmarketdata_uniffi.dylib -o bindings/go/tmp/
+	uniffi-bindgen-go --library $(UNIFFI_LIB) -o bindings/go/tmp/
 	mv bindings/go/tmp/marketdata_uniffi/* bindings/go/marketdata/
 	rmdir bindings/go/tmp/marketdata_uniffi bindings/go/tmp
 
@@ -73,7 +94,7 @@ gen-go:
 gen-java:
 	cargo build -p marketdata-uniffi --release
 	mkdir -p bindings/java/src/main/java
-	uniffi-bindgen-java generate --library target/release/libmarketdata_uniffi.dylib \
+	uniffi-bindgen-java generate --library $(UNIFFI_LIB) \
 		--out-dir bindings/java/src/main/java \
 		--crate marketdata_uniffi \
 		--config uniffi/uniffi.toml

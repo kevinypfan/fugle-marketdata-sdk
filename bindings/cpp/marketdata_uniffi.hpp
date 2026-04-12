@@ -99,15 +99,89 @@ struct MacdDataPoint {
 
 
 /**
- * Listing applicant entry
+ * Single historical candle
  */
-struct ListingApplicant {
+struct HistoricalCandle {
+    std::string date;
+    double open;
+    double high;
+    double low;
+    double close;
+    int64_t volume;
+    std::optional<double> turnover;
+    std::optional<double> change;
+};
+
+
+/**
+ * FutOpt price level
+ */
+struct FutOptPriceLevel {
+    double price;
+    int64_t size;
+};
+
+
+/**
+ * SMA data point
+ */
+struct SmaDataPoint {
+    std::string date;
+    double sma;
+};
+
+
+/**
+ * FutOpt total stats
+ */
+struct FutOptTotalStats {
+    int64_t trade_volume;
+    std::optional<int64_t> total_bid_match;
+    std::optional<int64_t> total_ask_match;
+};
+
+
+/**
+ * Capital change entry
+ */
+struct CapitalChange {
     std::string symbol;
     std::optional<std::string> name;
-    std::optional<std::string> application_date;
-    std::optional<std::string> listing_date;
-    std::optional<std::string> status;
-    std::optional<std::string> industry;
+    std::string date;
+    std::optional<double> previous_capital;
+    std::optional<double> current_capital;
+    std::optional<std::string> change_type;
+    std::optional<std::string> reason;
+};
+
+
+/**
+ * Single snapshot quote
+ */
+struct SnapshotQuote {
+    std::optional<std::string> data_type;
+    std::string symbol;
+    std::optional<std::string> name;
+    std::optional<double> open_price;
+    std::optional<double> high_price;
+    std::optional<double> low_price;
+    std::optional<double> close_price;
+    std::optional<double> change;
+    std::optional<double> change_percent;
+    std::optional<int64_t> trade_volume;
+    std::optional<double> trade_value;
+    std::optional<int64_t> last_updated;
+};
+
+
+/**
+ * KDJ data point
+ */
+struct KdjDataPoint {
+    std::string date;
+    double k;
+    double d;
+    double j;
 };
 
 
@@ -131,25 +205,27 @@ struct Active {
 
 
 /**
- * Single trade execution
+ * Bid/Ask price level for order book
  */
-struct Trade {
-    std::optional<double> bid;
-    std::optional<double> ask;
+struct PriceLevel {
     double price;
     int64_t size;
-    int64_t time;
 };
 
 
 /**
- * Volume at a specific price level
+ * FutOpt historical candle
  */
-struct VolumeAtPrice {
-    double price;
-    int64_t volume;
-    std::optional<int64_t> volume_at_bid;
-    std::optional<int64_t> volume_at_ask;
+struct FutOptHistoricalCandle {
+    std::string date;
+    double open;
+    double high;
+    double low;
+    double close;
+    uint64_t volume;
+    std::optional<uint64_t> open_interest;
+    std::optional<double> change;
+    std::optional<double> change_percent;
 };
 
 
@@ -165,11 +241,11 @@ struct BbDataPoint {
 
 
 /**
- * Bid/Ask price level for order book
+ * RSI data point
  */
-struct PriceLevel {
-    double price;
-    int64_t size;
+struct RsiDataPoint {
+    std::string date;
+    double rsi;
 };
 
 
@@ -202,17 +278,57 @@ struct Mover {
 
 
 /**
- * Single historical candle
+ * Total trading statistics
  */
-struct HistoricalCandle {
+struct TotalStats {
+    double trade_value;
+    int64_t trade_volume;
+    std::optional<int64_t> trade_volume_at_bid;
+    std::optional<int64_t> trade_volume_at_ask;
+    std::optional<int64_t> transaction;
+    std::optional<int64_t> time;
+};
+
+
+/**
+ * FutOpt daily data
+ */
+struct FutOptDailyData {
     std::string date;
     double open;
     double high;
     double low;
     double close;
+    uint64_t volume;
+    std::optional<uint64_t> open_interest;
+    std::optional<double> settlement_price;
+};
+
+
+/**
+ * Single intraday candle
+ */
+struct IntradayCandle {
+    double open;
+    double high;
+    double low;
+    double close;
     int64_t volume;
-    std::optional<double> turnover;
-    std::optional<double> change;
+    std::optional<double> average;
+    int64_t time;
+};
+
+
+/**
+ * Listing applicant entry
+ */
+struct ListingApplicant {
+    std::string symbol;
+    std::optional<std::string> name;
+    std::optional<std::string> application_date;
+    std::optional<std::string> listing_date;
+    std::optional<std::string> status;
+    std::optional<std::string> industry;
 };
 
 
@@ -240,15 +356,37 @@ struct Product {
 
 
 /**
- * Total trading statistics
+ * Trade execution info
  */
-struct TotalStats {
-    double trade_value;
-    int64_t trade_volume;
-    std::optional<int64_t> trade_volume_at_bid;
-    std::optional<int64_t> trade_volume_at_ask;
-    std::optional<int64_t> transaction;
-    std::optional<int64_t> time;
+struct TradeInfo {
+    std::optional<double> bid;
+    std::optional<double> ask;
+    double price;
+    int64_t size;
+    int64_t time;
+};
+
+
+/**
+ * Single trade execution
+ */
+struct Trade {
+    std::optional<double> bid;
+    std::optional<double> ask;
+    double price;
+    int64_t size;
+    int64_t time;
+};
+
+
+/**
+ * Volume at a specific price level
+ */
+struct VolumeAtPrice {
+    double price;
+    int64_t volume;
+    std::optional<int64_t> volume_at_bid;
+    std::optional<int64_t> volume_at_ask;
 };
 
 
@@ -263,57 +401,6 @@ struct FutOptLastTrade {
 
 
 /**
- * Trade execution info
- */
-struct TradeInfo {
-    std::optional<double> bid;
-    std::optional<double> ask;
-    double price;
-    int64_t size;
-    int64_t time;
-};
-
-
-/**
- * SMA data point
- */
-struct SmaDataPoint {
-    std::string date;
-    double sma;
-};
-
-
-/**
- * FutOpt historical candle
- */
-struct FutOptHistoricalCandle {
-    std::string date;
-    double open;
-    double high;
-    double low;
-    double close;
-    uint64_t volume;
-    std::optional<uint64_t> open_interest;
-    std::optional<double> change;
-    std::optional<double> change_percent;
-};
-
-
-/**
- * Capital change entry
- */
-struct CapitalChange {
-    std::string symbol;
-    std::optional<std::string> name;
-    std::string date;
-    std::optional<double> previous_capital;
-    std::optional<double> current_capital;
-    std::optional<std::string> change_type;
-    std::optional<std::string> reason;
-};
-
-
-/**
  * Dividend entry
  */
 struct Dividend {
@@ -324,93 +411,6 @@ struct Dividend {
     std::optional<double> cash_dividend;
     std::optional<double> stock_dividend;
     std::optional<std::string> dividend_year;
-};
-
-
-/**
- * RSI data point
- */
-struct RsiDataPoint {
-    std::string date;
-    double rsi;
-};
-
-
-/**
- * FutOpt price level
- */
-struct FutOptPriceLevel {
-    double price;
-    int64_t size;
-};
-
-
-/**
- * FutOpt daily data
- */
-struct FutOptDailyData {
-    std::string date;
-    double open;
-    double high;
-    double low;
-    double close;
-    uint64_t volume;
-    std::optional<uint64_t> open_interest;
-    std::optional<double> settlement_price;
-};
-
-
-/**
- * FutOpt total stats
- */
-struct FutOptTotalStats {
-    int64_t trade_volume;
-    std::optional<int64_t> total_bid_match;
-    std::optional<int64_t> total_ask_match;
-};
-
-
-/**
- * KDJ data point
- */
-struct KdjDataPoint {
-    std::string date;
-    double k;
-    double d;
-    double j;
-};
-
-
-/**
- * Single snapshot quote
- */
-struct SnapshotQuote {
-    std::optional<std::string> data_type;
-    std::string symbol;
-    std::optional<std::string> name;
-    std::optional<double> open_price;
-    std::optional<double> high_price;
-    std::optional<double> low_price;
-    std::optional<double> close_price;
-    std::optional<double> change;
-    std::optional<double> change_percent;
-    std::optional<int64_t> trade_volume;
-    std::optional<double> trade_value;
-    std::optional<int64_t> last_updated;
-};
-
-
-/**
- * Single intraday candle
- */
-struct IntradayCandle {
-    double open;
-    double high;
-    double low;
-    double close;
-    int64_t volume;
-    std::optional<double> average;
-    int64_t time;
 };
 
 
@@ -447,13 +447,26 @@ struct FutOptQuote {
 
 
 /**
- * FutOpt daily response
+ * Trades response
  */
-struct FutOptDailyResponse {
-    std::string symbol;
+struct TradesResponse {
+    std::string date;
     std::optional<std::string> data_type;
     std::optional<std::string> exchange;
-    std::vector<FutOptDailyData> data;
+    std::optional<std::string> market;
+    std::string symbol;
+    std::vector<Trade> data;
+};
+
+
+/**
+ * Listing applicants response
+ */
+struct ListingApplicantsResponse {
+    std::string data_type;
+    std::string exchange;
+    std::string market;
+    std::vector<ListingApplicant> data;
 };
 
 
@@ -474,42 +487,13 @@ struct MacdResponse {
 
 
 /**
- * Capital changes response
+ * Actives response
  */
-struct CapitalChangesResponse {
-    std::string data_type;
-    std::string exchange;
+struct ActivesResponse {
+    std::string date;
+    std::string time;
     std::string market;
-    std::vector<CapitalChange> data;
-};
-
-
-/**
- * Bollinger Bands response
- */
-struct BbResponse {
-    std::string symbol;
-    std::string data_type;
-    std::string exchange;
-    std::string market;
-    std::string timeframe;
-    uint32_t period;
-    double stddev;
-    std::vector<BbDataPoint> data;
-};
-
-
-/**
- * KDJ response
- */
-struct KdjResponse {
-    std::string symbol;
-    std::string data_type;
-    std::string exchange;
-    std::string market;
-    std::string timeframe;
-    uint32_t period;
-    std::vector<KdjDataPoint> data;
+    std::vector<Active> data;
 };
 
 
@@ -562,6 +546,20 @@ struct Quote {
 
 
 /**
+ * Intraday candles response
+ */
+struct IntradayCandlesResponse {
+    std::string date;
+    std::optional<std::string> data_type;
+    std::optional<std::string> exchange;
+    std::optional<std::string> market;
+    std::string symbol;
+    std::optional<std::string> timeframe;
+    std::vector<IntradayCandle> data;
+};
+
+
+/**
  * Volumes response
  */
 struct VolumesResponse {
@@ -571,6 +569,32 @@ struct VolumesResponse {
     std::optional<std::string> market;
     std::string symbol;
     std::vector<VolumeAtPrice> data;
+};
+
+
+/**
+ * KDJ response
+ */
+struct KdjResponse {
+    std::string symbol;
+    std::string data_type;
+    std::string exchange;
+    std::string market;
+    std::string timeframe;
+    uint32_t period;
+    std::vector<KdjDataPoint> data;
+};
+
+
+/**
+ * FutOpt historical candles response
+ */
+struct FutOptHistoricalCandlesResponse {
+    std::string symbol;
+    std::optional<std::string> data_type;
+    std::optional<std::string> exchange;
+    std::optional<std::string> timeframe;
+    std::vector<FutOptHistoricalCandle> candles;
 };
 
 
@@ -588,90 +612,6 @@ struct ProductsResponse {
 
 
 /**
- * FutOpt historical candles response
- */
-struct FutOptHistoricalCandlesResponse {
-    std::string symbol;
-    std::optional<std::string> data_type;
-    std::optional<std::string> exchange;
-    std::optional<std::string> timeframe;
-    std::vector<FutOptHistoricalCandle> candles;
-};
-
-
-/**
- * Historical candles response
- */
-struct HistoricalCandlesResponse {
-    std::string symbol;
-    std::optional<std::string> data_type;
-    std::optional<std::string> exchange;
-    std::optional<std::string> market;
-    std::optional<std::string> timeframe;
-    std::optional<bool> adjusted;
-    std::vector<HistoricalCandle> data;
-};
-
-
-/**
- * Intraday candles response
- */
-struct IntradayCandlesResponse {
-    std::string date;
-    std::optional<std::string> data_type;
-    std::optional<std::string> exchange;
-    std::optional<std::string> market;
-    std::string symbol;
-    std::optional<std::string> timeframe;
-    std::vector<IntradayCandle> data;
-};
-
-
-/**
- * Actives response
- */
-struct ActivesResponse {
-    std::string date;
-    std::string time;
-    std::string market;
-    std::vector<Active> data;
-};
-
-
-/**
- * Snapshot quotes response
- */
-struct SnapshotQuotesResponse {
-    std::string date;
-    std::string time;
-    std::string market;
-    std::vector<SnapshotQuote> data;
-};
-
-
-/**
- * Dividends response
- */
-struct DividendsResponse {
-    std::string data_type;
-    std::string exchange;
-    std::string market;
-    std::vector<Dividend> data;
-};
-
-
-/**
- * Listing applicants response
- */
-struct ListingApplicantsResponse {
-    std::string data_type;
-    std::string exchange;
-    std::string market;
-    std::vector<ListingApplicant> data;
-};
-
-
-/**
  * Movers response
  */
 struct MoversResponse {
@@ -683,16 +623,39 @@ struct MoversResponse {
 
 
 /**
- * RSI response
+ * Bollinger Bands response
  */
-struct RsiResponse {
+struct BbResponse {
     std::string symbol;
     std::string data_type;
     std::string exchange;
     std::string market;
     std::string timeframe;
     uint32_t period;
-    std::vector<RsiDataPoint> data;
+    double stddev;
+    std::vector<BbDataPoint> data;
+};
+
+
+/**
+ * FutOpt daily response
+ */
+struct FutOptDailyResponse {
+    std::string symbol;
+    std::optional<std::string> data_type;
+    std::optional<std::string> exchange;
+    std::vector<FutOptDailyData> data;
+};
+
+
+/**
+ * Capital changes response
+ */
+struct CapitalChangesResponse {
+    std::string data_type;
+    std::string exchange;
+    std::string market;
+    std::vector<CapitalChange> data;
 };
 
 
@@ -711,15 +674,52 @@ struct SmaResponse {
 
 
 /**
- * Trades response
+ * RSI response
  */
-struct TradesResponse {
-    std::string date;
+struct RsiResponse {
+    std::string symbol;
+    std::string data_type;
+    std::string exchange;
+    std::string market;
+    std::string timeframe;
+    uint32_t period;
+    std::vector<RsiDataPoint> data;
+};
+
+
+/**
+ * Historical candles response
+ */
+struct HistoricalCandlesResponse {
+    std::string symbol;
     std::optional<std::string> data_type;
     std::optional<std::string> exchange;
     std::optional<std::string> market;
-    std::string symbol;
-    std::vector<Trade> data;
+    std::optional<std::string> timeframe;
+    std::optional<bool> adjusted;
+    std::vector<HistoricalCandle> data;
+};
+
+
+/**
+ * Dividends response
+ */
+struct DividendsResponse {
+    std::string data_type;
+    std::string exchange;
+    std::string market;
+    std::vector<Dividend> data;
+};
+
+
+/**
+ * Snapshot quotes response
+ */
+struct SnapshotQuotesResponse {
+    std::string date;
+    std::string time;
+    std::string market;
+    std::vector<SnapshotQuote> data;
 };
 
 

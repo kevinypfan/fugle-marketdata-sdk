@@ -2,42 +2,80 @@ name: Build UniFFI Native Libraries
 
 on:
   workflow_call:
+    inputs:
+      include_cpp:
+        description: 'Also build the cpp feature variant (for internal C++ distribution)'
+        required: false
+        type: boolean
+        default: false
     outputs:
       version:
         description: "Package version from Cargo.toml"
         value: ${{ jobs.consolidate.outputs.version }}
   workflow_dispatch:
+    inputs:
+      include_cpp:
+        description: 'Also build the cpp feature variant'
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-    name: Build UniFFI (${{ matrix.target }})
+    name: Build UniFFI (${{ matrix.target }} / ${{ matrix.features }})
+    # Skip cpp matrix entries unless the caller requested them. The default
+    # matrix entries (features=default) always run — they power the C#/Java/Go
+    # publish paths and the Go internal tarball.
+    if: ${{ matrix.features != 'cpp' || inputs.include_cpp }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Linux x64
+          # ---- default feature (public + internal release) ----
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             lib: libmarketdata_uniffi.so
             rid: linux-x64
-          # macOS ARM64 (Apple Silicon)
+            features: default
           - os: macos-latest
             target: aarch64-apple-darwin
             lib: libmarketdata_uniffi.dylib
             rid: osx-arm64
-          # macOS x64 (Intel)
+            features: default
           - os: macos-latest
             target: x86_64-apple-darwin
             lib: libmarketdata_uniffi.dylib
             rid: osx-x64
-          # Windows x64
+            features: default
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             lib: marketdata_uniffi.dll
             rid: win-x64
+            features: default
+          # ---- cpp feature (internal release only; gated by `if` above) ----
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            lib: libmarketdata_uniffi.so
+            rid: linux-x64
+            features: cpp
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            lib: libmarketdata_uniffi.dylib
+            rid: osx-arm64
+            features: cpp
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            lib: libmarketdata_uniffi.dylib
+            rid: osx-x64
+            features: cpp
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            lib: marketdata_uniffi.dll
+            rid: win-x64
+            features: cpp
 
     runs-on: ${{ matrix.os }}
 
@@ -49,20 +87,50 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # Separate cache key per feature set — cargo incremental artifacts are
+      # invalidated by feature flag changes, so sharing a key would thrash.
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
-          shared-key: uniffi-release
+          shared-key: uniffi-${{ matrix.features }}-release
 
-      - name: Build UniFFI cdylib
+      - name: Build UniFFI cdylib (default features)
+        if: matrix.features == 'default'
         run: cargo build --release -p marketdata-uniffi --target ${{ matrix.target }}
+
+      - name: Build UniFFI cdylib (cpp feature)
+        if: matrix.features == 'cpp'
+        run: cargo build --release -p marketdata-uniffi --features cpp --target ${{ matrix.target }}
 
       - name: Upload native library artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uniffi-${{ matrix.target }}
+          name: uniffi-${{ matrix.features }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ matrix.lib }}
+          retention-days: 5
+
+      # Generate C++ headers once — the output is platform-independent, so we
+      # only run bindgen on a single matrix entry (Linux x64 cpp build) and
+      # ship the same header tarball to all 4 platform-specific C++ tarballs.
+      - name: Install uniffi-bindgen-cpp
+        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        run: cargo install uniffi-bindgen-cpp --git https://github.com/NordSecurity/uniffi-bindgen-cpp --tag v0.7.0+v0.28.3
+
+      - name: Generate C++ bindings
+        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        run: |
+          mkdir -p bindings/cpp
+          uniffi-bindgen-cpp \
+            --library target/${{ matrix.target }}/release/${{ matrix.lib }} \
+            -o bindings/cpp/
+
+      - name: Upload C++ header artifact
+        if: matrix.features == 'cpp' && matrix.rid == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: uniffi-cpp-headers
+          path: bindings/cpp/
           retention-days: 5
 
   consolidate:
@@ -82,28 +150,28 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Package version: $VERSION"
 
-      - name: Download Linux x64 artifact
+      - name: Download Linux x64 artifact (default)
         uses: actions/download-artifact@v4
         with:
-          name: uniffi-x86_64-unknown-linux-gnu
+          name: uniffi-default-x86_64-unknown-linux-gnu
           path: uniffi-all/linux-x64/
 
-      - name: Download macOS ARM64 artifact
+      - name: Download macOS ARM64 artifact (default)
         uses: actions/download-artifact@v4
         with:
-          name: uniffi-aarch64-apple-darwin
+          name: uniffi-default-aarch64-apple-darwin
           path: uniffi-all/osx-arm64/
 
-      - name: Download macOS x64 artifact
+      - name: Download macOS x64 artifact (default)
         uses: actions/download-artifact@v4
         with:
-          name: uniffi-x86_64-apple-darwin
+          name: uniffi-default-x86_64-apple-darwin
           path: uniffi-all/osx-x64/
 
-      - name: Download Windows x64 artifact
+      - name: Download Windows x64 artifact (default)
         uses: actions/download-artifact@v4
         with:
-          name: uniffi-x86_64-pc-windows-msvc
+          name: uniffi-default-x86_64-pc-windows-msvc
           path: uniffi-all/win-x64/
 
       - name: Verify consolidated structure
