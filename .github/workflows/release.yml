@@ -15,6 +15,14 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
+# Workflow-level permissions. Reusable workflows (publish-java, publish-nodejs,
+# create-release) need these to push to GitHub Packages, attest provenance,
+# and publish releases. Caller must grant at least as much as any callee asks.
+permissions:
+  contents: write   # create releases, upload assets
+  packages: write   # publish Java to GitHub Packages
+  id-token: write   # PyPI trusted publishing / npm provenance (stable path)
+
 jobs:
   # ==============================================================
   # Extract version + channel (stable / prerelease) from tag
