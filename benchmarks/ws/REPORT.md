@@ -11,20 +11,19 @@ Hardware: Apple Silicon (macOS), localhost loopback
 
 | Metric | Old SDK (`@fugle/marketdata@1.4.2`) | New SDK (Rust core) | Delta |
 |--------|-------------------------------------|---------------------|-------|
-| Throughput | 255,102 msg/s | 234,742 msg/s | **-8.0%** |
+| Throughput | 208,333 msg/s | 185,185 msg/s | **-11.1%** |
 | Latency p50 | 0 ms | 0 ms | -- |
 | Latency p99 | 1 ms | 1 ms | -- |
-| Memory delta | 10.9 MB | 9.2 MB | -16% |
-| CPU user | 207 ms | 304 ms | +47% |
+| CPU user | 74 ms | 71 ms | -4% |
 
 ### Python
 
 | Metric | Old SDK (`fugle-marketdata@2.4.1`) | New SDK (Rust core) | Delta |
 |--------|-------------------------------------|---------------------|-------|
-| Throughput | 25,445 msg/s | 100,000 msg/s | **+293%** |
-| Latency p50 | 186 ms | 19 ms | **-90%** |
-| Latency p99 | 372 ms | 58 ms | **-84%** |
-| CPU user | 1,091 ms | 205 ms | -81% |
+| Throughput | 25,906 msg/s | 104,166 msg/s | **+302%** |
+| Latency p50 | 182 ms | 18 ms | **-90%** |
+| Latency p99 | 366 ms | 55 ms | **-85%** |
+| CPU user | 1,032 ms | 199 ms | -81% |
 
 ### C# (.NET 8)
 
@@ -32,10 +31,10 @@ No legacy C# SDK exists, so results are absolute (cross-language comparison only
 
 | Metric | New SDK (Rust core / UniFFI) |
 |--------|:---------------------------:|
-| Throughput | **172,413 msg/s** |
-| Latency p50 | 3 ms |
-| Latency p99 | 6 ms |
-| CPU user | 88 ms |
+| Throughput | **175,438 msg/s** |
+| Latency p50 | 2 ms |
+| Latency p99 | 4 ms |
+| CPU user | 92 ms |
 
 ### Go
 
@@ -43,10 +42,10 @@ No legacy Go SDK exists, so results are absolute (cross-language comparison only
 
 | Metric | New SDK (Rust core / UniFFI) |
 |--------|:---------------------------:|
-| Throughput | **161,290 msg/s** |
+| Throughput | **158,730 msg/s** |
 | Latency p50 | 4 ms |
-| Latency p99 | 10 ms |
-| CPU user | 84 ms |
+| Latency p99 | 11 ms |
+| CPU user | 86 ms |
 
 ### Java (JDK 21)
 
@@ -54,19 +53,19 @@ No legacy Java SDK exists, so results are absolute (cross-language comparison on
 
 | Metric | New SDK (Rust core / UniFFI+JNA) |
 |--------|:-------------------------------:|
-| Throughput | **20,833 msg/s** |
-| Latency p50 | 336 ms |
-| Latency p99 | 517 ms |
-| CPU user | 93 ms |
+| Throughput | **21,097 msg/s** |
+| Latency p50 | 339 ms |
+| Latency p99 | 512 ms |
+| CPU user | 98 ms |
 
 ### Cross-Language Comparison (New Rust-core SDK only)
 
 | Metric | JS (napi-rs) | C# (UniFFI) | Go (UniFFI) | Python (PyO3) | Java (UniFFI+JNA) |
 |--------|:------------:|:-----------:|:-----------:|:-------------:|:-----------------:|
-| Throughput | 234,742 msg/s | 172,413 msg/s | 161,290 msg/s | 100,000 msg/s | 20,833 msg/s |
-| Latency p50 | 0 ms | 3 ms | 4 ms | 19 ms | 336 ms |
-| Latency p99 | 1 ms | 6 ms | 10 ms | 58 ms | 517 ms |
-| CPU user | 304 ms | 88 ms | 84 ms | 205 ms | 93 ms |
+| Throughput | 185,185 msg/s | 175,438 msg/s | 158,730 msg/s | 104,166 msg/s | 21,097 msg/s |
+| Latency p50 | 0 ms | 2 ms | 4 ms | 18 ms | 339 ms |
+| Latency p99 | 1 ms | 4 ms | 11 ms | 55 ms | 512 ms |
+| CPU user | 71 ms | 92 ms | 86 ms | 199 ms | 98 ms |
 
 ## Key Takeaways
 
