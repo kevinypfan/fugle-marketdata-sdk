@@ -31,7 +31,14 @@ csharp-release:
 	cargo build -p marketdata-uniffi --release
 
 # Generate all bindings (C#, Go, and Java)
-gen-bindings: gen-csharp gen-go gen-java
+gen-bindings: gen-csharp gen-go gen-java gen-cpp
+
+# Generate C++ bindings from UniFFI (requires cpp feature to strip async methods)
+gen-cpp:
+	cargo build -p marketdata-uniffi --features cpp --release
+	mkdir -p bindings/cpp
+	uniffi-bindgen-cpp --library target/release/libmarketdata_uniffi.dylib -o bindings/cpp/
+	@echo "C++ bindings generated successfully (sync-only API)"
 
 # Generate C# bindings from UniFFI (library mode - proc-macro approach)
 # Post-processes generated file to make types public for consumer access

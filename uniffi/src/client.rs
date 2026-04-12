@@ -116,6 +116,7 @@ impl StockIntradayClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl StockIntradayClient {
     // ========== Async Methods (Primary) ==========
@@ -275,6 +276,7 @@ impl StockHistoricalClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl StockHistoricalClient {
     // ========== Async Methods (Primary) ==========
@@ -357,6 +359,7 @@ impl StockSnapshotClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl StockSnapshotClient {
     // ========== Async Methods (Primary) ==========
@@ -475,6 +478,7 @@ impl StockTechnicalClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl StockTechnicalClient {
     // ========== Async Methods (Primary) ==========
@@ -661,6 +665,7 @@ impl StockCorporateActionsClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl StockCorporateActionsClient {
     // ========== Async Methods (Primary) ==========
@@ -791,6 +796,7 @@ impl FutOptIntradayClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl FutOptIntradayClient {
     // ========== Async Methods (Primary) ==========
@@ -984,6 +990,7 @@ impl FutOptHistoricalClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl FutOptHistoricalClient {
     // ========== Async Methods (Primary) ==========

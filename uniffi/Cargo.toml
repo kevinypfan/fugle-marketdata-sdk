@@ -31,6 +31,11 @@ thiserror = { workspace = true }
 # Async runtime for blocking operations
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 
+[features]
+# Enable this feature to exclude async methods for uniffi-bindgen-cpp compatibility.
+# C++ bindgen does not support async functions, so this strips them and keeps sync-only API.
+cpp = []
+
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
 

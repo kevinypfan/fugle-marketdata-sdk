@@ -269,17 +269,37 @@ impl WebSocketClient {
     }
 }
 
+#[cfg(not(feature = "cpp"))]
 #[uniffi::export(async_runtime = "tokio")]
 impl WebSocketClient {
-    /// Connect to the WebSocket server
-    ///
-    /// Establishes connection, authenticates, and starts a background task
-    /// to forward messages to the listener.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if connection or authentication fails.
     pub async fn connect(&self) -> Result<(), MarketDataError> {
+        self.connect_impl().await
+    }
+
+    pub async fn subscribe(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+        self.subscribe_impl(channel, symbol).await
+    }
+
+    pub async fn unsubscribe(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+        self.unsubscribe_impl(channel, symbol).await
+    }
+
+    pub async fn ping(&self, state: Option<String>) -> Result<(), MarketDataError> {
+        self.ping_impl(state).await
+    }
+
+    pub async fn query_subscriptions(&self) -> Result<(), MarketDataError> {
+        self.query_subscriptions_impl().await
+    }
+
+    pub async fn disconnect(&self) {
+        self.disconnect_impl().await
+    }
+}
+
+impl WebSocketClient {
+    /// Connect to the WebSocket server (implementation).
+    async fn connect_impl(&self) -> Result<(), MarketDataError> {
         // Create auth request
         let auth = AuthRequest::with_api_key(&self.api_key);
 
@@ -423,7 +443,7 @@ impl WebSocketClient {
     /// # Errors
     ///
     /// Returns error if not connected or subscription fails.
-    pub async fn subscribe(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+    async fn subscribe_impl(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
             use marketdata_core::models::{Channel, SubscribeRequest};
@@ -461,10 +481,9 @@ impl WebSocketClient {
     /// # Errors
     ///
     /// Returns error if not connected.
-    pub async fn unsubscribe(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+    async fn unsubscribe_impl(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
-            // Build key for unsubscribe
             let key = format!("{}:{}", channel, symbol);
             ws.unsubscribe(&key).await?;
             Ok(())
@@ -479,7 +498,7 @@ impl WebSocketClient {
     ///
     /// # Arguments
     /// * `state` - Optional state string echoed back in the pong response
-    pub async fn ping(&self, state: Option<String>) -> Result<(), MarketDataError> {
+    async fn ping_impl(&self, state: Option<String>) -> Result<(), MarketDataError> {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
             let request = marketdata_core::WebSocketRequest::ping(state);
@@ -492,8 +511,7 @@ impl WebSocketClient {
         }
     }
 
-    /// Query the server for current subscriptions
-    pub async fn query_subscriptions(&self) -> Result<(), MarketDataError> {
+    async fn query_subscriptions_impl(&self) -> Result<(), MarketDataError> {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
             let request = marketdata_core::WebSocketRequest::subscriptions();
@@ -506,10 +524,7 @@ impl WebSocketClient {
         }
     }
 
-    /// Disconnect from the WebSocket server
-    ///
-    /// Gracefully closes the connection and stops the message forwarding task.
-    pub async fn disconnect(&self) {
+    async fn disconnect_impl(&self) {
         // Signal shutdown to message loop
         self.shutdown.store(true, Ordering::SeqCst);
 
@@ -524,6 +539,55 @@ impl WebSocketClient {
 
         // Notify listener
         self.listener.on_disconnected();
+    }
+}
+
+/// Sync (blocking) wrappers for C++ compatibility.
+/// When the `cpp` feature is enabled, async methods are stripped and only these remain.
+#[cfg(feature = "cpp")]
+#[uniffi::export]
+impl WebSocketClient {
+    /// Connect to the WebSocket server (blocking).
+    pub fn connect_sync(&self) -> Result<(), MarketDataError> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
+        rt.block_on(self.connect_impl())
+    }
+
+    /// Subscribe to a channel for a symbol (blocking).
+    pub fn subscribe_sync(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
+        rt.block_on(self.subscribe_impl(channel, symbol))
+    }
+
+    /// Unsubscribe from a channel for a symbol (blocking).
+    pub fn unsubscribe_sync(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
+        rt.block_on(self.unsubscribe_impl(channel, symbol))
+    }
+
+    /// Send a ping message (blocking).
+    pub fn ping_sync(&self, state: Option<String>) -> Result<(), MarketDataError> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
+        rt.block_on(self.ping_impl(state))
+    }
+
+    /// Query server subscriptions (blocking).
+    pub fn query_subscriptions_sync(&self) -> Result<(), MarketDataError> {
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| MarketDataError::Other { msg: e.to_string() })?;
+        rt.block_on(self.query_subscriptions_impl())
+    }
+
+    /// Disconnect from the WebSocket server (blocking).
+    pub fn disconnect_sync(&self) {
+        let rt = tokio::runtime::Runtime::new().ok();
+        if let Some(rt) = rt {
+            rt.block_on(self.disconnect_impl());
+        }
     }
 }
 
