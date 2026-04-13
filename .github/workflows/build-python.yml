@@ -34,13 +34,24 @@ jobs:
           - os: ubuntu-latest
             target: x86_64
             manylinux: 'off'
-          # Linux aarch64 (ARM64 via QEMU cross-compilation)
-          - os: ubuntu-latest
+          # Linux aarch64 — native arm64 runner (ubuntu-24.04-arm, free for
+          # public repos since 2025). Native compilation, no docker/QEMU.
+          # Previously used x86_64 runner + QEMU cross-compile, which
+          # triggered `docker exit 1` in maturin-action regardless of the
+          # `manylinux: 'off'` setting.
+          - os: ubuntu-24.04-arm
             target: aarch64
             manylinux: 'off'
-          # macOS universal2 (Intel + Apple Silicon)
-          - os: macos-latest
-            target: universal2
+          # macOS Intel — native x86_64 runner. Previously used a single
+          # `macos-latest + target: universal2` entry which sporadically
+          # failed at `upload-artifact` with ENOTFOUND on the oversized
+          # fat binary. Two native-arch entries are smaller, faster, and
+          # independently resilient.
+          - os: macos-13
+            target: x86_64
+          # macOS Apple Silicon — native arm64 runner
+          - os: macos-14
+            target: aarch64
           # Windows x64
           - os: windows-latest
             target: x64
