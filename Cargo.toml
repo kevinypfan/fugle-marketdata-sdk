@@ -3,7 +3,7 @@ members = ["core", "py", "js", "uniffi"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0-rc.4"
+version = "0.2.0-rc.5"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/fugle/fugle-marketdata-sdk"
@@ -27,7 +27,7 @@ futures-util = "0.3"
 url = "2.5"
 
 # Python binding dependencies
-pyo3 = { version = "0.27", features = ["extension-module"] }
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py38"] }
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
 
 # Node.js binding dependencies (pinned for Rust 1.87 compatibility: napi 3.4 MSRV=1.82)
