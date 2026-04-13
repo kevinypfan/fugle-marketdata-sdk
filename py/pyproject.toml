@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "fugle-marketdata"
-version = "0.2.0-rc.5"
+version = "0.3.0-dev"
 description = "Python bindings for Fugle marketdata-core"
 requires-python = ">=3.8"
 classifiers = [
