@@ -1,19 +1,6 @@
 name: Performance Benchmarks
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/**'
-      - 'py/**'
-      - 'js/**'
-      - '.github/workflows/benchmark.yml'
-  pull_request:
-    paths:
-      - 'core/**'
-      - 'py/**'
-      - 'js/**'
-      - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
 env:

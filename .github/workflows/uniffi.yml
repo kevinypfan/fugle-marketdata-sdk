@@ -1,18 +1,6 @@
 name: UniFFI Bindings
 
 on:
-  push:
-    paths:
-      - 'uniffi/**'
-      - 'core/**'
-      - 'bindings/**'
-      - '.github/workflows/uniffi.yml'
-  pull_request:
-    paths:
-      - 'uniffi/**'
-      - 'core/**'
-      - 'bindings/**'
-      - '.github/workflows/uniffi.yml'
   workflow_dispatch:
 
 env:

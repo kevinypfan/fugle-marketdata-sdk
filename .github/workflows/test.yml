@@ -1,16 +1,6 @@
 name: Test All Bindings
 
 on:
-  pull_request:
-    paths:
-      - 'core/**'
-      - 'py/**'
-      - 'js/**'
-      - 'uniffi/**'
-      - 'bindings/**'
-      - '.github/workflows/test.yml'
-  push:
-    branches: [main]
   workflow_dispatch:
 
 env:

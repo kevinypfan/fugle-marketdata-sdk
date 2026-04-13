@@ -1,18 +1,6 @@
 name: Java Bindings
 
 on:
-  push:
-    paths:
-      - 'uniffi/**'
-      - 'core/**'
-      - 'bindings/java/**'
-      - '.github/workflows/java.yml'
-  pull_request:
-    paths:
-      - 'uniffi/**'
-      - 'core/**'
-      - 'bindings/java/**'
-      - '.github/workflows/java.yml'
   workflow_dispatch:
 
 env:
