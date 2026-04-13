@@ -75,7 +75,7 @@ jobs:
         run: |
           gh release download "$TAG" \
             --repo "${{ github.repository }}" \
-            --pattern 'fugle_marketdata-*-manylinux*x86_64.whl' \
+            --pattern 'fugle_marketdata-*-linux_x86_64.whl' \
             --dir ./wheels
 
       - name: Install wheel
@@ -85,10 +85,11 @@ jobs:
       - name: Import + construct client
         run: |
           python -c "
-          from fugle_marketdata import RestClient
+          from marketdata_py import RestClient, MarketDataError
           client = RestClient(api_key='smoke-test-token')
           assert hasattr(client, 'stock'), 'missing stock accessor'
           assert hasattr(client, 'futopt'), 'missing futopt accessor'
+          assert MarketDataError is not None
           print('OK: Python binding packaging verified')
           "
 

@@ -48,13 +48,22 @@ pip install "https://github.com/kevinypfan/fugle-marketdata-sdk/releases/downloa
 > `0.2.0rc1` in the wheel filename. Always copy the exact filename from the
 > Release page; don't construct it by hand.
 
-Smoke test:
+Smoke test (canonical example from `py/README.md`):
 
 ```python
-from fugle_marketdata import RestClient
-client = RestClient(api_key="YOUR_TOKEN")
-print(client.stock.intraday.quote("2330"))
+from marketdata_py import RestClient, MarketDataError
+
+client = RestClient(api_key="your-api-key")
+
+quote = client.stock.intraday.quote("2330")
+print(f"TSMC Price: {quote['closePrice']}")
+print(f"Change: {quote['change']}")
+print(f"Volume: {quote['total']['tradeVolume']}")
 ```
+
+> The Python import name is `marketdata_py` (the cdylib module name), not
+> `fugle_marketdata` (the pip distribution name). `MarketDataError` is the
+> primary exception class; `FugleAPIError` is kept as a legacy alias.
 
 ---
 
