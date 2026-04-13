@@ -42,16 +42,19 @@ jobs:
           - os: ubuntu-24.04-arm
             target: aarch64
             manylinux: 'off'
-          # macOS Intel — native x86_64 runner. Previously used a single
-          # `macos-latest + target: universal2` entry which sporadically
-          # failed at `upload-artifact` with ENOTFOUND on the oversized
-          # fat binary. Two native-arch entries are smaller, faster, and
-          # independently resilient.
-          - os: macos-13
-            target: x86_64
-          # macOS Apple Silicon — native arm64 runner
+          # macOS Intel — cross-compiled on Apple Silicon runner. The
+          # dedicated `macos-13` Intel runner pool is scarce in GitHub's
+          # hosted fleet and sporadically auto-cancels queued jobs before
+          # they can allocate. Apple's clang toolchain on arm64 supports
+          # targeting x86_64-apple-darwin natively (no emulation, just
+          # linker flags), so we run both mac builds on a single
+          # macos-14 runner with explicit target triples. Same strategy
+          # build-nodejs.yml uses.
           - os: macos-14
-            target: aarch64
+            target: x86_64-apple-darwin
+          # macOS Apple Silicon — native arm64 on the same runner pool
+          - os: macos-14
+            target: aarch64-apple-darwin
           # Windows x64
           - os: windows-latest
             target: x64
