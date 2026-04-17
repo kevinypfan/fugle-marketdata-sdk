@@ -339,7 +339,7 @@ pub struct IntradayCandle {
     pub close: f64,
     pub volume: i64,
     pub average: Option<f64>,
-    pub time: i64,
+    pub date: String,
 }
 
 impl From<core::IntradayCandle> for IntradayCandle {
@@ -351,7 +351,7 @@ impl From<core::IntradayCandle> for IntradayCandle {
             close: c.close,
             volume: c.volume,
             average: c.average,
-            time: c.time,
+            date: c.date,
         }
     }
 }

@@ -58,7 +58,7 @@ fn main() -> Result<(), marketdata_core::MarketDataError> {
     println!("   Total candles: {}", candles.data.len());
     if let Some(first) = candles.data.first() {
         println!("   First candle:");
-        println!("      Time: {}", first.time);
+        println!("      Date: {}", first.date);
         println!("      Open: {}", first.open);
         println!("      High: {}", first.high);
         println!("      Low: {}", first.low);

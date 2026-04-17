@@ -25,8 +25,8 @@ pub struct IntradayCandle {
     /// Average price (VWAP for the candle period)
     pub average: Option<f64>,
 
-    /// Candle timestamp (Unix milliseconds)
-    pub time: i64,
+    /// Candle timestamp (ISO 8601 with timezone, e.g. "2026-04-17T09:00:00.000+08:00")
+    pub date: String,
 }
 
 impl IntradayCandle {
@@ -217,7 +217,7 @@ mod tests {
             "close": 583.0,
             "volume": 10000,
             "average": 581.5,
-            "time": 1705287000000
+            "date": "2024-01-15T09:00:00.000+08:00"
         }"#;
         let candle: IntradayCandle = serde_json::from_str(json).unwrap();
         assert_eq!(candle.open, 580.0);
@@ -236,8 +236,8 @@ mod tests {
             "symbol": "2330",
             "timeframe": "5",
             "data": [
-                {"open": 580.0, "high": 582.0, "low": 579.0, "close": 581.0, "volume": 5000, "time": 1705287000000},
-                {"open": 581.0, "high": 585.0, "low": 580.0, "close": 584.0, "volume": 8000, "time": 1705287300000}
+                {"open": 580.0, "high": 582.0, "low": 579.0, "close": 581.0, "volume": 5000, "date": "2024-01-15T09:00:00.000+08:00"},
+                {"open": 581.0, "high": 585.0, "low": 580.0, "close": 584.0, "volume": 8000, "date": "2024-01-15T09:05:00.000+08:00"}
             ]
         }"#;
 
@@ -296,7 +296,7 @@ mod tests {
             close: 104.0,
             volume: 1000,
             average: None,
-            time: 0,
+            date: String::new(),
         };
         assert!(bullish.is_bullish());
         assert_eq!(bullish.body(), 4.0);
@@ -311,7 +311,7 @@ mod tests {
             close: 100.0,
             volume: 1000,
             average: None,
-            time: 0,
+            date: String::new(),
         };
         assert!(bearish.is_bearish());
         assert_eq!(bearish.body(), 4.0);
