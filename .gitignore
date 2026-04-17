@@ -127,6 +127,9 @@ fugle-marketdata-python/
 # Serena MCP cache
 .serena/
 
+# Claude Code session / task state — machine-specific, never commit
+.claude/
+
 # Ad-hoc developer scratch files (not part of the test suite)
 js/test_dummy.js
 py/test_1.py
