@@ -69,39 +69,42 @@ function ensureSymbol(symbols: Record<string, SymbolState>, symbol: string): Sym
   return s
 }
 
+function inferDirection(
+  price: number,
+  bid?: number,
+  ask?: number,
+  prevPrice?: number,
+): -1 | 0 | 1 {
+  if (bid !== undefined && ask !== undefined) {
+    if (price >= ask) return 1
+    if (price <= bid) return -1
+  }
+  if (prevPrice !== undefined) {
+    if (price > prevPrice) return 1
+    if (price < prevPrice) return -1
+  }
+  return 0
+}
+
 function tickFromStream(t: StreamTrade, time: number, prevPrice?: number): Tick {
-  let direction: -1 | 0 | 1 = 0
-  if (t.bid !== undefined && t.ask !== undefined) {
-    if (t.price >= t.ask) direction = 1
-    else if (t.price <= t.bid) direction = -1
-  }
-  if (direction === 0 && prevPrice !== undefined) {
-    if (t.price > prevPrice) direction = 1
-    else if (t.price < prevPrice) direction = -1
-  }
   return {
     price: t.price,
     size: t.size,
     bid: t.bid,
     ask: t.ask,
     time,
-    direction,
+    direction: inferDirection(t.price, t.bid, t.ask, prevPrice),
   }
 }
 
 function tickFromRest(t: Trade): Tick {
-  let direction: -1 | 0 | 1 = 0
-  if (t.bid !== undefined && t.ask !== undefined) {
-    if (t.price >= t.ask) direction = 1
-    else if (t.price <= t.bid) direction = -1
-  }
   return {
     price: t.price,
     size: t.size,
     bid: t.bid,
     ask: t.ask,
     time: Math.floor(t.time / 1000),
-    direction,
+    direction: inferDirection(t.price, t.bid, t.ask),
   }
 }
 
@@ -177,6 +180,12 @@ export const useAppStore = create<AppStore>()(
 
       applyConn: (s) =>
         set((state) => {
+          if (
+            state.conn?.state === s.state &&
+            JSON.stringify(state.conn) === JSON.stringify(s)
+          ) {
+            return
+          }
           state.conn = s
         }),
 
@@ -196,14 +205,6 @@ export const useAppStore = create<AppStore>()(
               case 'Aggregate': {
                 const s = ensureSymbol(state.symbols, ev.symbol)
                 s.agg = ev
-                if (ev.bids?.length || ev.asks?.length) {
-                  s.book = {
-                    symbol: ev.symbol,
-                    bids: ev.bids ?? [],
-                    asks: ev.asks ?? [],
-                    time: ev.time,
-                  }
-                }
                 break
               }
               case 'BookSnap': {
@@ -214,13 +215,15 @@ export const useAppStore = create<AppStore>()(
               case 'TradeTick': {
                 const s = ensureSymbol(state.symbols, ev.symbol)
                 const time = ev.time ? Math.floor(ev.time / 1000) : Date.now()
+                const newest: Tick[] = []
                 let last = s.tape[0]?.price
                 for (const t of ev.trades) {
-                  const tick = tickFromStream(t, time, last)
-                  s.tape.unshift(tick)
+                  newest.push(tickFromStream(t, time, last))
                   last = t.price
                 }
-                if (s.tape.length > TAPE_LIMIT) s.tape.length = TAPE_LIMIT
+                // ev.trades is oldest-first; tape[0] is newest, so reverse before prepending.
+                newest.reverse()
+                s.tape = newest.concat(s.tape).slice(0, TAPE_LIMIT)
                 break
               }
               case 'CandleTick':
@@ -240,15 +243,12 @@ export const useAppStore = create<AppStore>()(
       applyTradeHistory: (symbol, trades) =>
         set((state) => {
           const s = ensureSymbol(state.symbols, symbol)
-          // REST returns newest-first with epoch microseconds; same shape as tape.
           s.tape = trades.slice(0, TAPE_LIMIT).map(tickFromRest)
         }),
 
       applyQuote: (symbol, q) =>
         set((state) => {
           const s = ensureSymbol(state.symbols, symbol)
-          // Quote is the off-hours equivalent of the WS Aggregate stream:
-          // populates depth, last price, and OHLC even when WS is silent.
           s.book = { symbol, bids: q.bids ?? [], asks: q.asks ?? [] }
           s.agg = {
             symbol,

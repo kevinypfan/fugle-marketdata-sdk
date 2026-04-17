@@ -19,10 +19,15 @@ function pad<T>(arr: T[], n: number): (T | null)[] {
 function DepthBookImpl() {
   const selected = useAppStore((s) => s.selected)
   const book = useAppStore((s) => (selected ? s.symbols[selected]?.book : undefined))
+  const agg = useAppStore((s) => (selected ? s.symbols[selected]?.agg : undefined))
 
-  const bids = pad(book?.bids ?? [], LEVELS)
-  const asks = pad(book?.asks ?? [], LEVELS)
-  const max = Math.max(maxSize(book?.bids ?? []), maxSize(book?.asks ?? []))
+  // BookSnap channel takes priority; Aggregate carries depth on every tick.
+  const bidsSrc = book?.bids ?? agg?.bids ?? []
+  const asksSrc = book?.asks ?? agg?.asks ?? []
+
+  const bids = pad(bidsSrc, LEVELS)
+  const asks = pad(asksSrc, LEVELS)
+  const max = Math.max(maxSize(bidsSrc), maxSize(asksSrc))
 
   return (
     <div className="flex flex-col h-full bg-bg-panel">

@@ -3,9 +3,15 @@ import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../store/app'
 import { api } from '../tauri'
 import { loadPersisted, saveWatchlist } from '../persist'
+import {
+  CONN_STATE_EVENT,
+  INDICES_PREFIX,
+  MARKET_BATCH_EVENT,
+  TAIEX_SYMBOL,
+} from '../types/events'
 import type { ConnectionState, MarketEvent } from '../types/market'
 
-const TAIEX_SYMBOL = 'IX0001'
+const SAVE_DEBOUNCE_MS = 200
 let bootstrapped = false
 
 /**
@@ -19,13 +25,26 @@ export function useMarketBridge() {
     let unlistenConn: (() => void) | undefined
     let unsubWatchlist: (() => void) | undefined
     let cancelled = false
+    let saveTimer: ReturnType<typeof setTimeout> | undefined
+    let pendingSave: string[] | undefined
+
+    const flushSave = () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer)
+        saveTimer = undefined
+      }
+      if (pendingSave) {
+        void saveWatchlist(pendingSave)
+        pendingSave = undefined
+      }
+    }
 
     void (async () => {
       const [unlistenA, unlistenB] = await Promise.all([
-        listen<MarketEvent[]>('market-batch', (ev) => {
+        listen<MarketEvent[]>(MARKET_BATCH_EVENT, (ev) => {
           useAppStore.getState().applyEvents(ev.payload)
         }),
-        listen<ConnectionState>('connection-state', (ev) => {
+        listen<ConnectionState>(CONN_STATE_EVENT, (ev) => {
           useAppStore.getState().applyConn(ev.payload)
         }),
       ])
@@ -49,14 +68,17 @@ export function useMarketBridge() {
         }
       }
 
-      // Persist watchlist on every change (post-hydrate).
+      // Persist watchlist on every change (post-hydrate), debounced so
+      // rapid drag-reorder collapses to a single disk write.
       let lastWatchlist = useAppStore.getState().watchlist
       unsubWatchlist = useAppStore.subscribe(
         (s) => s.watchlist,
         (watchlist) => {
           if (watchlist === lastWatchlist) return
           lastWatchlist = watchlist
-          void saveWatchlist(watchlist)
+          pendingSave = watchlist
+          if (saveTimer) clearTimeout(saveTimer)
+          saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
         },
       )
     })()
@@ -66,6 +88,7 @@ export function useMarketBridge() {
       unlistenBatch?.()
       unlistenConn?.()
       unsubWatchlist?.()
+      flushSave()
     }
   }, [])
 }
@@ -93,7 +116,7 @@ export async function connectAndResubscribe(apiKey: string, watchlist: string[])
 }
 
 export async function seedSymbol(symbol: string) {
-  if (symbol.startsWith('IX')) return
+  if (symbol.startsWith(INDICES_PREFIX)) return
   try {
     const [ticker, trades, quote] = await Promise.all([
       api.fetchTicker(symbol),
