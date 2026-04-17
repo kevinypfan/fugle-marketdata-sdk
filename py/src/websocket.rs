@@ -2021,6 +2021,7 @@ mod tests {
         // WebSocketClient::new requires Python bindings, test the internal child client instead
         let client = StockWebSocketClient::new(
             "test-key".to_string(),
+            None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
         );
@@ -2032,6 +2033,7 @@ mod tests {
     fn test_stock_websocket_client_creation() {
         let client = StockWebSocketClient::new(
             "test-key".to_string(),
+            None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
         );
@@ -2043,6 +2045,7 @@ mod tests {
     fn test_futopt_websocket_client_creation() {
         let client = FutOptWebSocketClient::new(
             "test-key".to_string(),
+            None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
         );
