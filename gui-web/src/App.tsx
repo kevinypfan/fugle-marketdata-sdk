@@ -3,7 +3,7 @@ import { useMarketBridge, connectAndResubscribe } from './hooks/useMarketBridge'
 import { saveApiKey } from './persist'
 import { StatusBar } from './components/StatusBar'
 import { Watchlist } from './components/Watchlist'
-import { DepthBook } from './components/DepthBook'
+import { DepthBook } from './components/depth-book/DepthBook'
 import { TradeTape } from './components/TradeTape'
 import { ChartPlaceholder } from './components/ChartPlaceholder'
 import { ApiKeyModal } from './components/ApiKeyModal'
@@ -22,11 +22,11 @@ function App() {
         <ChartPlaceholder />
       </main>
 
-      <aside className="row-span-1 col-start-3 col-end-4 grid grid-rows-[1fr_1fr] border-l border-bg-row overflow-hidden">
-        <div className="overflow-hidden border-b border-bg-row">
+      <aside className="row-span-1 col-start-3 col-end-4 flex flex-col border-l border-bg-row overflow-hidden">
+        <div className="border-b border-bg-row">
           <DepthBook />
         </div>
-        <div className="overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <TradeTape />
         </div>
       </aside>
