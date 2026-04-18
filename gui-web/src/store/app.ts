@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer'
 import type {
   AggregatesData,
   BooksData,
+  CandleDto,
   ConnectionState,
   MarketEvent,
   Quote,
@@ -11,6 +12,7 @@ import type {
   Ticker,
   Trade,
 } from '../types/market'
+import type { Timeframe } from '../types/timeframe'
 
 const TAPE_LIMIT = 200
 
@@ -30,6 +32,11 @@ export interface SymbolState {
   agg?: AggregatesData
   book?: BooksData
   tape: Tick[]
+  /** newest-last (REST sort=asc). Holds whichever timeframe caller last set. */
+  candles?: CandleDto[]
+  /** Required for streaming: SDK only pushes 1-min ticks, so CandleTick
+   *  only applies when this is '1'. */
+  candleTimeframe?: Timeframe
 }
 
 export interface AppStore {
@@ -58,6 +65,7 @@ export interface AppStore {
   applyTicker: (symbol: string, ticker: Ticker) => void
   applyTradeHistory: (symbol: string, trades: Trade[]) => void
   applyQuote: (symbol: string, quote: Quote) => void
+  setCandles: (symbol: string, candles: CandleDto[], timeframe: Timeframe) => void
 }
 
 function ensureSymbol(symbols: Record<string, SymbolState>, symbol: string): SymbolState {
@@ -226,10 +234,38 @@ export const useAppStore = create<AppStore>()(
                 s.tape = newest.concat(s.tape).slice(0, TAPE_LIMIT)
                 break
               }
-              case 'CandleTick':
-              case 'CandleHistory':
-                // chart wiring deferred to iteration 8
+              case 'CandleHistory': {
+                const s = ensureSymbol(state.symbols, ev.symbol)
+                // ev.data items share shape with CandleDto (date, OHLCV).
+                s.candles = ev.data
+                s.candleTimeframe = (ev.timeframe as Timeframe) ?? '1'
                 break
+              }
+              case 'CandleTick': {
+                const s = ensureSymbol(state.symbols, ev.symbol)
+                // SDK only streams 1-min ticks; skip when user picked a larger
+                // timeframe to avoid polluting the daily/weekly/monthly array.
+                if (s.candleTimeframe !== '1') break
+                const tick: CandleDto = {
+                  date: ev.date,
+                  open: ev.open,
+                  high: ev.high,
+                  low: ev.low,
+                  close: ev.close,
+                  volume: ev.volume,
+                }
+                if (!s.candles) {
+                  s.candles = [tick]
+                } else {
+                  const last = s.candles[s.candles.length - 1]
+                  if (last.date === tick.date) {
+                    s.candles[s.candles.length - 1] = tick
+                  } else {
+                    s.candles.push(tick)
+                  }
+                }
+                break
+              }
             }
           }
         }),
@@ -261,6 +297,13 @@ export const useAppStore = create<AppStore>()(
             asks: q.asks,
             total: q.total,
           }
+        }),
+
+      setCandles: (symbol, candles, timeframe) =>
+        set((state) => {
+          const s = ensureSymbol(state.symbols, symbol)
+          s.candles = candles
+          s.candleTimeframe = timeframe
         }),
     })),
   ),

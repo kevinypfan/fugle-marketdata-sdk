@@ -10,6 +10,7 @@ import {
   TAIEX_SYMBOL,
 } from '../types/events'
 import type { ConnectionState, MarketEvent } from '../types/market'
+import { DEFAULT_TIMEFRAME } from '../types/timeframe'
 
 const SAVE_DEBOUNCE_MS = 200
 let bootstrapped = false
@@ -130,4 +131,14 @@ export async function seedSymbol(symbol: string) {
   } catch (e) {
     console.error('seed failed', symbol, e)
   }
+
+  // Fire-and-forget: prime candles in background so switching to this symbol
+  // shows a chart without waiting. Kept out of Promise.all above so ticker/
+  // trades/quote don't block on a bulky candles payload.
+  api
+    .fetchCandles(symbol, DEFAULT_TIMEFRAME)
+    .then((candles) =>
+      useAppStore.getState().setCandles(symbol, candles, DEFAULT_TIMEFRAME),
+    )
+    .catch((e) => console.error('seed candles failed', symbol, e))
 }

@@ -5,7 +5,7 @@ import { StatusBar } from './components/StatusBar'
 import { Watchlist } from './components/Watchlist'
 import { DepthBook } from './components/depth-book/DepthBook'
 import { TradeTape } from './components/TradeTape'
-import { ChartPlaceholder } from './components/ChartPlaceholder'
+import { CandleChart } from './components/candle-chart/CandleChart'
 import { ApiKeyModal } from './components/ApiKeyModal'
 
 function App() {
@@ -19,7 +19,7 @@ function App() {
       </aside>
 
       <main className="row-span-1 col-start-2 col-end-3 min-w-0 overflow-hidden">
-        <ChartPlaceholder />
+        <CandleChart />
       </main>
 
       <aside className="row-span-1 col-start-3 col-end-4 flex flex-col border-l border-bg-row overflow-hidden">
