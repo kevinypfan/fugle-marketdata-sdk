@@ -26,28 +26,32 @@ function IndicesCellImpl({ symbol }: { symbol: string }) {
   const name = INDEX_LABEL[symbol] ?? symbol
   const hasChange = change !== undefined
 
+  const changeClass = hasChange ? toneClass : 'text-neutral-500'
+
+  // 3-column layout mirroring fugle-web: name/value stack on the left,
+  // change/percent stacked compact in the middle, sparkline spanning the
+  // full cell height on the right. Avoids the prior 2-row layout where
+  // the percent got pushed to its own row below the chart.
   return (
-    <div className="flex-1 min-w-0 px-3 py-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex-1 min-w-0 px-3 py-1.5 flex items-stretch gap-3">
+      <div className="flex-1 min-w-0 flex flex-col justify-between">
         <span className="text-xs text-neutral-300">{name}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`font-mono text-xs ${hasChange ? toneClass : 'text-neutral-500'}`}>
-            {hasChange
-              ? `${arrow(tone)}${Math.abs(change).toFixed(2)}`
-              : '—'}
-          </span>
-          <Sparkline data={history} tone={tone} width={160} height={22} />
-        </div>
-      </div>
-      <div className="flex items-baseline justify-between gap-2">
         <span className={`font-mono text-base font-semibold ${toneClass}`}>
           {value !== undefined ? value.toFixed(2) : '—'}
         </span>
-        <span className={`font-mono text-xs ${hasChange ? toneClass : 'text-neutral-500'}`}>
+      </div>
+      <div className="shrink-0 flex flex-col justify-between items-end font-mono text-xs">
+        <span className={changeClass}>
+          {hasChange ? `${arrow(tone)}${Math.abs(change).toFixed(2)}` : '—'}
+        </span>
+        <span className={changeClass}>
           {changePct !== undefined
             ? `${arrow(tone)}${Math.abs(changePct).toFixed(2)}%`
             : '—'}
         </span>
+      </div>
+      <div className="shrink-0 flex items-center">
+        <Sparkline data={history} tone={tone} width={160} height={40} />
       </div>
     </div>
   )
