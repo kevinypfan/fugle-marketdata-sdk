@@ -34,7 +34,12 @@ impl Channel {
 }
 
 /// Subscription request for WebSocket
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// Modifier flags (`after_hours`, `intraday_odd_lot`) are preserved across
+/// reconnection so a 盤後 or 盤中零股 subscription comes back as the same
+/// session — previous design stored only `{channel, symbol}` which silently
+/// downgraded on resubscribe.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct SubscribeRequest {
     /// Channel to subscribe to
     pub channel: String,
@@ -42,6 +47,16 @@ pub struct SubscribeRequest {
     /// Stock symbol (optional for some channels)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
+
+    /// FutOpt after-hours session flag. Sent as `afterHours: true` on wire
+    /// when set; absent otherwise so stock path serializes unchanged.
+    #[serde(rename = "afterHours", skip_serializing_if = "Option::is_none")]
+    pub after_hours: Option<bool>,
+
+    /// Stock intraday odd-lot flag. Sent as `intradayOddLot: true` on wire
+    /// when set; absent otherwise.
+    #[serde(rename = "intradayOddLot", skip_serializing_if = "Option::is_none")]
+    pub intraday_odd_lot: Option<bool>,
 }
 
 impl SubscribeRequest {
@@ -50,6 +65,7 @@ impl SubscribeRequest {
         Self {
             channel: channel.as_str().to_string(),
             symbol: Some(symbol.into()),
+            ..Default::default()
         }
     }
 
@@ -73,11 +89,23 @@ impl SubscribeRequest {
         Self::new(Channel::Aggregates, symbol)
     }
 
-    /// Generate subscription key for tracking
+    /// Generate subscription key for tracking.
+    ///
+    /// Includes modifier suffix so 盤後/零股 subscriptions occupy distinct
+    /// slots from their regular-session counterparts — the key is the
+    /// identity used by `SubscriptionManager` for reconnect, replacement,
+    /// and unsubscribe lookup.
     pub fn key(&self) -> String {
-        match &self.symbol {
+        let base = match &self.symbol {
             Some(symbol) => format!("{}:{}", self.channel, symbol),
             None => self.channel.clone(),
+        };
+        if self.after_hours == Some(true) {
+            format!("{base}:afterhours")
+        } else if self.intraday_odd_lot == Some(true) {
+            format!("{base}:oddlot")
+        } else {
+            base
         }
     }
 }
@@ -315,6 +343,47 @@ mod tests {
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"channel\":\"trades\""));
         assert!(json.contains("\"symbol\":\"2330\""));
+        // Modifier flags absent when None — stock regular-session path
+        // wire payload must stay byte-identical to pre-fix behavior.
+        assert!(!json.contains("afterHours"));
+        assert!(!json.contains("intradayOddLot"));
+    }
+
+    #[test]
+    fn test_subscribe_request_after_hours_key_and_wire() {
+        let req = SubscribeRequest {
+            channel: "trades".to_string(),
+            symbol: Some("TXF1!".to_string()),
+            after_hours: Some(true),
+            ..Default::default()
+        };
+        // Key preserves afterhours suffix → reconnect replays the correct session
+        assert_eq!(req.key(), "trades:TXF1!:afterhours");
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"afterHours\":true"));
+    }
+
+    #[test]
+    fn test_subscribe_request_oddlot_key_and_wire() {
+        let req = SubscribeRequest {
+            channel: "trades".to_string(),
+            symbol: Some("2330".to_string()),
+            intraday_odd_lot: Some(true),
+            ..Default::default()
+        };
+        assert_eq!(req.key(), "trades:2330:oddlot");
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"intradayOddLot\":true"));
+    }
+
+    #[test]
+    fn test_subscribe_request_deserialize_without_modifiers() {
+        // Legacy payloads without the new fields must still deserialize.
+        let json = r#"{"channel":"trades","symbol":"2330"}"#;
+        let req: SubscribeRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.after_hours, None);
+        assert_eq!(req.intraday_odd_lot, None);
+        assert_eq!(req.key(), "trades:2330");
     }
 
     #[test]

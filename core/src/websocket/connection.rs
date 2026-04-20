@@ -812,8 +812,15 @@ impl WebSocketClient {
         let request_str = serde_json::to_string(&request)
             .map_err(|e| MarketDataError::DeserializationError { source: e })?;
 
-        // Store subscription in manager using the key
-        self.subscriptions.subscribe_key(sub.key());
+        // Store full SubscribeRequest so reconnect's resubscribe_all replays
+        // the same modifier (oddlot) instead of silently downgrading.
+        let stored = crate::models::SubscribeRequest {
+            channel: sub.channel.as_str().to_string(),
+            symbol: Some(sub.symbol.clone()),
+            intraday_odd_lot: if sub.intraday_odd_lot { Some(true) } else { None },
+            ..Default::default()
+        };
+        self.subscriptions.subscribe(stored);
 
         // Send if connected (ignore error if not connected - will be sent on reconnect)
         let _ = self.send_text(&request_str).await;
@@ -858,6 +865,45 @@ impl WebSocketClient {
         sub: &crate::websocket::channels::StockSubscription,
     ) -> Result<(), MarketDataError> {
         // Remove from local subscription state
+        self.subscriptions.unsubscribe(&sub.key());
+        Ok(())
+    }
+
+    /// Subscribe to a FutOpt streaming channel.
+    ///
+    /// Mirrors [`subscribe_channel`](Self::subscribe_channel) but accepts a
+    /// `FutOptSubscription`, whose `to_subscribe_request` encodes the
+    /// `afterHours` flag when the regular/after-hours session is requested.
+    /// The subscription key (`"{channel}:{symbol}[:afterhours]"`) is what the
+    /// subscription manager uses to track state for reconnect and unsubscribe.
+    pub async fn subscribe_futopt_channel(
+        &self,
+        sub: crate::websocket::channels::FutOptSubscription,
+    ) -> Result<(), MarketDataError> {
+        if self.is_closed().await {
+            return Err(MarketDataError::ClientClosed);
+        }
+        let request = sub.to_subscribe_request();
+        let request_str = serde_json::to_string(&request)
+            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+        // Store full SubscribeRequest so reconnect's resubscribe_all replays
+        // the afterHours flag — previous subscribe_key path dropped it.
+        let stored = crate::models::SubscribeRequest {
+            channel: sub.channel.as_str().to_string(),
+            symbol: Some(sub.symbol.clone()),
+            after_hours: if sub.after_hours { Some(true) } else { None },
+            ..Default::default()
+        };
+        self.subscriptions.subscribe(stored);
+        let _ = self.send_text(&request_str).await;
+        Ok(())
+    }
+
+    /// Unsubscribe a FutOpt streaming channel from local state.
+    pub async fn unsubscribe_futopt_channel(
+        &self,
+        sub: &crate::websocket::channels::FutOptSubscription,
+    ) -> Result<(), MarketDataError> {
         self.subscriptions.unsubscribe(&sub.key());
         Ok(())
     }

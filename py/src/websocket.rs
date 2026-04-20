@@ -1772,17 +1772,12 @@ impl FutOptWebSocketClient {
         })?;
 
         for sym in target_symbols {
-            // Construct via FutOptSubscription so the after_hours flag is honored
-            let _sub = marketdata_core::FutOptSubscription::new(ch, &sym)
-                .with_after_hours(effective_after_hours);
-
-            // TODO: Add afterHours support to SubscribeRequest in marketdata-core.
-            // For now, send a plain SubscribeRequest (after_hours flag is constructed
-            // above for parity with the stock side and future wiring).
             let request = marketdata_core::WebSocketRequest::subscribe(
                 marketdata_core::SubscribeRequest {
                     channel: ch.as_str().to_string(),
                     symbol: Some(sym.clone()),
+                    after_hours: if effective_after_hours { Some(true) } else { None },
+                    ..Default::default()
                 },
             );
 

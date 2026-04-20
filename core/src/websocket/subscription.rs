@@ -76,25 +76,6 @@ impl SubscriptionManager {
         subs.clear();
     }
 
-    /// Subscribe by key only (for StockSubscription support)
-    ///
-    /// Used when subscription info is tracked externally.
-    pub fn subscribe_key(&self, key: String) {
-        // Create a minimal SubscribeRequest for tracking
-        // The actual subscription details are handled by StockSubscription
-        let parts: Vec<&str> = key.split(':').collect();
-        if parts.len() >= 2 {
-            let channel = parts[0];
-            let symbol = parts[1];
-            let req = SubscribeRequest {
-                channel: channel.to_string(),
-                symbol: Some(symbol.to_string()),
-            };
-            let mut subs = self.subscriptions.write().unwrap();
-            subs.insert(key, req);
-        }
-    }
-
     /// Get all subscription keys
     pub fn keys(&self) -> Vec<String> {
         let subs = self.subscriptions.read().unwrap();
