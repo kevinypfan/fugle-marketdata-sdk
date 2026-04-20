@@ -1,6 +1,6 @@
 [package]
 name = "marketdata-gui-tauri"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fugle Marketdata desktop GUI"
 authors = ["Fugle Team"]
 license = "MIT"

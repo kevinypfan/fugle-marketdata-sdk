@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-gui-tauri"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "log",
  "marketdata-core",
