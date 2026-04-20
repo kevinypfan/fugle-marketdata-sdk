@@ -899,12 +899,33 @@ impl WebSocketClient {
         Ok(())
     }
 
-    /// Unsubscribe a FutOpt streaming channel from local state.
+    /// Unsubscribe a FutOpt streaming channel.
+    ///
+    /// Removes from local state AND sends an unsubscribe message to the
+    /// server so it stops streaming. Previously this only cleared the local
+    /// map, which left the server pushing data after a session switch — the
+    /// client would then subscribe the new session on top of the still-live
+    /// old session, and both feeds would flow into the UI simultaneously.
     pub async fn unsubscribe_futopt_channel(
         &self,
         sub: &crate::websocket::channels::FutOptSubscription,
     ) -> Result<(), MarketDataError> {
-        self.subscriptions.unsubscribe(&sub.key());
+        if self.is_closed().await {
+            return Err(MarketDataError::ClientClosed);
+        }
+
+        let key = sub.key();
+        self.subscriptions.unsubscribe(&key);
+
+        if self.is_connected().await {
+            let unsub_msg = crate::models::WebSocketRequest::unsubscribe(
+                crate::models::UnsubscribeRequest::by_id(key),
+            );
+            let unsub_json = serde_json::to_string(&unsub_msg)
+                .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+            self.enqueue_write(unsub_json).await?;
+        }
+
         Ok(())
     }
 
@@ -1683,6 +1704,28 @@ mod tests {
         assert!(result.is_ok());
 
         // Subscription should be removed
+        assert_eq!(client.subscriptions().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_futopt_channel_removes_from_state() {
+        use crate::websocket::channels::FutOptSubscription;
+        use crate::FutOptChannel;
+
+        let config =
+            ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
+        let client = WebSocketClient::new(config);
+
+        let sub = FutOptSubscription {
+            channel: FutOptChannel::Books,
+            symbol: "TXFE6".to_string(),
+            after_hours: true,
+        };
+        let _ = client.subscribe_futopt_channel(sub.clone()).await;
+        assert_eq!(client.subscriptions().len(), 1);
+
+        let result = client.unsubscribe_futopt_channel(&sub).await;
+        assert!(result.is_ok());
         assert_eq!(client.subscriptions().len(), 0);
     }
 
