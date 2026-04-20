@@ -179,6 +179,7 @@ pub async fn fetch_futopt_trades(
     offset: Option<i32>,
     limit: Option<i32>,
     after_hours: Option<bool>,
+    is_trial: Option<bool>,
 ) -> AppResult<Vec<Trade>> {
     let api_key = state.require_api_key().await?;
     tokio::task::spawn_blocking(move || {
@@ -189,6 +190,7 @@ pub async fn fetch_futopt_trades(
             offset,
             limit,
             after_hours.unwrap_or(false),
+            is_trial,
         )
     })
     .await

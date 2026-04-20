@@ -40,6 +40,7 @@ export interface FetchFutOptTradesOptions {
   offset?: number
   limit?: number
   afterHours?: boolean
+  isTrial?: boolean
 }
 
 export const api = {

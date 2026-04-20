@@ -535,6 +535,7 @@ pub fn fetch_futopt_trades_blocking(
     offset: Option<i32>,
     limit: Option<i32>,
     after_hours: bool,
+    is_trial: Option<bool>,
 ) -> AppResult<Vec<Trade>> {
     let rest = build_rest(api_key, rest_base_url);
     let futopt = rest.futopt();
@@ -548,6 +549,9 @@ pub fn fetch_futopt_trades_blocking(
     }
     if after_hours {
         builder = builder.after_hours();
+    }
+    if let Some(t) = is_trial {
+        builder = builder.is_trial(t);
     }
     let resp = builder.send()?;
     Ok(resp.data)

@@ -51,12 +51,25 @@ function TradeTapeImpl() {
   // Fetch trial snapshot on toggle ON / symbol change while in trial mode.
   // Static seed (no live stream): WS has no per-trade `isTrial` flag. The user
   // can paginate deeper via load-more the same way they do for regular trades.
+  // Deps include `market` + `futoptSession` so that futopt trial refetches when
+  // the user toggles morning/afterhours session — the two sessions have
+  // independent pre-open trial windows.
   useEffect(() => {
     if (!trialMode || !selected) return
     let cancelled = false
     setLoadingTrial(true)
-    api
-      .fetchTrades(selected, restBaseUrl, { isTrial: true, limit: PAGE_SIZE })
+    const promise =
+      market === 'futopt'
+        ? api.fetchFutoptTrades(selected, restBaseUrl, {
+            isTrial: true,
+            limit: PAGE_SIZE,
+            afterHours: futoptSession === 'afterhours',
+          })
+        : api.fetchTrades(selected, restBaseUrl, {
+            isTrial: true,
+            limit: PAGE_SIZE,
+          })
+    promise
       .then((trades) => {
         if (cancelled) return
         useAppStore.getState().setTrialTape(selected, trades, PAGE_SIZE)
@@ -68,16 +81,22 @@ function TradeTapeImpl() {
     return () => {
       cancelled = true
     }
-  }, [trialMode, selected, restBaseUrl])
+  }, [trialMode, selected, restBaseUrl, market, futoptSession])
 
   async function loadMore() {
     if (!selected || loadingMore) return
     setLoadingMore(true)
     try {
-      if (market === 'futopt') {
-        // Futopt has no isTrial concept (trial toggle is hidden in this mode),
-        // so trialMode is irrelevant; always append to the regular tape. Must
-        // pass afterHours so REST returns the matching session's history.
+      if (market === 'futopt' && trialMode) {
+        const offset = (trialSeedCount ?? 0) + (trialExtraCount ?? 0)
+        const older = await api.fetchFutoptTrades(selected, restBaseUrl, {
+          isTrial: true,
+          offset,
+          limit: PAGE_SIZE,
+          afterHours: futoptSession === 'afterhours',
+        })
+        useAppStore.getState().appendOlderTrialTrades(selected, older, PAGE_SIZE)
+      } else if (market === 'futopt') {
         const offset = (tapeSeedCount ?? 0) + (tapeExtraCount ?? 0)
         const older = await api.fetchFutoptTrades(selected, restBaseUrl, {
           offset,
@@ -118,24 +137,22 @@ function TradeTapeImpl() {
       <header className="border-b border-bg-row">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-xs font-medium text-neutral-400">成交明細</span>
-          {market !== 'futopt' && (
-            <div className="flex text-[10px]">
-              <button
-                type="button"
-                onClick={() => setTrialMode(false)}
-                className={`px-2 py-0.5 border border-bg-row rounded-l ${!trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
-              >
-                一般
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrialMode(true)}
-                className={`px-2 py-0.5 border border-l-0 border-bg-row rounded-r ${trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
-              >
-                試撮
-              </button>
-            </div>
-          )}
+          <div className="flex text-[10px]">
+            <button
+              type="button"
+              onClick={() => setTrialMode(false)}
+              className={`px-2 py-0.5 border border-bg-row rounded-l ${!trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+            >
+              一般
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrialMode(true)}
+              className={`px-2 py-0.5 border border-l-0 border-bg-row rounded-r ${trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+            >
+              試撮
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-[56px_1fr_1fr_1fr_40px] gap-2 px-3 pb-1 text-[10px] text-neutral-500 font-mono">
           <span>時間</span>
