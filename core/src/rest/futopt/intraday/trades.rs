@@ -13,6 +13,7 @@ pub struct TradesRequestBuilder<'a> {
     offset: Option<i32>,
     limit: Option<i32>,
     session: Option<String>,
+    is_trial: Option<bool>,
 }
 
 impl<'a> TradesRequestBuilder<'a> {
@@ -24,6 +25,7 @@ impl<'a> TradesRequestBuilder<'a> {
             offset: None,
             limit: None,
             session: None,
+            is_trial: None,
         }
     }
 
@@ -53,6 +55,12 @@ impl<'a> TradesRequestBuilder<'a> {
         self
     }
 
+    /// Fetch trial-matching (試撮合) trades only
+    pub fn is_trial(mut self, is_trial: bool) -> Self {
+        self.is_trial = Some(is_trial);
+        self
+    }
+
     /// Execute the request and return the trades response
     pub fn send(self) -> Result<TradesResponse, MarketDataError> {
         let symbol = self.symbol.ok_or_else(|| MarketDataError::InvalidSymbol {
@@ -72,6 +80,9 @@ impl<'a> TradesRequestBuilder<'a> {
         }
         if let Some(session) = &self.session {
             query_params.push(format!("session={}", session));
+        }
+        if let Some(is_trial) = self.is_trial {
+            query_params.push(format!("isTrial={}", is_trial));
         }
 
         if !query_params.is_empty() {
@@ -137,5 +148,41 @@ mod tests {
 
         assert_eq!(builder.symbol, Some("TXFC4".to_string()));
         assert_eq!(builder.session, Some("afterhours".to_string()));
+    }
+
+    #[test]
+    fn test_trades_builder_with_is_trial() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        let builder = TradesRequestBuilder::new(&client)
+            .symbol("TXFC4")
+            .is_trial(true);
+
+        assert_eq!(builder.is_trial, Some(true));
+    }
+
+    #[test]
+    fn test_trades_builder_trial_with_pagination() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        let builder = TradesRequestBuilder::new(&client)
+            .symbol("TXFC4")
+            .offset(50)
+            .limit(100)
+            .is_trial(true);
+
+        assert_eq!(builder.offset, Some(50));
+        assert_eq!(builder.limit, Some(100));
+        assert_eq!(builder.is_trial, Some(true));
+    }
+
+    #[test]
+    fn test_trades_builder_after_hours_and_trial() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        let builder = TradesRequestBuilder::new(&client)
+            .symbol("TXFC4")
+            .after_hours()
+            .is_trial(true);
+
+        assert_eq!(builder.session, Some("afterhours".to_string()));
+        assert_eq!(builder.is_trial, Some(true));
     }
 }
