@@ -675,13 +675,21 @@ impl WebSocketClient {
             return Err(MarketDataError::ClientClosed);
         }
 
+        // Consume the server-assigned id BEFORE dropping local state, since
+        // unsubscribe() clears the id map as part of its bookkeeping.
+        let server_id = self.subscriptions.take_server_id(key);
+
         // Remove from subscription state immediately
         self.subscriptions.unsubscribe(key);
 
-        // If connected, enqueue unsubscribe message
+        // If connected, enqueue unsubscribe message. Fugle's protocol requires
+        // the server-assigned id from the `subscribed` ack, wrapped in an
+        // `ids` array. Fallback to the local key keeps the wire format valid
+        // when the ack hasn't arrived yet (race on fast sub/unsub).
         if self.is_connected().await {
+            let id = server_id.unwrap_or_else(|| key.to_string());
             let unsub_msg = WebSocketRequest::unsubscribe(
-                crate::models::UnsubscribeRequest::by_id(key.to_string()),
+                crate::models::UnsubscribeRequest::by_ids(vec![id]),
             );
             let unsub_json = serde_json::to_string(&unsub_msg)
                 .map_err(|e| MarketDataError::DeserializationError { source: e })?;
@@ -730,6 +738,11 @@ impl WebSocketClient {
     ///
     /// From CONTEXT.md: "重連後按原始訂閱順序重新訂閱"
     async fn resubscribe_all(&self) -> Result<(), MarketDataError> {
+        // Old server ids point at a dead connection — clear before replay so
+        // the fresh subscribed acks can overwrite cleanly. Without this,
+        // unsubscribe after reconnect could briefly pick up a zombie id.
+        self.subscriptions.clear_server_ids();
+
         let subs = self.subscriptions.get_all();
 
         for req in subs {
@@ -901,11 +914,10 @@ impl WebSocketClient {
 
     /// Unsubscribe a FutOpt streaming channel.
     ///
-    /// Removes from local state AND sends an unsubscribe message to the
-    /// server so it stops streaming. Previously this only cleared the local
-    /// map, which left the server pushing data after a session switch — the
-    /// client would then subscribe the new session on top of the still-live
-    /// old session, and both feeds would flow into the UI simultaneously.
+    /// Looks up the server-assigned id captured from the `subscribed` ack and
+    /// sends `{event:"unsubscribe", data:{ids:[server_id]}}` — matching the
+    /// Fugle protocol. If the ack hasn't been recorded yet (rare race), falls
+    /// back to the local key so the wire format stays valid.
     pub async fn unsubscribe_futopt_channel(
         &self,
         sub: &crate::websocket::channels::FutOptSubscription,
@@ -915,11 +927,13 @@ impl WebSocketClient {
         }
 
         let key = sub.key();
+        let server_id = self.subscriptions.take_server_id(&key);
         self.subscriptions.unsubscribe(&key);
 
         if self.is_connected().await {
+            let id = server_id.unwrap_or_else(|| key.clone());
             let unsub_msg = crate::models::WebSocketRequest::unsubscribe(
-                crate::models::UnsubscribeRequest::by_id(key),
+                crate::models::UnsubscribeRequest::by_ids(vec![id]),
             );
             let unsub_json = serde_json::to_string(&unsub_msg)
                 .map_err(|e| MarketDataError::DeserializationError { source: e })?;
