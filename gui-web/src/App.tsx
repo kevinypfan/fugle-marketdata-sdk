@@ -65,14 +65,24 @@ function App() {
 
           // Bridge short-circuits connect() while a client is live, so any
           // endpoint/key change needs a disconnect → reconnect round-trip.
-          if (store.conn && store.conn.state !== 'disconnected') {
+          // Either market alive counts — disconnect() tears down both.
+          const anyAlive =
+            (store.conn.stock && store.conn.stock.state !== 'disconnected') ||
+            (store.conn.futopt && store.conn.futopt.state !== 'disconnected')
+          if (anyAlive) {
             try {
               await api.disconnect()
             } catch (e) {
               console.warn('disconnect failed before reconnect', e)
             }
           }
-          await connectAndResubscribe(key, rest, ws, store.watchlist)
+          await connectAndResubscribe(
+            key,
+            rest,
+            ws,
+            store.stockWatchlist,
+            store.futoptWatchlist,
+          )
         }}
       />
     </div>

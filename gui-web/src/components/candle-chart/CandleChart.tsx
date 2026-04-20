@@ -51,7 +51,11 @@ const TIMEFRAME_LABEL: Record<Timeframe, string> = {
   W: '週',
   M: '月',
 }
-const TIMEFRAMES: Timeframe[] = ['1', 'D', 'W', 'M']
+const STOCK_TIMEFRAMES: Timeframe[] = ['1', 'D', 'W', 'M']
+/** FutOpt's historical daily/weekly/monthly endpoint isn't supported in this
+ *  SDK bridge — only intraday 1-min. Restricting the picker avoids empty
+ *  charts and confusing error logs on clicks. */
+const FUTOPT_TIMEFRAMES: Timeframe[] = ['1']
 
 function CandleChartImpl() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -65,6 +69,19 @@ function CandleChartImpl() {
   const candles = useAppStore((s) =>
     selected ? s.symbols[selected]?.candles : undefined,
   )
+  const selectedMarket = useAppStore((s) =>
+    selected ? s.symbols[selected]?.market : undefined,
+  )
+  const availableTimeframes =
+    selectedMarket === 'futopt' ? FUTOPT_TIMEFRAMES : STOCK_TIMEFRAMES
+
+  // If user was on D/W/M for a stock and switches to a futopt symbol, snap
+  // back to '1' — the alternative is an empty chart with a silent fetch error.
+  useEffect(() => {
+    if (!availableTimeframes.includes(timeframe)) {
+      setTimeframe('1')
+    }
+  }, [availableTimeframes, timeframe])
 
   // (1) Mount once: init + VOL pane + styles. Container is always rendered
   // (overlay pattern below) so the ref is valid on first commit.
@@ -82,21 +99,35 @@ function CandleChartImpl() {
     }
   }, [])
 
-  // (2) Fetch when symbol or timeframe changes; result lands in the store.
-  // Generation token prevents a stale response from overwriting fresh data.
+  const futoptSession = useAppStore((s) => s.futoptSession)
+
+  // (2) Fetch when symbol, timeframe, or session changes; result lands in
+  // the store. Generation token prevents a stale response from overwriting
+  // fresh data. For futopt symbols, the session flag gates which disjoint
+  // stream (日盤 vs 夜盤) REST returns — forgetting it silently overwrites
+  // the chart with the other session's candles.
   useEffect(() => {
     if (!selected || selected.startsWith(INDICES_PREFIX)) return
     const gen = ++fetchGenRef.current
     void (async () => {
       try {
-        const data = await api.fetchCandles(selected, timeframe, restBaseUrl)
+        const market = useAppStore.getState().symbols[selected]?.market ?? 'stock'
+        const data =
+          market === 'futopt'
+            ? await api.fetchFutoptCandles(
+                selected,
+                timeframe,
+                restBaseUrl,
+                futoptSession === 'afterhours',
+              )
+            : await api.fetchCandles(selected, timeframe, restBaseUrl)
         if (gen !== fetchGenRef.current) return
         useAppStore.getState().setCandles(selected, data, timeframe)
       } catch (e) {
         console.error('fetchCandles failed', selected, timeframe, e)
       }
     })()
-  }, [selected, timeframe, restBaseUrl])
+  }, [selected, timeframe, restBaseUrl, futoptSession])
 
   // (3) Sync store candles → chart. Streaming CandleTick mutates the same
   // array, so this effect also handles the live update path.
@@ -115,7 +146,7 @@ function CandleChartImpl() {
   return (
     <div className="flex flex-col h-full bg-bg-base">
       <div className="flex items-center gap-1 px-3 h-8 border-b border-bg-row text-xs">
-        {TIMEFRAMES.map((tf) => (
+        {availableTimeframes.map((tf) => (
           <button
             key={tf}
             onClick={() => setTimeframe(tf)}

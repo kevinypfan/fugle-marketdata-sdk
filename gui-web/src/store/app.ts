@@ -6,10 +6,15 @@ import type {
   BooksData,
   CandleDto,
   ConnectionState,
+  FutOptQuote,
+  FutOptTicker,
+  Market,
   MarketEvent,
+  PriceLevel,
   Quote,
   StreamTrade,
   Ticker,
+  TotalStats,
   Trade,
 } from '../types/market'
 import type { Timeframe } from '../types/timeframe'
@@ -39,7 +44,14 @@ export interface Tick {
 
 export interface SymbolState {
   symbol: string
+  /** Stored at first ingestion so UI (Watchlist tab filter, chart fetch path,
+   *  subscribe target) can route without re-deriving from symbol shape. */
+  market: Market
   ticker?: Ticker
+  /** FutOpt-specific contract metadata (expiry dates, type). Only set when
+   *  `market === 'futopt'`. Kept separate from `ticker` because its shape is
+   *  distinct enough that merging would lose information. */
+  futoptTicker?: FutOptTicker
   agg?: AggregatesData
   book?: BooksData
   tape: Tick[]
@@ -51,6 +63,12 @@ export interface SymbolState {
   tapeExtraCount?: number
   /** False once the server returns a partial page. UI hides load-more. */
   hasMoreTape?: boolean
+  /** FutOpt-only: the highest WS-level serial base (equivalent to
+   *  `floor(restSerial / 100)`) covered by the REST seed + accepted WS
+   *  TradeTicks so far. Used to drop whole WS events whose batch has
+   *  already been fully covered by REST, since one WS event carries N
+   *  trades that would otherwise all slip past a tape[0]-only check. */
+  futoptTradeSerialHigh?: number
   /** Trial-matching snapshot — independent of `tape`. No live stream (WS
    *  has no per-trade isTrial flag), but supports the same load-more
    *  pagination as `tape` via the counters below. */
@@ -70,10 +88,36 @@ export interface AppStore {
   apiKey: string | null
   restBaseUrl: string | null
   wsUrl: string | null
-  watchlist: string[]
+  /** Stock-market watchlist (legacy `watchlist` → renamed for clarity). */
+  stockWatchlist: string[]
+  /** FutOpt watchlist. Can hold either concrete month codes (`TXFD4`) or
+   *  near-month aliases the server resolves (`TXF1!`). For aliases, the
+   *  server echoes the resolved canonical symbol in WS events — we learn
+   *  that mapping in `applyFutoptTicker` and redirect via `symbolAliases`. */
+  futoptWatchlist: string[]
+  /** Canonical → user-input redirect, populated when REST ticker resolves an
+   *  alias (e.g. `TXF1!` → `TXFD4`). `applyEvents` reads this so incoming
+   *  WS events for the canonical symbol land in the user-input slot instead
+   *  of creating a parallel dead entry the UI can't see. */
+  symbolAliases: Record<string, string>
+  /** Which tab the Watchlist is currently showing. Drives filtering and
+   *  which market new "add" actions go to. Not persisted; resets to 'stock'
+   *  on launch. */
+  activeMarket: Market
+  /** Which FutOpt trading session the bridge is subscribed to right now.
+   *  Server delivers disjoint streams for 日盤 (regular) vs 夜盤 (afterhours)
+   *  — switching requires unsub all current futopt subs and resub with the
+   *  new flag, plus re-seed REST with `session=afterhours`. Defaults by the
+   *  caller based on wall-clock time. Not persisted. */
+  futoptSession: 'regular' | 'afterhours'
   selected: string | null
   symbols: Record<string, SymbolState>
-  conn: ConnectionState | null
+  /** Per-market connection state. Both markets have independent WSes so
+   *  UI can show each market's lifecycle without one overwriting the other. */
+  conn: {
+    stock: ConnectionState | null
+    futopt: ConnectionState | null
+  }
   /** Live index values, keyed by symbol (e.g. 'IX0001', 'IX0043').
    *  `history` is a rolling buffer of recent values for the sparkline and
    *  doubles as a session-reference fallback when `previousClose` is not
@@ -95,22 +139,38 @@ export interface AppStore {
     apiKey?: string | null
     restBaseUrl?: string | null
     wsUrl?: string | null
-    watchlist?: string[]
+    stockWatchlist?: string[]
+    futoptWatchlist?: string[]
   }) => void
   setApiKey: (key: string) => void
   setEndpoints: (restBaseUrl: string, wsUrl: string) => void
+  /** Switch between 股票 / 期貨 tab. Snaps `selected` to the first symbol of
+   *  the new market so the chart/tape/book follow the visible tab. */
+  setActiveMarket: (market: Market) => void
+  /** Store-only update — does not trigger WS re-subscribe. Callers (see
+   *  `useMarketBridge.applyFutoptSession`) must orchestrate the unsub/sub
+   *  switchover so the bridge state stays aligned. */
+  setFutoptSession: (session: 'regular' | 'afterhours') => void
+  /** Wipe futopt-bucket SymbolState entries + their alias mappings. Used
+   *  before a session switch so stale 日盤/夜盤 tape/book data doesn't
+   *  linger until the new seed/WS events arrive. */
+  clearFutoptSymbolData: () => void
 
   // ── watchlist
   setSelected: (symbol: string) => void
-  addToWatchlist: (symbol: string) => boolean
-  removeFromWatchlist: (symbol: string) => void
-  moveToTop: (symbol: string) => void
-  moveToBottom: (symbol: string) => void
+  /** Add to the given market's watchlist. Returns true if inserted (false if
+   *  already present). */
+  addToWatchlist: (market: Market, symbol: string) => boolean
+  removeFromWatchlist: (market: Market, symbol: string) => void
+  moveToTop: (market: Market, symbol: string) => void
+  moveToBottom: (market: Market, symbol: string) => void
 
   // ── ingestion
   applyConn: (s: ConnectionState) => void
   applyEvents: (batch: MarketEvent[]) => void
   applyTicker: (symbol: string, ticker: Ticker) => void
+  applyFutoptTicker: (symbol: string, ticker: FutOptTicker) => void
+  applyFutoptQuote: (symbol: string, quote: FutOptQuote) => void
   /** `fetchedLimit` is the `limit` passed to `fetchTrades` for the seed;
    *  drives `hasMoreTape` (full page → assume more, partial → exhausted). */
   applyTradeHistory: (symbol: string, trades: Trade[], fetchedLimit: number) => void
@@ -125,13 +185,78 @@ export interface AppStore {
   setCandles: (symbol: string, candles: CandleDto[], timeframe: Timeframe) => void
 }
 
-function ensureSymbol(symbols: Record<string, SymbolState>, symbol: string): SymbolState {
+/** Pick the FutOpt session most likely active right now in Taipei time.
+ *  日盤: 08:45–13:45, 夜盤: 15:00–05:00 (next day). Outside both windows
+ *  (13:45–15:00, weekends) default to 'regular' — a single toggle click
+ *  flips it. */
+function defaultFutoptSession(): 'regular' | 'afterhours' {
+  const now = new Date()
+  // Convert to Taipei time regardless of machine TZ. Intl.DateTimeFormat
+  // is on every browser + Tauri's webview.
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Taipei',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const [hh, mm] = fmt.format(now).split(':').map(Number)
+  const m = hh * 60 + mm
+  // 15:00 (900) .. 05:00 next day (300) wraps midnight.
+  if (m >= 15 * 60 || m < 5 * 60) return 'afterhours'
+  return 'regular'
+}
+
+function ensureSymbol(
+  symbols: Record<string, SymbolState>,
+  symbol: string,
+  market: Market,
+): SymbolState {
   let s = symbols[symbol]
   if (!s) {
-    s = { symbol, tape: [] }
+    s = { symbol, market, tape: [] }
     symbols[symbol] = s
   }
   return s
+}
+
+/** Resolve a symbol's market from store state, defaulting to 'stock' for
+ *  unknown symbols. REST seed/apply actions use this to preserve an already-
+ *  tagged market when an entry exists, without forcing every caller to thread
+ *  a market argument it doesn't know. */
+function marketOf(symbols: Record<string, SymbolState>, symbol: string): Market {
+  return symbols[symbol]?.market ?? 'stock'
+}
+
+/** Build the shared AggregatesData slot from a REST quote response. Stock and
+ *  FutOpt quotes share most fields; callers pre-map the `total` sub-shape
+ *  (FutOpt carries only `tradeVolume`). Keeping the shape in one place avoids
+ *  field-name drift between the two apply paths. */
+function buildAggFromQuote(
+  symbol: string,
+  q: {
+    lastPrice?: number
+    openPrice?: number
+    highPrice?: number
+    lowPrice?: number
+    closePrice?: number
+    previousClose?: number
+    bids?: PriceLevel[]
+    asks?: PriceLevel[]
+    total?: TotalStats
+  },
+): AggregatesData {
+  return {
+    symbol,
+    lastPrice: q.lastPrice,
+    openPrice: q.openPrice,
+    highPrice: q.highPrice,
+    lowPrice: q.lowPrice,
+    closePrice: q.closePrice,
+    previousClose: q.previousClose,
+    bids: q.bids,
+    asks: q.asks,
+    total: q.total,
+  }
 }
 
 function inferDirection(
@@ -181,10 +306,17 @@ export const useAppStore = create<AppStore>()(
       apiKey: null,
       restBaseUrl: null,
       wsUrl: null,
-      watchlist: [],
+      stockWatchlist: [],
+      futoptWatchlist: [],
+      symbolAliases: {},
+      activeMarket: 'stock',
+      // Default to the session most likely active right now in Taipei time:
+      // 日盤 8:45-13:45, 夜盤 15:00-next-day 05:00. Outside both windows
+      // (13:45-15:00, weekends) fall back to 'regular' — user can flip.
+      futoptSession: defaultFutoptSession(),
       selected: null,
       symbols: {},
-      conn: null,
+      conn: { stock: null, futopt: null },
       indices: {},
 
       hydrate: (snapshot) =>
@@ -192,11 +324,19 @@ export const useAppStore = create<AppStore>()(
           if (snapshot.apiKey !== undefined) state.apiKey = snapshot.apiKey
           if (snapshot.restBaseUrl !== undefined) state.restBaseUrl = snapshot.restBaseUrl
           if (snapshot.wsUrl !== undefined) state.wsUrl = snapshot.wsUrl
-          if (snapshot.watchlist) {
-            state.watchlist = snapshot.watchlist.slice()
-            if (!state.selected && state.watchlist.length > 0) {
-              state.selected = state.watchlist[0]
-            }
+          if (snapshot.stockWatchlist) {
+            state.stockWatchlist = snapshot.stockWatchlist.slice()
+            for (const s of state.stockWatchlist) ensureSymbol(state.symbols, s, 'stock')
+          }
+          if (snapshot.futoptWatchlist) {
+            state.futoptWatchlist = snapshot.futoptWatchlist.slice()
+            for (const s of state.futoptWatchlist) ensureSymbol(state.symbols, s, 'futopt')
+          }
+          if (!state.selected) {
+            state.selected =
+              state.activeMarket === 'stock'
+                ? (state.stockWatchlist[0] ?? state.futoptWatchlist[0] ?? null)
+                : (state.futoptWatchlist[0] ?? state.stockWatchlist[0] ?? null)
           }
         }),
 
@@ -211,17 +351,53 @@ export const useAppStore = create<AppStore>()(
           state.wsUrl = wsUrl
         }),
 
+      setActiveMarket: (market) =>
+        set((state) => {
+          if (state.activeMarket === market) return
+          state.activeMarket = market
+          // Snap selection to the new market's list so chart/tape/book follow
+          // the visible tab. Empty list → null (UI shows empty state).
+          const list = market === 'stock' ? state.stockWatchlist : state.futoptWatchlist
+          if (!state.selected || !list.includes(state.selected)) {
+            state.selected = list[0] ?? null
+          }
+        }),
+
+      setFutoptSession: (session) =>
+        set((state) => {
+          state.futoptSession = session
+        }),
+
+      clearFutoptSymbolData: () =>
+        set((state) => {
+          // Wipe futopt entries (they carry stale session data) and any alias
+          // entries pointing at them. Keeps stockWatchlist entries untouched.
+          const keys = Object.keys(state.symbols)
+          for (const k of keys) {
+            if (state.symbols[k]?.market === 'futopt') {
+              delete state.symbols[k]
+            }
+          }
+          for (const canonical of Object.keys(state.symbolAliases)) {
+            const userInput = state.symbolAliases[canonical]
+            if (state.futoptWatchlist.includes(userInput)) {
+              delete state.symbolAliases[canonical]
+            }
+          }
+        }),
+
       setSelected: (symbol) =>
         set((state) => {
           state.selected = symbol
         }),
 
-      addToWatchlist: (symbol) => {
+      addToWatchlist: (market, symbol) => {
         let added = false
         set((state) => {
-          if (!state.watchlist.includes(symbol)) {
-            state.watchlist.push(symbol)
-            ensureSymbol(state.symbols, symbol)
+          const list = market === 'stock' ? state.stockWatchlist : state.futoptWatchlist
+          if (!list.includes(symbol)) {
+            list.push(symbol)
+            ensureSymbol(state.symbols, symbol, market)
             added = true
             if (!state.selected) state.selected = symbol
           }
@@ -229,52 +405,69 @@ export const useAppStore = create<AppStore>()(
         return added
       },
 
-      removeFromWatchlist: (symbol) =>
+      removeFromWatchlist: (market, symbol) =>
         set((state) => {
-          state.watchlist = state.watchlist.filter((s) => s !== symbol)
+          if (market === 'stock') {
+            state.stockWatchlist = state.stockWatchlist.filter((s) => s !== symbol)
+          } else {
+            state.futoptWatchlist = state.futoptWatchlist.filter((s) => s !== symbol)
+          }
           delete state.symbols[symbol]
+          // Drop any alias entries that pointed to this symbol — otherwise
+          // a future subscribe using the same canonical symbol would keep
+          // redirecting to a non-existent key.
+          for (const canonical of Object.keys(state.symbolAliases)) {
+            if (state.symbolAliases[canonical] === symbol) {
+              delete state.symbolAliases[canonical]
+            }
+          }
           if (state.selected === symbol) {
-            state.selected = state.watchlist[0] ?? null
+            const list = market === 'stock' ? state.stockWatchlist : state.futoptWatchlist
+            state.selected = list[0] ?? null
           }
         }),
 
-      moveToTop: (symbol) =>
+      moveToTop: (market, symbol) =>
         set((state) => {
-          const i = state.watchlist.indexOf(symbol)
+          const list = market === 'stock' ? state.stockWatchlist : state.futoptWatchlist
+          const i = list.indexOf(symbol)
           if (i > 0) {
-            state.watchlist.splice(i, 1)
-            state.watchlist.unshift(symbol)
+            list.splice(i, 1)
+            list.unshift(symbol)
           }
         }),
 
-      moveToBottom: (symbol) =>
+      moveToBottom: (market, symbol) =>
         set((state) => {
-          const i = state.watchlist.indexOf(symbol)
-          if (i >= 0 && i < state.watchlist.length - 1) {
-            state.watchlist.splice(i, 1)
-            state.watchlist.push(symbol)
+          const list = market === 'stock' ? state.stockWatchlist : state.futoptWatchlist
+          const i = list.indexOf(symbol)
+          if (i >= 0 && i < list.length - 1) {
+            list.splice(i, 1)
+            list.push(symbol)
           }
         }),
 
       applyConn: (s) =>
         set((state) => {
+          // Route to the market's own slot so stock/futopt lifecycles are
+          // independent — previously one would clobber the other's status.
+          const prev = state.conn[s.market]
           if (
-            state.conn?.state === s.state &&
-            JSON.stringify(state.conn) === JSON.stringify(s)
+            prev?.state === s.state &&
+            JSON.stringify(prev) === JSON.stringify(s)
           ) {
             return
           }
-          state.conn = s
+          state.conn[s.market] = s
         }),
 
       applyEvents: (batch) =>
         set((state) => {
           for (const ev of batch) {
-            // TEMP debug — remove after trade tape issue resolved
-            if (ev.kind === 'TradeTick' || ev.kind === 'Indices') {
-              // eslint-disable-next-line no-console
-              console.log('[applyEvents]', ev.kind, ev)
-            }
+            // Redirect canonical-symbol events to user-input key when an
+            // alias is known (populated by applyFutoptTicker). If no alias
+            // is recorded, ev.symbol is used as-is.
+            const key = state.symbolAliases[ev.symbol] ?? ev.symbol
             switch (ev.kind) {
               case 'Indices': {
                 if (ev.index !== undefined) {
@@ -298,21 +491,52 @@ export const useAppStore = create<AppStore>()(
                 break
               }
               case 'Aggregate': {
-                const s = ensureSymbol(state.symbols, ev.symbol)
+                const s = ensureSymbol(state.symbols, key, ev.marketSource)
                 s.agg = ev
                 break
               }
               case 'BookSnap': {
-                const s = ensureSymbol(state.symbols, ev.symbol)
+                const s = ensureSymbol(state.symbols, key, ev.marketSource)
                 s.book = ev
                 break
               }
               case 'TradeTick': {
-                const s = ensureSymbol(state.symbols, ev.symbol)
+                const s = ensureSymbol(state.symbols, key, ev.marketSource)
+                // FutOpt serial dedup: REST serial = WS serial * 100 + seq.
+                // One WS event represents a whole base batch; if that base
+                // is already covered by REST seed / prior WS events, drop
+                // the entire event (not just tape[0]). Runs before the
+                // per-trade tape[0] heuristic to catch multi-trade batches.
+                if (
+                  ev.marketSource === 'futopt' &&
+                  ev.serial != null &&
+                  s.futoptTradeSerialHigh != null &&
+                  ev.serial <= s.futoptTradeSerialHigh
+                ) {
+                  break
+                }
                 const time = ev.time ? Math.floor(ev.time / 1000) : Date.now()
                 const newest: Tick[] = []
                 let last = s.tape[0]?.price
                 for (const t of ev.trades) {
+                  // Boundary dedup: the first futopt-synthesized TradeTick
+                  // after a REST seed echoes the newest seeded exec (server
+                  // reads both from the same trade record, so price/size/
+                  // ms-time line up exactly). Suppress matches against
+                  // tape[0] — O(1) guard, handles the common case without a
+                  // Set of all serials. Back-to-back identical executions
+                  // would be false-positive-suppressed, but for the user
+                  // they're visually indistinguishable anyway.
+                  if (s.tape.length > 0) {
+                    const top = s.tape[0]
+                    if (
+                      top.time === time &&
+                      top.price === t.price &&
+                      top.size === t.size
+                    ) {
+                      continue
+                    }
+                  }
                   newest.push(tickFromStream(t, time, last))
                   last = t.price
                 }
@@ -324,17 +548,25 @@ export const useAppStore = create<AppStore>()(
                 // and invalidate `tapeExtraCount`/`hasMoreTape`.
                 const cap = (s.tapeExtraCount ?? 0) > 0 ? HARD_TAPE_CEILING : TAPE_LIMIT
                 if (s.tape.length > cap) s.tape = s.tape.slice(0, cap)
+                // Advance the futopt serial high-water mark so subsequent WS
+                // events in the same base get dropped as duplicates.
+                if (ev.marketSource === 'futopt' && ev.serial != null) {
+                  s.futoptTradeSerialHigh = Math.max(
+                    s.futoptTradeSerialHigh ?? 0,
+                    ev.serial,
+                  )
+                }
                 break
               }
               case 'CandleHistory': {
-                const s = ensureSymbol(state.symbols, ev.symbol)
+                const s = ensureSymbol(state.symbols, key, ev.marketSource)
                 // ev.data items share shape with CandleDto (date, OHLCV).
                 s.candles = ev.data
                 s.candleTimeframe = (ev.timeframe as Timeframe) ?? '1'
                 break
               }
               case 'CandleTick': {
-                const s = ensureSymbol(state.symbols, ev.symbol)
+                const s = ensureSymbol(state.symbols, key, ev.marketSource)
                 // SDK only streams 1-min ticks; skip when user picked a larger
                 // timeframe to avoid polluting the daily/weekly/monthly array.
                 if (s.candleTimeframe !== '1') break
@@ -364,13 +596,60 @@ export const useAppStore = create<AppStore>()(
 
       applyTicker: (symbol, ticker) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           s.ticker = ticker
+        }),
+
+      applyFutoptTicker: (symbol, ticker) =>
+        set((state) => {
+          // Learn alias if the server resolved a near-month input into a
+          // canonical contract (e.g. TXF1! → TXFD4). WS events come back
+          // tagged with the canonical symbol — without this map, they'd
+          // create a parallel dead entry the UI never sees.
+          if (ticker.symbol && ticker.symbol !== symbol) {
+            state.symbolAliases[ticker.symbol] = symbol
+            // If WS events already landed under the canonical key before
+            // the alias was learned, fold that data into the user-input
+            // entry so DepthBook/TradeTape catch up immediately.
+            const orphan = state.symbols[ticker.symbol]
+            if (orphan) {
+              const live = ensureSymbol(state.symbols, symbol, 'futopt')
+              if (orphan.book && !live.book) live.book = orphan.book
+              if (orphan.agg && !live.agg) live.agg = orphan.agg
+              if (orphan.tape.length > 0 && live.tape.length === 0) {
+                live.tape = orphan.tape
+              }
+              delete state.symbols[ticker.symbol]
+            }
+          }
+          const s = ensureSymbol(state.symbols, symbol, 'futopt')
+          s.futoptTicker = ticker
+          // Bridge a subset into the generic `ticker` slot so WatchlistRow
+          // (which reads `ticker.name` / `ticker.previousClose`) works without
+          // branching on market.
+          s.ticker = {
+            symbol,
+            name: ticker.name,
+            market: ticker.exchange,
+            previousClose: ticker.referencePrice,
+          }
+        }),
+
+      applyFutoptQuote: (symbol, q) =>
+        set((state) => {
+          const s = ensureSymbol(state.symbols, symbol, 'futopt')
+          s.book = { symbol, bids: q.bids ?? [], asks: q.asks ?? [] }
+          s.agg = buildAggFromQuote(symbol, {
+            ...q,
+            // FutOptTotalStats only carries tradeVolume; map to the shared
+            // TotalStats shape so downstream volume readers work unchanged.
+            total: q.total ? { tradeVolume: q.total.tradeVolume, tradeValue: 0 } : undefined,
+          })
         }),
 
       applyTradeHistory: (symbol, trades, fetchedLimit) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           const sliced = trades.slice(0, TAPE_LIMIT)
           s.tape = sliced.map(tickFromRest)
           s.tapeSeedCount = sliced.length
@@ -379,11 +658,19 @@ export const useAppStore = create<AppStore>()(
           // exhausted. Compare against the actual fetched limit, not TAPE_LIMIT,
           // so this works regardless of seed page size.
           s.hasMoreTape = trades.length >= fetchedLimit
+          // FutOpt: REST trade serial = wsSerial * 100 + seq. Track the base
+          // of the newest seeded trade so incoming WS TradeTick events whose
+          // serial is <= this base are recognized as already-covered.
+          if (s.market === 'futopt') {
+            const newest = trades[0]?.serial
+            s.futoptTradeSerialHigh =
+              newest != null ? Math.floor(newest / 100) : undefined
+          }
         }),
 
       appendOlderTrades: (symbol, older, limit) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           // Boundary dedup: server pagination at offset N may overlap tape[N-1]
           // by one if a live tick landed between pages. Cheap filter via Set.
           const seenSerials = new Set<number>()
@@ -401,7 +688,7 @@ export const useAppStore = create<AppStore>()(
 
       setTrialTape: (symbol, trades, fetchedLimit) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           s.trialTape = trades.map(tickFromRest)
           s.trialSeedCount = trades.length
           s.trialExtraCount = 0
@@ -410,7 +697,7 @@ export const useAppStore = create<AppStore>()(
 
       appendOlderTrialTrades: (symbol, older, limit) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           const existing = s.trialTape ?? []
           const seenSerials = new Set<number>()
           for (const t of existing) seenSerials.add(t.serial)
@@ -424,24 +711,17 @@ export const useAppStore = create<AppStore>()(
 
       applyQuote: (symbol, q) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           s.book = { symbol, bids: q.bids ?? [], asks: q.asks ?? [] }
-          s.agg = {
-            symbol,
-            lastPrice: q.lastPrice,
-            openPrice: q.openPrice,
-            highPrice: q.highPrice,
-            lowPrice: q.lowPrice,
-            closePrice: q.closePrice,
-            bids: q.bids,
-            asks: q.asks,
-            total: q.total,
-          }
+          // Stock Quote has no previousClose; Ticker carries it separately
+          // and WatchlistRow reads from there. buildAggFromQuote leaves it
+          // undefined here, which is correct.
+          s.agg = buildAggFromQuote(symbol, q)
         }),
 
       setCandles: (symbol, candles, timeframe) =>
         set((state) => {
-          const s = ensureSymbol(state.symbols, symbol)
+          const s = ensureSymbol(state.symbols, symbol, marketOf(state.symbols, symbol))
           s.candles = candles
           s.candleTimeframe = timeframe
         }),

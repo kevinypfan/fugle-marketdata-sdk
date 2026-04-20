@@ -1,9 +1,7 @@
 import { useAppStore } from '../store/app'
+import type { ConnectionState } from '../types/market'
 
-function connLabel(conn: ReturnType<typeof useAppStore.getState>['conn']): {
-  text: string
-  color: string
-} {
+function connLabel(conn: ConnectionState | null): { text: string; color: string } {
   if (!conn) return { text: '未連線', color: 'text-neutral-500' }
   switch (conn.state) {
     case 'connecting':
@@ -24,12 +22,16 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ onOpenSettings }: StatusBarProps) {
-  const conn = useAppStore((s) => s.conn)
-  const { text, color } = connLabel(conn)
+  const stockConn = useAppStore((s) => s.conn.stock)
+  const futoptConn = useAppStore((s) => s.conn.futopt)
 
   return (
     <div className="flex items-center justify-between h-full px-3 text-xs bg-bg-panel">
-      <span className={color}>{text}</span>
+      <div className="flex items-center gap-3">
+        <MarketStatus label="股票" conn={stockConn} />
+        <span className="text-neutral-700">|</span>
+        <MarketStatus label="期貨" conn={futoptConn} />
+      </div>
       <button
         type="button"
         onClick={onOpenSettings}
@@ -39,5 +41,15 @@ export function StatusBar({ onOpenSettings }: StatusBarProps) {
         設定
       </button>
     </div>
+  )
+}
+
+function MarketStatus({ label, conn }: { label: string; conn: ConnectionState | null }) {
+  const { text, color } = connLabel(conn)
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="text-neutral-500">{label}</span>
+      <span className={color}>{text}</span>
+    </span>
   )
 }

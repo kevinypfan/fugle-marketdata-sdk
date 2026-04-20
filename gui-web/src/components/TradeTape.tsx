@@ -13,6 +13,10 @@ function fmtTime(t: number): string {
 function TradeTapeImpl() {
   const selected = useAppStore((s) => s.selected)
   const restBaseUrl = useAppStore((s) => s.restBaseUrl)
+  const market = useAppStore((s) =>
+    selected ? s.symbols[selected]?.market : undefined,
+  )
+  const futoptSession = useAppStore((s) => s.futoptSession)
   // NOTE: never allocate a fresh array inside the selector — it makes
   // useSyncExternalStore think state changed every tick and infinite-loops.
   const liveTape = useAppStore((s) =>
@@ -70,7 +74,18 @@ function TradeTapeImpl() {
     if (!selected || loadingMore) return
     setLoadingMore(true)
     try {
-      if (trialMode) {
+      if (market === 'futopt') {
+        // Futopt has no isTrial concept (trial toggle is hidden in this mode),
+        // so trialMode is irrelevant; always append to the regular tape. Must
+        // pass afterHours so REST returns the matching session's history.
+        const offset = (tapeSeedCount ?? 0) + (tapeExtraCount ?? 0)
+        const older = await api.fetchFutoptTrades(selected, restBaseUrl, {
+          offset,
+          limit: PAGE_SIZE,
+          afterHours: futoptSession === 'afterhours',
+        })
+        useAppStore.getState().appendOlderTrades(selected, older, PAGE_SIZE)
+      } else if (trialMode) {
         const offset = (trialSeedCount ?? 0) + (trialExtraCount ?? 0)
         const older = await api.fetchTrades(selected, restBaseUrl, {
           isTrial: true,
@@ -103,22 +118,24 @@ function TradeTapeImpl() {
       <header className="border-b border-bg-row">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-xs font-medium text-neutral-400">成交明細</span>
-          <div className="flex text-[10px]">
-            <button
-              type="button"
-              onClick={() => setTrialMode(false)}
-              className={`px-2 py-0.5 border border-bg-row rounded-l ${!trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
-            >
-              一般
-            </button>
-            <button
-              type="button"
-              onClick={() => setTrialMode(true)}
-              className={`px-2 py-0.5 border border-l-0 border-bg-row rounded-r ${trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
-            >
-              試撮
-            </button>
-          </div>
+          {market !== 'futopt' && (
+            <div className="flex text-[10px]">
+              <button
+                type="button"
+                onClick={() => setTrialMode(false)}
+                className={`px-2 py-0.5 border border-bg-row rounded-l ${!trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                一般
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrialMode(true)}
+                className={`px-2 py-0.5 border border-l-0 border-bg-row rounded-r ${trialMode ? 'bg-bg-row text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                試撮
+              </button>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-[56px_1fr_1fr_1fr_40px] gap-2 px-3 pb-1 text-[10px] text-neutral-500 font-mono">
           <span>時間</span>

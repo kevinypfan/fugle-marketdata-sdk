@@ -7,15 +7,20 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
+use marketdata_core::models::futopt::{FutOptChannel, FutOptQuote, FutOptTicker, Product};
+use marketdata_core::models::SubscribeRequest;
 use marketdata_core::rest::Auth;
-use marketdata_core::websocket::channels::StockSubscription;
+use marketdata_core::websocket::channels::FutOptSubscription;
 use marketdata_core::{
-    AuthRequest, Channel, ConnectionConfig, Quote, ReconnectionConfig, RestClient, Ticker, Trade,
-    WebSocketClient,
+    AuthRequest, Channel, ConnectionConfig, ReconnectionConfig, RestClient, WebSocketClient,
+    Quote, Ticker, Trade,
 };
 
 use crate::error::{AppError, AppResult};
-use crate::events::{CandleDto, ConnectionStateDto, MarketEventDto, Timeframe};
+use crate::events::{
+    CandleDto, ConnectionStateDto, Market, MarketConnectionStateDto, MarketEventDto,
+    TaggedMarketEvent, Timeframe,
+};
 
 const COALESCE_INTERVAL_MS: u64 = 16;
 pub const MARKET_BATCH_EVENT: &str = "market-batch";
@@ -25,11 +30,23 @@ pub struct AppBridge {
     inner: Mutex<BridgeInner>,
 }
 
-struct BridgeInner {
-    api_key: Option<String>,
-    client: Option<Arc<WebSocketClient>>,
+/// Per-market client + its subscription set + its pump handles. Both markets
+/// share the coalesce loop so frontend gets a single ordered stream tagged by
+/// `market`.
+struct MarketClient {
+    client: Arc<WebSocketClient>,
     subscriptions: HashSet<String>,
     pump_handles: Vec<JoinHandle<()>>,
+}
+
+struct BridgeInner {
+    api_key: Option<String>,
+    stock: Option<MarketClient>,
+    futopt: Option<MarketClient>,
+    /// Shared sender into the coalesce loop. Created on first connect, reused
+    /// by both markets. `None` when nothing is connected (coalesce loop absent).
+    event_tx: Option<UnboundedSender<TaggedMarketEvent>>,
+    coalesce_handle: Option<JoinHandle<()>>,
 }
 
 impl Default for AppBridge {
@@ -43,9 +60,10 @@ impl AppBridge {
         Self {
             inner: Mutex::new(BridgeInner {
                 api_key: None,
-                client: None,
-                subscriptions: HashSet::new(),
-                pump_handles: Vec::new(),
+                stock: None,
+                futopt: None,
+                event_tx: None,
+                coalesce_handle: None,
             }),
         }
     }
@@ -55,25 +73,48 @@ impl AppBridge {
         inner.api_key.clone().ok_or(AppError::MissingApiKey)
     }
 
-    pub async fn connect(
+    pub async fn connect_stock(
         &self,
         app: AppHandle,
         api_key: String,
         ws_url: Option<String>,
     ) -> AppResult<()> {
+        self.connect_market(app, Market::Stock, api_key, ws_url).await
+    }
+
+    pub async fn connect_futopt(
+        &self,
+        app: AppHandle,
+        api_key: String,
+        ws_url: Option<String>,
+    ) -> AppResult<()> {
+        self.connect_market(app, Market::Futopt, api_key, ws_url).await
+    }
+
+    async fn connect_market(
+        &self,
+        app: AppHandle,
+        market: Market,
+        api_key: String,
+        ws_url: Option<String>,
+    ) -> AppResult<()> {
         let mut inner = self.inner.lock().await;
 
-        if inner.client.is_some() {
-            log::info!("connect() called while already connected — skipping");
+        if inner.existing_for(market).is_some() {
+            log::info!("connect_{market:?} called while already connected — skipping");
             return Ok(());
         }
 
-        let _ = app.emit(CONN_STATE_EVENT, ConnectionStateDto::Connecting);
+        let _ = app.emit(
+            CONN_STATE_EVENT,
+            MarketConnectionStateDto { market, state: ConnectionStateDto::Connecting },
+        );
 
         let auth = AuthRequest::with_api_key(&api_key);
-        let config = match ws_url {
-            Some(u) => ConnectionConfig::new(u, auth),
-            None => ConnectionConfig::fugle_stock(auth),
+        let config = match (market, ws_url) {
+            (_, Some(u)) => ConnectionConfig::new(u, auth),
+            (Market::Stock, None) => ConnectionConfig::fugle_stock(auth),
+            (Market::Futopt, None) => ConnectionConfig::fugle_futopt(auth),
         };
         let reconnect_cfg = ReconnectionConfig::new(
             5,
@@ -84,35 +125,61 @@ impl AppBridge {
         let client = Arc::new(WebSocketClient::with_reconnection_config(config, reconnect_cfg));
 
         if let Err(e) = client.connect().await {
-            let dto = ConnectionStateDto::Failed {
-                message: e.to_string(),
-            };
-            let _ = app.emit(CONN_STATE_EVENT, dto);
+            let _ = app.emit(
+                CONN_STATE_EVENT,
+                MarketConnectionStateDto {
+                    market,
+                    state: ConnectionStateDto::Failed { message: e.to_string() },
+                },
+            );
             return Err(e.into());
         }
 
-        let _ = app.emit(CONN_STATE_EVENT, ConnectionStateDto::Connected);
+        let _ = app.emit(
+            CONN_STATE_EVENT,
+            MarketConnectionStateDto { market, state: ConnectionStateDto::Connected },
+        );
 
-        let (event_tx, event_rx) = unbounded_channel::<MarketEventDto>();
+        // Shared coalesce infra: create on first connect, reuse thereafter.
+        let tx = if let Some(tx) = &inner.event_tx {
+            tx.clone()
+        } else {
+            let (tx, rx) = unbounded_channel::<TaggedMarketEvent>();
+            let handle = spawn_coalesce_loop(app.clone(), rx);
+            inner.event_tx = Some(tx.clone());
+            inner.coalesce_handle = Some(handle);
+            tx
+        };
 
-        let msg_pump = spawn_message_pump(Arc::clone(&client), event_tx.clone());
-        let state_pump = spawn_state_pump(Arc::clone(&client), app.clone());
-        let coalesce = spawn_coalesce_loop(app.clone(), event_rx);
+        let msg_pump = spawn_message_pump(Arc::clone(&client), market, tx);
+        let state_pump = spawn_state_pump(Arc::clone(&client), market, app.clone());
 
         inner.api_key = Some(api_key);
-        inner.client = Some(client);
-        inner.pump_handles = vec![msg_pump, state_pump, coalesce];
+        let held = MarketClient {
+            client: Arc::clone(&client),
+            subscriptions: HashSet::new(),
+            pump_handles: vec![msg_pump, state_pump],
+        };
+        // Preserve subscriptions from a previous session of this market.
+        let prior_subs: Vec<String> = inner
+            .existing_for(market)
+            .map(|mc| mc.subscriptions.iter().cloned().collect())
+            .unwrap_or_default();
+        match market {
+            Market::Stock => inner.stock = Some(held),
+            Market::Futopt => inner.futopt = Some(held),
+        }
 
-        // Re-apply any subscriptions held from a previous session.
-        let to_resub: Vec<String> = inner.subscriptions.iter().cloned().collect();
-        let client = inner.client.as_ref().unwrap().clone();
         drop(inner);
-        for symbol in to_resub {
-            for ch in channels_for(&symbol) {
-                let sub = StockSubscription::new(*ch, &symbol);
-                if let Err(e) = client.subscribe_channel(sub).await {
-                    log::warn!("resubscribe {symbol} {ch:?} failed: {e}");
-                }
+        // prior_subs is only non-empty when connect_market is invoked a
+        // second time against a still-existing MarketClient — our current
+        // `connect` paths short-circuit when that slot is `Some(_)`, so this
+        // resubscribe path is effectively latent. Default `after_hours=false`
+        // for safety; once we add explicit bridge-level reconnect, the
+        // futoptSession needs to be threaded through here.
+        for symbol in prior_subs {
+            if let Err(e) = subscribe_on(&client, market, &symbol, false).await {
+                log::warn!("resubscribe {market:?} {symbol} failed: {e}");
             }
         }
 
@@ -121,41 +188,129 @@ impl AppBridge {
 
     pub async fn disconnect(&self) -> AppResult<()> {
         let mut inner = self.inner.lock().await;
-        if let Some(client) = inner.client.take() {
-            let _ = client.disconnect().await;
+        if let Some(mc) = inner.stock.take() {
+            let _ = mc.client.disconnect().await;
+            for h in mc.pump_handles {
+                h.abort();
+            }
         }
-        for h in inner.pump_handles.drain(..) {
+        if let Some(mc) = inner.futopt.take() {
+            let _ = mc.client.disconnect().await;
+            for h in mc.pump_handles {
+                h.abort();
+            }
+        }
+        if let Some(h) = inner.coalesce_handle.take() {
             h.abort();
         }
+        inner.event_tx = None;
         Ok(())
     }
 
-    pub async fn subscribe(&self, symbol: String) -> AppResult<()> {
+    pub async fn subscribe(
+        &self,
+        market: Market,
+        symbol: String,
+        after_hours: bool,
+    ) -> AppResult<()> {
         let mut inner = self.inner.lock().await;
-        let client = inner.client.clone().ok_or(AppError::NotConnected)?;
-        inner.subscriptions.insert(symbol.clone());
+        let mc = inner.existing_for_mut(market).ok_or(AppError::NotConnected)?;
+        mc.subscriptions.insert(symbol.clone());
+        let client = Arc::clone(&mc.client);
         drop(inner);
-        for ch in channels_for(&symbol) {
-            let sub = StockSubscription::new(*ch, &symbol);
-            client.subscribe_channel(sub).await?;
-        }
-        Ok(())
+        subscribe_on(&client, market, &symbol, after_hours).await
     }
 
-    pub async fn unsubscribe(&self, symbol: String) -> AppResult<()> {
+    pub async fn unsubscribe(
+        &self,
+        market: Market,
+        symbol: String,
+        after_hours: bool,
+    ) -> AppResult<()> {
         let mut inner = self.inner.lock().await;
-        let client = inner.client.clone().ok_or(AppError::NotConnected)?;
-        inner.subscriptions.remove(&symbol);
+        let mc = inner.existing_for_mut(market).ok_or(AppError::NotConnected)?;
+        mc.subscriptions.remove(&symbol);
+        let client = Arc::clone(&mc.client);
         drop(inner);
-        for ch in channels_for(&symbol) {
-            let sub = StockSubscription::new(*ch, &symbol);
-            client.unsubscribe_channel(&sub).await?;
-        }
-        Ok(())
+        unsubscribe_on(&client, market, &symbol, after_hours).await
     }
 }
 
-fn channels_for(symbol: &str) -> &'static [Channel] {
+impl BridgeInner {
+    fn existing_for(&self, market: Market) -> Option<&MarketClient> {
+        match market {
+            Market::Stock => self.stock.as_ref(),
+            Market::Futopt => self.futopt.as_ref(),
+        }
+    }
+
+    fn existing_for_mut(&mut self, market: Market) -> Option<&mut MarketClient> {
+        match market {
+            Market::Stock => self.stock.as_mut(),
+            Market::Futopt => self.futopt.as_mut(),
+        }
+    }
+}
+
+/// Subscribe `symbol` to the appropriate channels for the given market.
+/// Stock uses the generic `SubscribeRequest` path; FutOpt uses the typed
+/// `FutOptSubscription` so the `afterHours` flag lands in the wire payload
+/// correctly (server distinguishes 日盤 vs 夜盤 purely by that field).
+async fn subscribe_on(
+    client: &Arc<WebSocketClient>,
+    market: Market,
+    symbol: &str,
+    after_hours: bool,
+) -> AppResult<()> {
+    match market {
+        Market::Stock => {
+            for ch in stock_channels_for(symbol) {
+                let req = SubscribeRequest::new(*ch, symbol);
+                client.subscribe(req).await?;
+            }
+        }
+        Market::Futopt => {
+            for ch in futopt_channels() {
+                let sub = FutOptSubscription {
+                    channel: *ch,
+                    symbol: symbol.to_string(),
+                    after_hours,
+                };
+                client.subscribe_futopt_channel(sub).await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn unsubscribe_on(
+    client: &Arc<WebSocketClient>,
+    market: Market,
+    symbol: &str,
+    after_hours: bool,
+) -> AppResult<()> {
+    match market {
+        Market::Stock => {
+            for ch in stock_channels_for(symbol) {
+                let key = format!("{}:{}", ch.as_str(), symbol);
+                client.unsubscribe(&key).await?;
+            }
+        }
+        Market::Futopt => {
+            for ch in futopt_channels() {
+                let sub = FutOptSubscription {
+                    channel: *ch,
+                    symbol: symbol.to_string(),
+                    after_hours,
+                };
+                client.unsubscribe_futopt_channel(&sub).await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn stock_channels_for(symbol: &str) -> &'static [Channel] {
     if symbol.starts_with("IX") {
         &[Channel::Indices]
     } else {
@@ -168,33 +323,51 @@ fn channels_for(symbol: &str) -> &'static [Channel] {
     }
 }
 
+fn futopt_channels() -> &'static [FutOptChannel] {
+    &[
+        FutOptChannel::Aggregates,
+        FutOptChannel::Trades,
+        FutOptChannel::Candles,
+        FutOptChannel::Books,
+    ]
+}
+
 fn spawn_message_pump(
     client: Arc<WebSocketClient>,
-    tx: UnboundedSender<MarketEventDto>,
+    market: Market,
+    tx: UnboundedSender<TaggedMarketEvent>,
 ) -> JoinHandle<()> {
     let receiver = client.messages();
     tokio::task::spawn_blocking(move || loop {
         match receiver.receive() {
             Ok(ws_msg) => {
-                log::debug!(
-                    "ws message event={} channel={:?}",
-                    ws_msg.event,
-                    ws_msg.channel
-                );
-                // TEMP — dump raw data for trades channel to diagnose empty
-                // trades array. Remove after schema confirmed.
-                if ws_msg.channel.as_deref() == Some("trades") {
-                    log::info!("trades raw data: {:?}", ws_msg.data);
+                // Control frames (subscribed ack, auth, errors) at info;
+                // per-tick `data`/`snapshot` at debug so an active multi-
+                // channel subscription doesn't flood logs at info level.
+                match ws_msg.event.as_str() {
+                    "data" | "snapshot" => {
+                        log::debug!(
+                            "ws {market:?} event={} channel={:?}",
+                            ws_msg.event,
+                            ws_msg.channel
+                        );
+                    }
+                    _ => {
+                        log::info!(
+                            "ws {market:?} event={} channel={:?} data={:?}",
+                            ws_msg.event,
+                            ws_msg.channel,
+                            ws_msg.data
+                        );
+                    }
                 }
                 if let Some(ev) = MarketEventDto::from_ws(&ws_msg) {
-                    if tx.send(ev).is_err() {
+                    if tx.send(TaggedMarketEvent { market, event: ev }).is_err() {
                         break;
                     }
                 } else if matches!(ws_msg.event.as_str(), "data" | "snapshot") {
-                    // data/snapshot that from_ws couldn't map — parser miss or
-                    // unhandled channel. subscribed/pong/error are expected drops.
                     log::warn!(
-                        "ws message dropped by from_ws: event={} channel={:?} data={:?}",
+                        "ws {market:?} message dropped by from_ws: event={} channel={:?} data={:?}",
                         ws_msg.event,
                         ws_msg.channel,
                         ws_msg.data
@@ -206,23 +379,27 @@ fn spawn_message_pump(
     })
 }
 
-fn spawn_state_pump(client: Arc<WebSocketClient>, app: AppHandle) -> JoinHandle<()> {
+fn spawn_state_pump(
+    client: Arc<WebSocketClient>,
+    market: Market,
+    app: AppHandle,
+) -> JoinHandle<()> {
     let events = Arc::clone(client.state_events());
     tokio::task::spawn_blocking(move || {
         let rx = events.blocking_lock();
         while let Ok(ev) = rx.recv() {
-            let dto: ConnectionStateDto = ev.into();
-            let _ = app.emit(CONN_STATE_EVENT, dto);
+            let state: ConnectionStateDto = ev.into();
+            let _ = app.emit(CONN_STATE_EVENT, MarketConnectionStateDto { market, state });
         }
     })
 }
 
 fn spawn_coalesce_loop(
     app: AppHandle,
-    mut event_rx: tokio::sync::mpsc::UnboundedReceiver<MarketEventDto>,
+    mut event_rx: tokio::sync::mpsc::UnboundedReceiver<TaggedMarketEvent>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let mut buf: Vec<MarketEventDto> = Vec::with_capacity(64);
+        let mut buf: Vec<TaggedMarketEvent> = Vec::with_capacity(64);
         let mut interval = tokio::time::interval(Duration::from_millis(COALESCE_INTERVAL_MS));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -267,8 +444,6 @@ pub fn fetch_candles_blocking(
             .send()?;
         Ok(resp.data.into_iter().map(Into::into).collect())
     } else {
-        // Range must be strictly < 1 year per API; pad below 365 to absorb
-        // UTC↔TPE day-boundary skew on the server side.
         let from = date_n_days_ago(360);
         let resp = rest
             .stock()
@@ -326,6 +501,102 @@ pub fn fetch_quote_blocking(
     Ok(rest.stock().intraday().quote().symbol(symbol).send()?)
 }
 
+// ─── FutOpt REST seed helpers ────────────────────────────────────────────────
+
+pub fn fetch_futopt_ticker_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+) -> AppResult<FutOptTicker> {
+    let rest = build_rest(api_key, rest_base_url);
+    Ok(rest.futopt().intraday().ticker().symbol(symbol).send()?)
+}
+
+pub fn fetch_futopt_quote_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+    after_hours: bool,
+) -> AppResult<FutOptQuote> {
+    let rest = build_rest(api_key, rest_base_url);
+    let futopt = rest.futopt();
+    let intraday = futopt.intraday();
+    let mut builder = intraday.quote().symbol(symbol);
+    if after_hours {
+        builder = builder.after_hours();
+    }
+    Ok(builder.send()?)
+}
+
+pub fn fetch_futopt_trades_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+    offset: Option<i32>,
+    limit: Option<i32>,
+    after_hours: bool,
+) -> AppResult<Vec<Trade>> {
+    let rest = build_rest(api_key, rest_base_url);
+    let futopt = rest.futopt();
+    let intraday = futopt.intraday();
+    let mut builder = intraday.trades().symbol(symbol);
+    if let Some(o) = offset {
+        builder = builder.offset(o);
+    }
+    if let Some(l) = limit {
+        builder = builder.limit(l);
+    }
+    if after_hours {
+        builder = builder.after_hours();
+    }
+    let resp = builder.send()?;
+    Ok(resp.data)
+}
+
+pub fn fetch_futopt_candles_blocking(
+    symbol: &str,
+    timeframe: Timeframe,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+    after_hours: bool,
+) -> AppResult<Vec<CandleDto>> {
+    let rest = build_rest(api_key, rest_base_url);
+    if timeframe.is_intraday() {
+        let futopt = rest.futopt();
+        let intraday = futopt.intraday();
+        let mut builder = intraday
+            .candles()
+            .symbol(symbol)
+            .timeframe(timeframe.as_api_str());
+        if after_hours {
+            builder = builder.after_hours();
+        }
+        let resp = builder.send()?;
+        Ok(resp.data.into_iter().map(Into::into).collect())
+    } else {
+        let from = date_n_days_ago(360);
+        let resp = rest
+            .futopt()
+            .historical()
+            .candles()
+            .symbol(symbol)
+            .timeframe(timeframe.as_api_str())
+            .from(&from)
+            .send()?;
+        // FutOpt historical uses `.candles` (not `.data`) for the series.
+        Ok(resp.candles.into_iter().map(Into::into).collect())
+    }
+}
+
+pub fn fetch_futopt_products_blocking(
+    api_key: &str,
+    rest_base_url: Option<&str>,
+) -> AppResult<Vec<Product>> {
+    let rest = build_rest(api_key, rest_base_url);
+    let resp = rest.futopt().intraday().products().send()?;
+    Ok(resp.data)
+}
+
 fn build_rest(api_key: &str, base_url: Option<&str>) -> RestClient {
     let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
     match base_url {
@@ -334,8 +605,6 @@ fn build_rest(api_key: &str, base_url: Option<&str>) -> RestClient {
     }
 }
 
-/// `YYYY-MM-DD` for the date `days` ago in UTC (Hinnant civil_from_days,
-/// inlined to avoid pulling chrono just for one date string).
 fn date_n_days_ago(days: i64) -> String {
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

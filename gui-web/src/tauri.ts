@@ -1,5 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { CandleDto, Quote, Ticker, Timeframe, Trade } from './types/market'
+import type {
+  CandleDto,
+  FutOptQuote,
+  FutOptTicker,
+  Product,
+  Quote,
+  Ticker,
+  Timeframe,
+  Trade,
+} from './types/market'
 
 export interface AppError {
   kind: 'sdk' | 'not_connected' | 'missing_api_key' | 'other'
@@ -27,12 +36,24 @@ export interface FetchTradesOptions {
   isTrial?: boolean
 }
 
+export interface FetchFutOptTradesOptions {
+  offset?: number
+  limit?: number
+  afterHours?: boolean
+}
+
 export const api = {
   connect: (apiKey: string, wsUrl: string | null) =>
     unwrap(invoke<void>('connect', { apiKey, wsUrl })),
+  connectFutopt: (apiKey: string, wsUrl: string | null) =>
+    unwrap(invoke<void>('connect_futopt', { apiKey, wsUrl })),
   disconnect: () => unwrap(invoke<void>('disconnect')),
   subscribe: (symbol: string) => unwrap(invoke<void>('subscribe', { symbol })),
   unsubscribe: (symbol: string) => unwrap(invoke<void>('unsubscribe', { symbol })),
+  subscribeFutopt: (symbol: string, afterHours?: boolean) =>
+    unwrap(invoke<void>('subscribe_futopt', { symbol, afterHours })),
+  unsubscribeFutopt: (symbol: string, afterHours?: boolean) =>
+    unwrap(invoke<void>('unsubscribe_futopt', { symbol, afterHours })),
   fetchCandles: (symbol: string, timeframe: Timeframe, restBaseUrl: string | null) =>
     unwrap(invoke<CandleDto[]>('fetch_candles', { symbol, timeframe, restBaseUrl })),
   fetchTicker: (symbol: string, restBaseUrl: string | null) =>
@@ -44,4 +65,36 @@ export const api = {
   ) => unwrap(invoke<Trade[]>('fetch_trades', { symbol, restBaseUrl, ...opts })),
   fetchQuote: (symbol: string, restBaseUrl: string | null) =>
     unwrap(invoke<Quote>('fetch_quote', { symbol, restBaseUrl })),
+
+  fetchFutoptTicker: (symbol: string, restBaseUrl: string | null) =>
+    unwrap(invoke<FutOptTicker>('fetch_futopt_ticker', { symbol, restBaseUrl })),
+  fetchFutoptQuote: (
+    symbol: string,
+    restBaseUrl: string | null,
+    afterHours?: boolean,
+  ) =>
+    unwrap(
+      invoke<FutOptQuote>('fetch_futopt_quote', { symbol, restBaseUrl, afterHours }),
+    ),
+  fetchFutoptTrades: (
+    symbol: string,
+    restBaseUrl: string | null,
+    opts?: FetchFutOptTradesOptions,
+  ) => unwrap(invoke<Trade[]>('fetch_futopt_trades', { symbol, restBaseUrl, ...opts })),
+  fetchFutoptCandles: (
+    symbol: string,
+    timeframe: Timeframe,
+    restBaseUrl: string | null,
+    afterHours?: boolean,
+  ) =>
+    unwrap(
+      invoke<CandleDto[]>('fetch_futopt_candles', {
+        symbol,
+        timeframe,
+        restBaseUrl,
+        afterHours,
+      }),
+    ),
+  fetchFutoptProducts: (restBaseUrl: string | null) =>
+    unwrap(invoke<Product[]>('fetch_futopt_products', { restBaseUrl })),
 }

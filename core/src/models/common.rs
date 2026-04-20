@@ -62,12 +62,14 @@ pub struct TradeInfo {
 #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[cfg_attr(feature = "js", napi_derive::napi(object))]
 pub struct TotalStats {
-    /// Total trade value
-    #[serde(rename = "tradeValue")]
+    /// Total trade value. Absent on FutOpt aggregates — server sends
+    /// `{time, totalBidMatch, totalAskMatch, tradeVolume}` with no
+    /// `tradeValue`, so a missing field must not fail deserialization.
+    #[serde(rename = "tradeValue", default)]
     pub trade_value: f64,
 
     /// Total trade volume
-    #[serde(rename = "tradeVolume")]
+    #[serde(rename = "tradeVolume", default)]
     pub trade_volume: i64,
 
     /// Volume traded at bid

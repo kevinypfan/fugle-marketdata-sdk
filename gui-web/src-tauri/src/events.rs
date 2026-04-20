@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use marketdata_core::models::futopt::FutOptHistoricalCandle;
 use marketdata_core::websocket::channels::{parse_channel_data, ChannelData};
 use marketdata_core::{
     AggregatesData, BooksData, CandleData, CandleHistoryItem, CandlesSnapshot, ConnectionEvent,
@@ -84,6 +85,49 @@ impl From<CandleHistoryItem> for CandleDto {
     }
 }
 
+impl From<FutOptHistoricalCandle> for CandleDto {
+    fn from(c: FutOptHistoricalCandle) -> Self {
+        Self {
+            date: c.date,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            // Futures volume is u64 contract count; cast down — real contract
+            // counts never approach i64::MAX and the frontend treats it as a
+            // plain number anyway.
+            volume: c.volume as i64,
+        }
+    }
+}
+
+/// Which WebSocket (and therefore which watchlist bucket) an event belongs to.
+/// Indices channel is stock-only, but both markets can emit trades/books/etc.
+/// — the frontend uses this to route events to the right SymbolState.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Market {
+    Stock,
+    Futopt,
+}
+
+/// Market-tagged wrapper emitted on the shared `market-batch` channel. The
+/// inner `event` already carries a `kind` discriminant — we flatten it so the
+/// TS side sees `{ marketSource, kind, ...payload }` rather than nesting.
+///
+/// Field name is `marketSource` (not `market`) because `AggregatesData` and
+/// `TradesData` already carry `market: Option<String>` ("TSE"/"OTC"); flatten
+/// with the same outer name would produce two same-keyed JSON fields with
+/// serde-undefined ordering, and the stock market code could clobber the
+/// routing discriminator on the TS side.
+#[derive(Debug, Clone, Serialize)]
+pub struct TaggedMarketEvent {
+    #[serde(rename = "marketSource")]
+    pub market: Market,
+    #[serde(flatten)]
+    pub event: MarketEventDto,
+}
+
 /// Single market event pushed from backend to frontend (one element of `market-batch`).
 ///
 /// REST-seeded data (ticker info, trade history, candle history) does not flow
@@ -153,6 +197,21 @@ pub enum ConnectionStateDto {
     Reconnecting { attempt: u32 },
     Disconnected { reason: String },
     Failed { message: String },
+}
+
+/// Market-tagged connection state. Stock and futopt have independent WS
+/// clients, so the UI needs per-market status — previously both were
+/// emitted into the same event and the last writer won, making "已連線"
+/// ambiguous when only one market was actually alive.
+///
+/// `#[serde(flatten)]` composes with the inner `#[serde(tag = "state")]`
+/// enum: output is `{market, state, ...payload}` — same pattern as
+/// `TaggedMarketEvent` above.
+#[derive(Debug, Clone, Serialize)]
+pub struct MarketConnectionStateDto {
+    pub market: Market,
+    #[serde(flatten)]
+    pub state: ConnectionStateDto,
 }
 
 impl From<ConnectionEvent> for ConnectionStateDto {

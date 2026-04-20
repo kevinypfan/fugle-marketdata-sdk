@@ -30,13 +30,21 @@ pub fn run() {
         .manage(AppBridge::new())
         .invoke_handler(tauri::generate_handler![
             commands::connect,
+            commands::connect_futopt,
             commands::disconnect,
             commands::subscribe,
             commands::unsubscribe,
+            commands::subscribe_futopt,
+            commands::unsubscribe_futopt,
             commands::fetch_candles,
             commands::fetch_ticker,
             commands::fetch_trades,
             commands::fetch_quote,
+            commands::fetch_futopt_ticker,
+            commands::fetch_futopt_quote,
+            commands::fetch_futopt_trades,
+            commands::fetch_futopt_candles,
+            commands::fetch_futopt_products,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

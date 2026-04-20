@@ -18,22 +18,33 @@ async function getSecretsStore(): Promise<Store> {
 }
 
 export async function loadPersisted(): Promise<{
-  watchlist: string[]
+  stockWatchlist: string[]
+  futoptWatchlist: string[]
   apiKey: string | null
   restBaseUrl: string | null
   wsUrl: string | null
 }> {
   const [w, s] = await Promise.all([getWatchlistStore(), getSecretsStore()])
-  const watchlist = (await w.get<string[]>('symbols')) ?? []
+  // Legacy pre-futopt installs stored stock symbols under `symbols`. Fall back
+  // so existing users don't lose their list on upgrade.
+  const stockWatchlist =
+    (await w.get<string[]>('stockSymbols')) ??
+    (await w.get<string[]>('symbols')) ??
+    []
+  const futoptWatchlist = (await w.get<string[]>('futoptSymbols')) ?? []
   const apiKey = (await s.get<string>('apiKey')) ?? null
   const restBaseUrl = (await s.get<string>('restBaseUrl')) ?? null
   const wsUrl = (await s.get<string>('wsUrl')) ?? null
-  return { watchlist, apiKey, restBaseUrl, wsUrl }
+  return { stockWatchlist, futoptWatchlist, apiKey, restBaseUrl, wsUrl }
 }
 
-export async function saveWatchlist(symbols: string[]): Promise<void> {
+export async function saveWatchlists(
+  stock: string[],
+  futopt: string[],
+): Promise<void> {
   const w = await getWatchlistStore()
-  await w.set('symbols', symbols)
+  await w.set('stockSymbols', stock)
+  await w.set('futoptSymbols', futopt)
   await w.save()
 }
 

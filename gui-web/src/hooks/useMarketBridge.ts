@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../store/app'
 import { api } from '../tauri'
-import { loadPersisted, saveWatchlist } from '../persist'
+import { loadPersisted, saveWatchlists } from '../persist'
 import {
   CONN_STATE_EVENT,
   INDEX_SYMBOLS,
@@ -24,20 +24,32 @@ export function useMarketBridge() {
   useEffect(() => {
     let unlistenBatch: (() => void) | undefined
     let unlistenConn: (() => void) | undefined
-    let unsubWatchlist: (() => void) | undefined
+    let unsubStock: (() => void) | undefined
+    let unsubFutopt: (() => void) | undefined
     let cancelled = false
     let saveTimer: ReturnType<typeof setTimeout> | undefined
-    let pendingSave: string[] | undefined
+    let pendingStock: string[] | undefined
+    let pendingFutopt: string[] | undefined
 
     const flushSave = () => {
       if (saveTimer) {
         clearTimeout(saveTimer)
         saveTimer = undefined
       }
-      if (pendingSave) {
-        void saveWatchlist(pendingSave)
-        pendingSave = undefined
+      if (pendingStock !== undefined || pendingFutopt !== undefined) {
+        const s = useAppStore.getState()
+        void saveWatchlists(
+          pendingStock ?? s.stockWatchlist,
+          pendingFutopt ?? s.futoptWatchlist,
+        )
+        pendingStock = undefined
+        pendingFutopt = undefined
       }
+    }
+
+    const scheduleSave = () => {
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
     }
 
     void (async () => {
@@ -69,22 +81,32 @@ export function useMarketBridge() {
             persisted.apiKey,
             persisted.restBaseUrl,
             persisted.wsUrl,
-            persisted.watchlist,
+            persisted.stockWatchlist,
+            persisted.futoptWatchlist,
           )
         }
       }
 
-      // Persist watchlist on every change (post-hydrate), debounced so
+      // Persist watchlists on every change (post-hydrate), debounced so
       // rapid drag-reorder collapses to a single disk write.
-      let lastWatchlist = useAppStore.getState().watchlist
-      unsubWatchlist = useAppStore.subscribe(
-        (s) => s.watchlist,
-        (watchlist) => {
-          if (watchlist === lastWatchlist) return
-          lastWatchlist = watchlist
-          pendingSave = watchlist
-          if (saveTimer) clearTimeout(saveTimer)
-          saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS)
+      let lastStock = useAppStore.getState().stockWatchlist
+      unsubStock = useAppStore.subscribe(
+        (s) => s.stockWatchlist,
+        (w) => {
+          if (w === lastStock) return
+          lastStock = w
+          pendingStock = w
+          scheduleSave()
+        },
+      )
+      let lastFutopt = useAppStore.getState().futoptWatchlist
+      unsubFutopt = useAppStore.subscribe(
+        (s) => s.futoptWatchlist,
+        (w) => {
+          if (w === lastFutopt) return
+          lastFutopt = w
+          pendingFutopt = w
+          scheduleSave()
         },
       )
     })()
@@ -93,28 +115,43 @@ export function useMarketBridge() {
       cancelled = true
       unlistenBatch?.()
       unlistenConn?.()
-      unsubWatchlist?.()
+      unsubStock?.()
+      unsubFutopt?.()
       flushSave()
     }
   }, [])
 }
 
 /**
- * Connects, subscribes the index bar symbols + every watchlist symbol, and
- * seeds REST data for each. Used both on first-launch (after API-key submit)
- * and on hydrate (when restoring a persisted session).
+ * Connects both the stock and (if there are any futopt symbols) the futopt
+ * WebSocket, subscribes index symbols + every watchlist symbol, and seeds REST
+ * data for each. Used on first launch (post-API-key submit) and on hydrate
+ * (restoring a persisted session). FutOpt WS is only connected when needed —
+ * a stock-only user never hits the futopt endpoint.
  */
 export async function connectAndResubscribe(
   apiKey: string,
   restBaseUrl: string | null,
   wsUrl: string | null,
-  watchlist: string[],
+  stockWatchlist: string[],
+  futoptWatchlist: string[],
 ) {
-  try {
-    await api.connect(apiKey, wsUrl)
-  } catch (e) {
-    console.error('connect failed', e)
+  // Stock and futopt WS are independent — run connects in parallel to save
+  // one handshake RTT on startup. Failures are isolated: if futopt rejects
+  // (e.g. account lacks perm), stock still comes up.
+  const needFutopt = futoptWatchlist.length > 0
+  const results = await Promise.allSettled([
+    api.connect(apiKey, wsUrl),
+    needFutopt ? api.connectFutopt(apiKey, deriveFutoptWsUrl(wsUrl)) : Promise.resolve(),
+  ])
+  if (results[0].status === 'rejected') {
+    console.error('connect (stock) failed', results[0].reason)
     return
+  }
+  if (needFutopt && results[1].status === 'rejected') {
+    console.error('connect (futopt) failed', results[1].reason)
+    // Fall through: stock is up, futopt subscribes below will throw
+    // NotConnected individually — logged but non-fatal for stock.
   }
 
   // Indices live outside the watchlist — always subscribe + seed previousClose.
@@ -123,10 +160,93 @@ export async function connectAndResubscribe(
     void seedIndex(symbol, restBaseUrl)
   }
 
-  for (const symbol of watchlist) {
+  for (const symbol of stockWatchlist) {
     api.subscribe(symbol).catch((e) => console.warn('subscribe failed', symbol, e))
     void seedSymbol(symbol, restBaseUrl)
   }
+
+  if (needFutopt) {
+    const afterHours = useAppStore.getState().futoptSession === 'afterhours'
+    for (const symbol of futoptWatchlist) {
+      // Seed first so REST ticker populates the store's alias map before any
+      // WS event with canonical symbol arrives. Subscribe with user-input
+      // (aliases like TXF1! are accepted; server echoes canonical in data
+      // events — alias map redirects events back to the user-input key).
+      await seedFutoptSymbol(symbol, restBaseUrl, afterHours)
+      api
+        .subscribeFutopt(symbol, afterHours)
+        .catch((e) => console.warn('futopt subscribe failed', symbol, e))
+    }
+  }
+}
+
+/** Switch the FutOpt trading session end-to-end:
+ *  1. Unsubscribe every futopt symbol on the OLD session
+ *  2. Clear stale SymbolState (old session's tape/book/agg linger otherwise)
+ *  3. Set the new session in the store
+ *  4. Re-seed each symbol with the new REST session, then resubscribe on WS
+ *
+ *  Uses `useAppStore.getState()` directly so the caller doesn't need to
+ *  thread the store through props. Idempotent if called with the same
+ *  session — still tears down and rebuilds, which is fine for a user-driven
+ *  action. Call this from a UI handler, not a render. */
+export async function applyFutoptSession(
+  next: 'regular' | 'afterhours',
+  apiKey: string | null,
+  restBaseUrl: string | null,
+) {
+  const store = useAppStore.getState()
+  const current = store.futoptSession
+  const watchlist = store.futoptWatchlist
+  const futoptAlive = store.conn.futopt?.state === 'connected'
+  if (!apiKey || watchlist.length === 0 || !futoptAlive) {
+    // No live connection to reconfigure — flip the flag so future adds /
+    // reconnects use the new session. unsubscribeFutopt would throw
+    // NotConnected here since the futopt client isn't up yet.
+    store.setFutoptSession(next)
+    return
+  }
+
+  const oldAfterHours = current === 'afterhours'
+  for (const symbol of watchlist) {
+    try {
+      await api.unsubscribeFutopt(symbol, oldAfterHours)
+    } catch (e) {
+      console.warn('unsubscribe before session switch failed', symbol, e)
+    }
+  }
+
+  store.clearFutoptSymbolData()
+  store.setFutoptSession(next)
+
+  const nextAfterHours = next === 'afterhours'
+  for (const symbol of watchlist) {
+    try {
+      await seedFutoptSymbol(symbol, restBaseUrl, nextAfterHours)
+      await api.subscribeFutopt(symbol, nextAfterHours)
+    } catch (e) {
+      console.error('session-switch resubscribe failed', symbol, e)
+    }
+  }
+}
+
+/** Derive the futopt WS URL from a user-configured stock WS URL by path swap.
+ *  Dev vs prod differ only in host, not in the `/stock/streaming` ↔
+ *  `/futopt/streaming` suffix, so a single override (stock wsUrl) is enough
+ *  to route futopt to the same environment. Returns null when stock wsUrl
+ *  isn't set (SDK falls back to its prod default). */
+function deriveFutoptWsUrl(stockWsUrl: string | null): string | null {
+  if (!stockWsUrl) return null
+  if (stockWsUrl.includes('/stock/streaming')) {
+    return stockWsUrl.replace('/stock/streaming', '/futopt/streaming')
+  }
+  // Unrecognized shape — bail to SDK default rather than guess. Warn so a
+  // dev-env session doesn't silently hit the prod futopt endpoint with a
+  // dev API key (the failure mode that triggered this whole fix).
+  console.warn(
+    `deriveFutoptWsUrl: stock wsUrl "${stockWsUrl}" has no "/stock/streaming" segment; futopt will fall back to the SDK default (prod). If you are on dev, set a stock wsUrl containing "/stock/streaming" so futopt can be derived.`,
+  )
+  return null
 }
 
 /**
@@ -181,4 +301,58 @@ export async function seedSymbol(symbol: string, restBaseUrl: string | null) {
       useAppStore.getState().setCandles(symbol, candles, DEFAULT_TIMEFRAME),
     )
     .catch((e) => console.error('seed candles failed', symbol, e))
+}
+
+/** FutOpt symbol seeder — mirror of `seedSymbol` but routed to the futopt
+ *  REST endpoints. Takes the current `afterHours` flag so REST pulls the
+ *  matching session (server serves disjoint 日盤 / 夜盤 streams; wrong flag
+ *  returns the other session's data silently). Candle fetch fire-and-forget.
+ *
+ *  Subscribe uses the user-input symbol directly (e.g. `TXF1!`). Server
+ *  echoes canonical (e.g. `TXFE6`) in data events; `symbolAliases` redirects. */
+export async function seedFutoptSymbol(
+  symbol: string,
+  restBaseUrl: string | null,
+  afterHours: boolean,
+) {
+  try {
+    const [ticker, trades, quote] = await Promise.all([
+      api.fetchFutoptTicker(symbol, restBaseUrl),
+      api.fetchFutoptTrades(symbol, restBaseUrl, {
+        limit: TRADE_SEED_LIMIT,
+        afterHours,
+      }),
+      api.fetchFutoptQuote(symbol, restBaseUrl, afterHours),
+    ])
+    const store = useAppStore.getState()
+    store.applyFutoptTicker(symbol, ticker)
+    store.applyTradeHistory(symbol, trades, TRADE_SEED_LIMIT)
+    store.applyFutoptQuote(symbol, quote)
+  } catch (e) {
+    console.error('seed futopt failed', symbol, e)
+  }
+
+  api
+    .fetchFutoptCandles(symbol, DEFAULT_TIMEFRAME, restBaseUrl, afterHours)
+    .then((candles) =>
+      useAppStore.getState().setCandles(symbol, candles, DEFAULT_TIMEFRAME),
+    )
+    .catch((e) => console.error('seed futopt candles failed', symbol, e))
+}
+
+/** Ensure the futopt WS is connected before subscribing the first futopt
+ *  symbol. Idempotent: second call is a no-op in the bridge. Call this
+ *  before `api.subscribeFutopt` in the add-to-watchlist flow. The futopt WS
+ *  URL is derived from the stock wsUrl so dev/prod stay aligned without a
+ *  second setting to configure. */
+export async function ensureFutoptConnected(
+  apiKey: string | null,
+  stockWsUrl: string | null,
+) {
+  if (!apiKey) return
+  try {
+    await api.connectFutopt(apiKey, deriveFutoptWsUrl(stockWsUrl))
+  } catch (e) {
+    console.error('connect (futopt) failed', e)
+  }
 }
