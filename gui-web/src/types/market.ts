@@ -90,14 +90,15 @@ export interface IndicesData {
   time?: number
 }
 
-/** Mirrors Rust `MarketEventDto` (`#[serde(tag = "type")]`). */
+/** Mirrors Rust `MarketEventDto` (`#[serde(tag = "kind")]` — "type" collided
+ *  with TradesData/AggregatesData/IndicesData's own `type` field). */
 export type MarketEvent =
-  | ({ type: 'Aggregate' } & AggregatesData)
-  | ({ type: 'TradeTick' } & TradesData)
-  | ({ type: 'BookSnap' } & BooksData)
-  | ({ type: 'CandleTick' } & CandleData)
-  | ({ type: 'CandleHistory' } & CandlesSnapshot)
-  | ({ type: 'Indices' } & IndicesData)
+  | ({ kind: 'Aggregate' } & AggregatesData)
+  | ({ kind: 'TradeTick' } & TradesData)
+  | ({ kind: 'BookSnap' } & BooksData)
+  | ({ kind: 'CandleTick' } & CandleData)
+  | ({ kind: 'CandleHistory' } & CandlesSnapshot)
+  | ({ kind: 'Indices' } & IndicesData)
 
 /** Mirrors Rust `ConnectionStateDto` (`#[serde(tag = "state")]`). */
 export type ConnectionState =
@@ -124,6 +125,7 @@ export interface Trade {
   size: number
   time: number
   serial?: number
+  volume?: number
 }
 
 export interface Ticker {

@@ -6,7 +6,6 @@ import { WatchlistRow } from './WatchlistRow'
 
 export function Watchlist() {
   const watchlist = useAppStore((s) => s.watchlist)
-  const symbols = useAppStore((s) => s.symbols)
   const selected = useAppStore((s) => s.selected)
   const setSelected = useAppStore((s) => s.setSelected)
   const addToWatchlist = useAppStore((s) => s.addToWatchlist)
@@ -14,6 +13,7 @@ export function Watchlist() {
   const moveToTop = useAppStore((s) => s.moveToTop)
   const moveToBottom = useAppStore((s) => s.moveToBottom)
   const apiKey = useAppStore((s) => s.apiKey)
+  const restBaseUrl = useAppStore((s) => s.restBaseUrl)
 
   const [input, setInput] = useState('')
 
@@ -26,7 +26,7 @@ export function Watchlist() {
     if (apiKey) {
       try {
         await api.subscribe(symbol)
-        await seedSymbol(symbol)
+        await seedSymbol(symbol, restBaseUrl)
       } catch (err) {
         console.error('subscribe failed', symbol, err)
       }
@@ -60,29 +60,17 @@ export function Watchlist() {
       </form>
 
       <ul className="flex-1 overflow-y-auto">
-        {watchlist.map((symbol) => {
-          const s = symbols[symbol]
-          const lastPrice = s?.agg?.lastPrice ?? s?.tape[0]?.price
-          const prev = s?.ticker?.previousClose ?? s?.agg?.previousClose
-          const changePercent =
-            lastPrice !== undefined && prev !== undefined && prev !== 0
-              ? ((lastPrice - prev) / prev) * 100
-              : undefined
-          return (
-            <WatchlistRow
-              key={symbol}
-              symbol={symbol}
-              name={s?.ticker?.name}
-              price={lastPrice}
-              changePercent={changePercent}
-              selected={selected === symbol}
-              onSelect={() => setSelected(symbol)}
-              onMoveTop={() => moveToTop(symbol)}
-              onMoveBottom={() => moveToBottom(symbol)}
-              onRemove={() => handleRemove(symbol)}
-            />
-          )
-        })}
+        {watchlist.map((symbol) => (
+          <WatchlistRow
+            key={symbol}
+            symbol={symbol}
+            selected={selected === symbol}
+            onSelect={() => setSelected(symbol)}
+            onMoveTop={() => moveToTop(symbol)}
+            onMoveBottom={() => moveToBottom(symbol)}
+            onRemove={() => handleRemove(symbol)}
+          />
+        ))}
         {watchlist.length === 0 && (
           <li className="px-3 py-6 text-center text-xs text-neutral-500">
             輸入代號加入自選

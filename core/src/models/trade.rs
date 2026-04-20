@@ -21,6 +21,14 @@ pub struct Trade {
 
     /// Trade timestamp (Unix milliseconds)
     pub time: i64,
+
+    /// Server-assigned monotonic sequence number (dedup / pagination anchor)
+    #[serde(default)]
+    pub serial: Option<i64>,
+
+    /// Cumulative volume at this trade (session total so far)
+    #[serde(default)]
+    pub volume: Option<i64>,
 }
 
 impl Trade {
@@ -130,6 +138,7 @@ mod tests {
             price: 100.5,
             size: 100,
             time: 0,
+            ..Default::default()
         };
         assert_eq!(buy_trade.infer_direction(), "B");
 
@@ -140,6 +149,7 @@ mod tests {
             price: 100.0,
             size: 100,
             time: 0,
+            ..Default::default()
         };
         assert_eq!(sell_trade.infer_direction(), "S");
 
@@ -150,6 +160,7 @@ mod tests {
             price: 100.5,
             size: 100,
             time: 0,
+            ..Default::default()
         };
         assert_eq!(neutral_trade.infer_direction(), "N");
     }

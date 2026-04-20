@@ -10,7 +10,8 @@ use tokio::task::JoinHandle;
 use marketdata_core::rest::Auth;
 use marketdata_core::websocket::channels::StockSubscription;
 use marketdata_core::{
-    AuthRequest, Channel, ConnectionConfig, Quote, RestClient, Ticker, Trade, WebSocketClient,
+    AuthRequest, Channel, ConnectionConfig, Quote, ReconnectionConfig, RestClient, Ticker, Trade,
+    WebSocketClient,
 };
 
 use crate::error::{AppError, AppResult};
@@ -54,18 +55,33 @@ impl AppBridge {
         inner.api_key.clone().ok_or(AppError::MissingApiKey)
     }
 
-    pub async fn connect(&self, app: AppHandle, api_key: String) -> AppResult<()> {
+    pub async fn connect(
+        &self,
+        app: AppHandle,
+        api_key: String,
+        ws_url: Option<String>,
+    ) -> AppResult<()> {
         let mut inner = self.inner.lock().await;
 
         if inner.client.is_some() {
-            tracing::info!("connect() called while already connected — skipping");
+            log::info!("connect() called while already connected — skipping");
             return Ok(());
         }
 
         let _ = app.emit(CONN_STATE_EVENT, ConnectionStateDto::Connecting);
 
-        let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(&api_key));
-        let client = Arc::new(WebSocketClient::new(config));
+        let auth = AuthRequest::with_api_key(&api_key);
+        let config = match ws_url {
+            Some(u) => ConnectionConfig::new(u, auth),
+            None => ConnectionConfig::fugle_stock(auth),
+        };
+        let reconnect_cfg = ReconnectionConfig::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(60),
+        )
+        .expect("static reconnection config is valid");
+        let client = Arc::new(WebSocketClient::with_reconnection_config(config, reconnect_cfg));
 
         if let Err(e) = client.connect().await {
             let dto = ConnectionStateDto::Failed {
@@ -95,7 +111,7 @@ impl AppBridge {
             for ch in channels_for(&symbol) {
                 let sub = StockSubscription::new(*ch, &symbol);
                 if let Err(e) = client.subscribe_channel(sub).await {
-                    tracing::warn!("resubscribe {symbol} {ch:?} failed: {e}");
+                    log::warn!("resubscribe {symbol} {ch:?} failed: {e}");
                 }
             }
         }
@@ -143,7 +159,12 @@ fn channels_for(symbol: &str) -> &'static [Channel] {
     if symbol.starts_with("IX") {
         &[Channel::Indices]
     } else {
-        &[Channel::Aggregates, Channel::Trades, Channel::Candles]
+        &[
+            Channel::Aggregates,
+            Channel::Trades,
+            Channel::Candles,
+            Channel::Books,
+        ]
     }
 }
 
@@ -155,10 +176,29 @@ fn spawn_message_pump(
     tokio::task::spawn_blocking(move || loop {
         match receiver.receive() {
             Ok(ws_msg) => {
+                log::debug!(
+                    "ws message event={} channel={:?}",
+                    ws_msg.event,
+                    ws_msg.channel
+                );
+                // TEMP — dump raw data for trades channel to diagnose empty
+                // trades array. Remove after schema confirmed.
+                if ws_msg.channel.as_deref() == Some("trades") {
+                    log::info!("trades raw data: {:?}", ws_msg.data);
+                }
                 if let Some(ev) = MarketEventDto::from_ws(&ws_msg) {
                     if tx.send(ev).is_err() {
                         break;
                     }
+                } else if matches!(ws_msg.event.as_str(), "data" | "snapshot") {
+                    // data/snapshot that from_ws couldn't map — parser miss or
+                    // unhandled channel. subscribed/pong/error are expected drops.
+                    log::warn!(
+                        "ws message dropped by from_ws: event={} channel={:?} data={:?}",
+                        ws_msg.event,
+                        ws_msg.channel,
+                        ws_msg.data
+                    );
                 }
             }
             Err(_) => break,
@@ -198,7 +238,7 @@ fn spawn_coalesce_loop(
                     if !buf.is_empty() {
                         let batch = std::mem::take(&mut buf);
                         if app.emit(MARKET_BATCH_EVENT, &batch).is_err() {
-                            tracing::warn!("emit market-batch failed; window closed?");
+                            log::warn!("emit market-batch failed; window closed?");
                             break;
                         }
                     }
@@ -214,8 +254,9 @@ pub fn fetch_candles_blocking(
     symbol: &str,
     timeframe: Timeframe,
     api_key: &str,
+    rest_base_url: Option<&str>,
 ) -> AppResult<Vec<CandleDto>> {
-    let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
+    let rest = build_rest(api_key, rest_base_url);
     if timeframe.is_intraday() {
         let resp = rest
             .stock()
@@ -242,20 +283,55 @@ pub fn fetch_candles_blocking(
     }
 }
 
-pub fn fetch_ticker_blocking(symbol: &str, api_key: &str) -> AppResult<Ticker> {
-    let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
+pub fn fetch_ticker_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+) -> AppResult<Ticker> {
+    let rest = build_rest(api_key, rest_base_url);
     Ok(rest.stock().intraday().ticker().symbol(symbol).send()?)
 }
 
-pub fn fetch_trades_blocking(symbol: &str, api_key: &str) -> AppResult<Vec<Trade>> {
-    let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
-    let resp = rest.stock().intraday().trades().symbol(symbol).send()?;
+pub fn fetch_trades_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    is_trial: Option<bool>,
+) -> AppResult<Vec<Trade>> {
+    let rest = build_rest(api_key, rest_base_url);
+    let stock = rest.stock();
+    let intraday = stock.intraday();
+    let mut builder = intraday.trades().symbol(symbol);
+    if let Some(o) = offset {
+        builder = builder.offset(o);
+    }
+    if let Some(l) = limit {
+        builder = builder.limit(l);
+    }
+    if let Some(t) = is_trial {
+        builder = builder.is_trial(t);
+    }
+    let resp = builder.send()?;
     Ok(resp.data)
 }
 
-pub fn fetch_quote_blocking(symbol: &str, api_key: &str) -> AppResult<Quote> {
-    let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
+pub fn fetch_quote_blocking(
+    symbol: &str,
+    api_key: &str,
+    rest_base_url: Option<&str>,
+) -> AppResult<Quote> {
+    let rest = build_rest(api_key, rest_base_url);
     Ok(rest.stock().intraday().quote().symbol(symbol).send()?)
+}
+
+fn build_rest(api_key: &str, base_url: Option<&str>) -> RestClient {
+    let rest = RestClient::new(Auth::ApiKey(api_key.to_string()));
+    match base_url {
+        Some(u) => rest.base_url(u),
+        None => rest,
+    }
 }
 
 /// `YYYY-MM-DD` for the date `days` ago in UTC (Hinnant civil_from_days,

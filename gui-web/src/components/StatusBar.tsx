@@ -19,17 +19,25 @@ function connLabel(conn: ReturnType<typeof useAppStore.getState>['conn']): {
   }
 }
 
-export function StatusBar() {
+interface StatusBarProps {
+  onOpenSettings: () => void
+}
+
+export function StatusBar({ onOpenSettings }: StatusBarProps) {
   const conn = useAppStore((s) => s.conn)
-  const taiex = useAppStore((s) => s.taiex)
   const { text, color } = connLabel(conn)
 
   return (
     <div className="flex items-center justify-between h-full px-3 text-xs bg-bg-panel">
       <span className={color}>{text}</span>
-      <span className="font-mono text-neutral-300">
-        TAIEX {taiex ? taiex.value.toFixed(2) : '—'}
-      </span>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="text-neutral-400 hover:text-neutral-200"
+        title="設定"
+      >
+        設定
+      </button>
     </div>
   )
 }

@@ -5,9 +5,9 @@ import { api } from '../tauri'
 import { loadPersisted, saveWatchlist } from '../persist'
 import {
   CONN_STATE_EVENT,
+  INDEX_SYMBOLS,
   INDICES_PREFIX,
   MARKET_BATCH_EVENT,
-  TAIEX_SYMBOL,
 } from '../types/events'
 import type { ConnectionState, MarketEvent } from '../types/market'
 import { DEFAULT_TIMEFRAME } from '../types/timeframe'
@@ -65,7 +65,12 @@ export function useMarketBridge() {
         useAppStore.getState().hydrate(persisted)
 
         if (persisted.apiKey) {
-          await connectAndResubscribe(persisted.apiKey, persisted.watchlist)
+          await connectAndResubscribe(
+            persisted.apiKey,
+            persisted.restBaseUrl,
+            persisted.wsUrl,
+            persisted.watchlist,
+          )
         }
       }
 
@@ -95,38 +100,73 @@ export function useMarketBridge() {
 }
 
 /**
- * Connects, subscribes TAIEX + every watchlist symbol, and seeds REST data
- * for each. Used both on first-launch (after API-key submit) and on hydrate
- * (when restoring a persisted session).
+ * Connects, subscribes the index bar symbols + every watchlist symbol, and
+ * seeds REST data for each. Used both on first-launch (after API-key submit)
+ * and on hydrate (when restoring a persisted session).
  */
-export async function connectAndResubscribe(apiKey: string, watchlist: string[]) {
+export async function connectAndResubscribe(
+  apiKey: string,
+  restBaseUrl: string | null,
+  wsUrl: string | null,
+  watchlist: string[],
+) {
   try {
-    await api.connect(apiKey)
+    await api.connect(apiKey, wsUrl)
   } catch (e) {
     console.error('connect failed', e)
     return
   }
 
-  // Always have TAIEX in the status bar; it lives outside the watchlist.
-  api.subscribe(TAIEX_SYMBOL).catch((e) => console.warn('TAIEX subscribe failed', e))
+  // Indices live outside the watchlist — always subscribe + seed previousClose.
+  for (const symbol of INDEX_SYMBOLS) {
+    api.subscribe(symbol).catch((e) => console.warn('index subscribe failed', symbol, e))
+    void seedIndex(symbol, restBaseUrl)
+  }
 
   for (const symbol of watchlist) {
     api.subscribe(symbol).catch((e) => console.warn('subscribe failed', symbol, e))
-    void seedSymbol(symbol)
+    void seedSymbol(symbol, restBaseUrl)
   }
 }
 
-export async function seedSymbol(symbol: string) {
+/**
+ * Pre-populate the IndicesBar sparkline and change-% reference from Fugle's
+ * `/stock/intraday/candles/{IX}` endpoint (which returns today's 1-min bars
+ * for indices). First bar's `open` ≈ today's opening price — used as the
+ * "change" reference. Fugle doesn't expose true yesterday-close for indices
+ * to this SDK, so the shown change is "change since today's open" (off from
+ * the exchange's official change by the overnight gap, typically <1%).
+ *
+ * Non-fatal: on failure we just rely on WS ticks (sparkline grows live,
+ * change-% falls back to session-start reference via `history[0]`).
+ */
+async function seedIndex(symbol: string, restBaseUrl: string | null) {
+  try {
+    const candles = await api.fetchCandles(symbol, '1', restBaseUrl)
+    if (candles.length === 0) return
+    const closes = candles.map((c) => c.close)
+    useAppStore.getState().seedIndexHistory(symbol, closes, candles[0].open)
+  } catch (e) {
+    console.warn('seed index failed', symbol, e)
+  }
+}
+
+/** Seed tape size. Explicit so `hasMoreTape` can detect a full page — relying
+ *  on the server's implicit default would make the "more available?" signal
+ *  ambiguous (default varies by endpoint). */
+const TRADE_SEED_LIMIT = 200
+
+export async function seedSymbol(symbol: string, restBaseUrl: string | null) {
   if (symbol.startsWith(INDICES_PREFIX)) return
   try {
     const [ticker, trades, quote] = await Promise.all([
-      api.fetchTicker(symbol),
-      api.fetchTrades(symbol),
-      api.fetchQuote(symbol),
+      api.fetchTicker(symbol, restBaseUrl),
+      api.fetchTrades(symbol, restBaseUrl, { limit: TRADE_SEED_LIMIT }),
+      api.fetchQuote(symbol, restBaseUrl),
     ])
     const store = useAppStore.getState()
     store.applyTicker(symbol, ticker)
-    store.applyTradeHistory(symbol, trades)
+    store.applyTradeHistory(symbol, trades, TRADE_SEED_LIMIT)
     store.applyQuote(symbol, quote)
   } catch (e) {
     console.error('seed failed', symbol, e)
@@ -136,7 +176,7 @@ export async function seedSymbol(symbol: string) {
   // shows a chart without waiting. Kept out of Promise.all above so ticker/
   // trades/quote don't block on a bulky candles payload.
   api
-    .fetchCandles(symbol, DEFAULT_TIMEFRAME)
+    .fetchCandles(symbol, DEFAULT_TIMEFRAME, restBaseUrl)
     .then((candles) =>
       useAppStore.getState().setCandles(symbol, candles, DEFAULT_TIMEFRAME),
     )

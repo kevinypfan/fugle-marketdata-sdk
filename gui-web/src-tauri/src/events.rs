@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use marketdata_core::websocket::channels::{parse_channel_data, ChannelData};
 use marketdata_core::{
     AggregatesData, BooksData, CandleData, CandleHistoryItem, CandlesSnapshot, ConnectionEvent,
-    HistoricalCandle, IndicesData, IntradayCandle, TradesData, WebSocketMessage,
+    HistoricalCandle, IndicesData, IntradayCandle, StreamTrade, TradesData, WebSocketMessage,
 };
 
 /// Candle timeframe accepted by both intraday and historical endpoints.
@@ -90,7 +90,10 @@ impl From<CandleHistoryItem> for CandleDto {
 /// through this enum — those are returned directly from `fetch_ticker`,
 /// `fetch_trades`, and `fetch_candles` commands so the frontend can await them.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type")]
+// Use "kind" — "type" collides with TradesData/AggregatesData/IndicesData
+// which have their own `#[serde(rename = "type")]` field (data_type="EQUITY"
+// etc.), and flatten would overwrite the enum discriminant.
+#[serde(tag = "kind")]
 pub enum MarketEventDto {
     Aggregate(AggregatesData),
     TradeTick(TradesData),
@@ -109,7 +112,28 @@ impl MarketEventDto {
             msg.event.as_str(),
             parse_channel_data(channel, data, is_snapshot).ok()?,
         ) {
-            ("data" | "snapshot", ChannelData::Trades(t)) => Some(Self::TradeTick(t)),
+            ("data" | "snapshot", ChannelData::Trades(mut t)) => {
+                // "data" events send a single trade as flat top-level fields
+                // (price/size/bid/ask), not wrapped in `trades: [...]`. SDK's
+                // TradesData has `#[serde(default)]` on `trades`, so those
+                // events deserialize into an empty Vec. Reconstruct here.
+                if t.trades.is_empty() {
+                    if let Some(obj) = data.as_object() {
+                        if let (Some(price), Some(size)) = (
+                            obj.get("price").and_then(serde_json::Value::as_f64),
+                            obj.get("size").and_then(serde_json::Value::as_i64),
+                        ) {
+                            t.trades.push(StreamTrade {
+                                price,
+                                size,
+                                bid: obj.get("bid").and_then(serde_json::Value::as_f64),
+                                ask: obj.get("ask").and_then(serde_json::Value::as_f64),
+                            });
+                        }
+                    }
+                }
+                Some(Self::TradeTick(t))
+            }
             ("data" | "snapshot", ChannelData::Books(b)) => Some(Self::BookSnap(b)),
             ("data", ChannelData::CandleData(c)) => Some(Self::CandleTick(c)),
             ("snapshot", ChannelData::CandlesSnapshot(s)) => Some(Self::CandleHistory(s)),
@@ -140,7 +164,14 @@ impl From<ConnectionEvent> for ConnectionStateDto {
             ConnectionEvent::Disconnected { reason, .. } => Self::Disconnected { reason },
             ConnectionEvent::Reconnecting { attempt } => Self::Reconnecting { attempt },
             ConnectionEvent::ReconnectFailed { attempts } => Self::Failed {
-                message: format!("reconnect failed after {attempts} attempts"),
+                // SDK emits attempts=0 when the close code is non-retriable
+                // (1000 normal, 4xxx auth/app), i.e. gave up before trying;
+                // attempts>0 means it actually tried and ran out.
+                message: if attempts == 0 {
+                    "連線中斷（無法自動重連）".to_string()
+                } else {
+                    format!("重連失敗（{attempts} 次嘗試）")
+                },
             },
             ConnectionEvent::Unauthenticated { message } => Self::Failed { message },
             ConnectionEvent::Error { message, .. } => Self::Failed { message },

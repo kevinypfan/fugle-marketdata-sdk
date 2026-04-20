@@ -11,6 +11,10 @@ pub struct TradesRequestBuilder<'a> {
     client: &'a RestClient,
     symbol: Option<String>,
     odd_lot: Option<bool>,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    sort: Option<&'static str>,
+    is_trial: Option<bool>,
 }
 
 impl<'a> TradesRequestBuilder<'a> {
@@ -20,6 +24,10 @@ impl<'a> TradesRequestBuilder<'a> {
             client,
             symbol: None,
             odd_lot: None,
+            offset: None,
+            limit: None,
+            sort: None,
+            is_trial: None,
         }
     }
 
@@ -32,6 +40,36 @@ impl<'a> TradesRequestBuilder<'a> {
     /// Set whether to query odd lot data
     pub fn odd_lot(mut self, odd_lot: bool) -> Self {
         self.odd_lot = Some(odd_lot);
+        self
+    }
+
+    /// Pagination start offset (0 = most recent with default sort=desc)
+    pub fn offset(mut self, offset: u32) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    /// Max number of trades to return
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// Oldest-first ordering
+    pub fn sort_asc(mut self) -> Self {
+        self.sort = Some("asc");
+        self
+    }
+
+    /// Newest-first ordering (server default)
+    pub fn sort_desc(mut self) -> Self {
+        self.sort = Some("desc");
+        self
+    }
+
+    /// Fetch trial-matching (試撮合) trades only
+    pub fn is_trial(mut self, is_trial: bool) -> Self {
+        self.is_trial = Some(is_trial);
         self
     }
 
@@ -48,6 +86,18 @@ impl<'a> TradesRequestBuilder<'a> {
         let mut query_params = Vec::new();
         if let Some(odd_lot) = self.odd_lot {
             query_params.push(format!("oddLot={}", odd_lot));
+        }
+        if let Some(offset) = self.offset {
+            query_params.push(format!("offset={}", offset));
+        }
+        if let Some(limit) = self.limit {
+            query_params.push(format!("limit={}", limit));
+        }
+        if let Some(sort) = self.sort {
+            query_params.push(format!("sort={}", sort));
+        }
+        if let Some(is_trial) = self.is_trial {
+            query_params.push(format!("isTrial={}", is_trial));
         }
 
         if !query_params.is_empty() {
@@ -90,5 +140,21 @@ mod tests {
 
         assert_eq!(builder.symbol, Some("2330".to_string()));
         assert_eq!(builder.odd_lot, Some(true));
+    }
+
+    #[test]
+    fn test_trades_builder_with_pagination() {
+        let client = RestClient::new(Auth::SdkToken("test".to_string()));
+        let builder = TradesRequestBuilder::new(&client)
+            .symbol("2330")
+            .offset(50)
+            .limit(100)
+            .sort_desc()
+            .is_trial(true);
+
+        assert_eq!(builder.offset, Some(50));
+        assert_eq!(builder.limit, Some(100));
+        assert_eq!(builder.sort, Some("desc"));
+        assert_eq!(builder.is_trial, Some(true));
     }
 }

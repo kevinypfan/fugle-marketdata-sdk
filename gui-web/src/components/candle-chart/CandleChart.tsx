@@ -61,6 +61,7 @@ function CandleChartImpl() {
   const [timeframe, setTimeframe] = useState<Timeframe>('1')
 
   const selected = useAppStore((s) => s.selected)
+  const restBaseUrl = useAppStore((s) => s.restBaseUrl)
   const candles = useAppStore((s) =>
     selected ? s.symbols[selected]?.candles : undefined,
   )
@@ -88,14 +89,14 @@ function CandleChartImpl() {
     const gen = ++fetchGenRef.current
     void (async () => {
       try {
-        const data = await api.fetchCandles(selected, timeframe)
+        const data = await api.fetchCandles(selected, timeframe, restBaseUrl)
         if (gen !== fetchGenRef.current) return
         useAppStore.getState().setCandles(selected, data, timeframe)
       } catch (e) {
         console.error('fetchCandles failed', selected, timeframe, e)
       }
     })()
-  }, [selected, timeframe])
+  }, [selected, timeframe, restBaseUrl])
 
   // (3) Sync store candles → chart. Streaming CandleTick mutates the same
   // array, so this effect also handles the live update path.
