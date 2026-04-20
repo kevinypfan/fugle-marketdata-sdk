@@ -4,7 +4,7 @@
 //! Uses std::sync::mpsc (not tokio channels) for compatibility with non-async FFI consumers.
 
 use crate::models::WebSocketMessage;
-use crate::websocket::{ConnectionEvent, HealthCheck};
+use crate::websocket::{ConnectionEvent, HealthCheck, SubscriptionManager};
 use crate::MarketDataError;
 use futures_util::stream::SplitStream;
 use futures_util::StreamExt;
@@ -114,6 +114,7 @@ pub(crate) async fn dispatch_messages(
     message_tx: mpsc::Sender<WebSocketMessage>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     health_check: Arc<HealthCheck>,
+    subscriptions: Arc<SubscriptionManager>,
 ) -> Option<u16> {
     while let Some(msg_result) = ws_read.next().await {
         match msg_result {
@@ -121,6 +122,9 @@ pub(crate) async fn dispatch_messages(
                 match serde_json::from_str::<WebSocketMessage>(&text) {
                     Ok(ws_msg) => {
                         health_check.touch();
+                        // Mutex is only taken when event == "subscribed" (cheap
+                        // string compare for every other message).
+                        handle_subscribed_event(&subscriptions, &ws_msg);
                         if message_tx.send(ws_msg).is_err() {
                             return None;
                         }
@@ -137,6 +141,7 @@ pub(crate) async fn dispatch_messages(
                 match serde_json::from_slice::<WebSocketMessage>(&data) {
                     Ok(ws_msg) => {
                         health_check.touch();
+                        handle_subscribed_event(&subscriptions, &ws_msg);
                         if message_tx.send(ws_msg).is_err() {
                             return None;
                         }
@@ -194,6 +199,100 @@ pub(crate) async fn dispatch_messages(
         reason: "Connection closed".to_string(),
     });
     None
+}
+
+/// Build the subscription key used by `SubscriptionManager`, mirroring the
+/// suffix rules in `SubscribeRequest::key()`. The suffix only appears when
+/// the respective flag is explicitly true — matching server ack shapes that
+/// may omit the field for regular sessions.
+fn build_sub_key(channel: &str, symbol: &str, after_hours: bool, odd_lot: bool) -> String {
+    let base = format!("{}:{}", channel, symbol);
+    if after_hours {
+        format!("{base}:afterhours")
+    } else if odd_lot {
+        format!("{base}:oddlot")
+    } else {
+        base
+    }
+}
+
+/// If `msg` is a `subscribed` ack, record the server-assigned id in the
+/// subscription manager. Supports two wire shapes observed in the Fugle
+/// protocol:
+///   - single: top-level `{event, id, channel, symbol, afterHours?, intradayOddLot?}`
+///   - batched: `{event, data: [{id, channel, symbol, afterHours?, intradayOddLot?}, ...]}`
+/// Any shape we can't parse is silently ignored — the unsub fallback path
+/// (sending the local key as id) keeps the wire format valid even without
+/// a recorded server id.
+pub(crate) fn handle_subscribed_event(
+    subscriptions: &SubscriptionManager,
+    msg: &WebSocketMessage,
+) {
+    if msg.event != "subscribed" {
+        return;
+    }
+
+    // Batched shape: data is an array of subscription entries.
+    if let Some(arr) = msg.data.as_ref().and_then(|d| d.as_array()) {
+        for entry in arr {
+            let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let Some(channel) = entry.get("channel").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let Some(symbol) = entry.get("symbol").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let after_hours = entry
+                .get("afterHours")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let odd_lot = entry
+                .get("intradayOddLot")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            subscriptions.record_server_id(
+                build_sub_key(channel, symbol, after_hours, odd_lot),
+                id.to_string(),
+            );
+        }
+        return;
+    }
+
+    // Single shape: pull fields from data object when present, falling back
+    // to the WebSocketMessage top-level fields the model already exposes.
+    let data_obj = msg.data.as_ref().and_then(|d| d.as_object());
+    let id = data_obj
+        .and_then(|d| d.get("id"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| msg.id.clone());
+    let channel = data_obj
+        .and_then(|d| d.get("channel"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| msg.channel.clone());
+    let symbol = data_obj
+        .and_then(|d| d.get("symbol"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| msg.symbol.clone());
+    let after_hours = data_obj
+        .and_then(|d| d.get("afterHours"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let odd_lot = data_obj
+        .and_then(|d| d.get("intradayOddLot"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    if let (Some(id), Some(channel), Some(symbol)) = (id, channel, symbol) {
+        subscriptions.record_server_id(
+            build_sub_key(&channel, &symbol, after_hours, odd_lot),
+            id,
+        );
+    }
 }
 
 /// Internal ping sender
@@ -356,5 +455,91 @@ mod tests {
         // Next try should return None (channel closed, no more messages)
         let received2 = receiver.try_receive();
         assert!(received2.is_none());
+    }
+
+    fn parse_msg(json: &str) -> WebSocketMessage {
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn test_handle_subscribed_ignores_non_subscribed() {
+        let manager = SubscriptionManager::new();
+        let msg = parse_msg(
+            r#"{"event":"data","id":"sub-1","channel":"trades","symbol":"2330"}"#,
+        );
+        handle_subscribed_event(&manager, &msg);
+        assert!(manager.take_server_id("trades:2330").is_none());
+    }
+
+    #[test]
+    fn test_handle_subscribed_single_top_level() {
+        let manager = SubscriptionManager::new();
+        let msg = parse_msg(
+            r#"{"event":"subscribed","id":"sub-abc","channel":"trades","symbol":"2330"}"#,
+        );
+        handle_subscribed_event(&manager, &msg);
+        assert_eq!(
+            manager.take_server_id("trades:2330"),
+            Some("sub-abc".to_string())
+        );
+    }
+
+    #[test]
+    fn test_handle_subscribed_single_with_after_hours() {
+        let manager = SubscriptionManager::new();
+        let msg = parse_msg(
+            r#"{"event":"subscribed","data":{"id":"sub-ah","channel":"books","symbol":"TXFE6","afterHours":true}}"#,
+        );
+        handle_subscribed_event(&manager, &msg);
+        assert_eq!(
+            manager.take_server_id("books:TXFE6:afterhours"),
+            Some("sub-ah".to_string())
+        );
+        // Without the suffix it's a different key — mustn't collide.
+        assert!(manager.take_server_id("books:TXFE6").is_none());
+    }
+
+    #[test]
+    fn test_handle_subscribed_single_with_odd_lot() {
+        let manager = SubscriptionManager::new();
+        let msg = parse_msg(
+            r#"{"event":"subscribed","data":{"id":"sub-odd","channel":"trades","symbol":"2330","intradayOddLot":true}}"#,
+        );
+        handle_subscribed_event(&manager, &msg);
+        assert_eq!(
+            manager.take_server_id("trades:2330:oddlot"),
+            Some("sub-odd".to_string())
+        );
+    }
+
+    #[test]
+    fn test_handle_subscribed_batched_array() {
+        let manager = SubscriptionManager::new();
+        let msg = parse_msg(
+            r#"{"event":"subscribed","data":[
+                {"id":"sub-1","channel":"trades","symbol":"2330"},
+                {"id":"sub-2","channel":"books","symbol":"TXFE6","afterHours":true},
+                {"id":"sub-3","channel":"trades","symbol":"2317","intradayOddLot":true}
+            ]}"#,
+        );
+        handle_subscribed_event(&manager, &msg);
+        assert_eq!(manager.take_server_id("trades:2330"), Some("sub-1".into()));
+        assert_eq!(
+            manager.take_server_id("books:TXFE6:afterhours"),
+            Some("sub-2".into())
+        );
+        assert_eq!(
+            manager.take_server_id("trades:2317:oddlot"),
+            Some("sub-3".into())
+        );
+    }
+
+    #[test]
+    fn test_handle_subscribed_missing_fields_no_op() {
+        let manager = SubscriptionManager::new();
+        // No id, no channel — nothing to record.
+        let msg = parse_msg(r#"{"event":"subscribed","symbol":"2330"}"#);
+        handle_subscribed_event(&manager, &msg);
+        assert!(manager.take_server_id("trades:2330").is_none());
     }
 }

@@ -977,6 +977,7 @@ impl WebSocketClient {
                     message_tx.clone(),
                     event_tx.clone(),
                     Arc::clone(&health_check),
+                    Arc::clone(&subscriptions),
                 )
                 .await;
 
