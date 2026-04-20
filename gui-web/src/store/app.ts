@@ -585,8 +585,27 @@ export const useAppStore = create<AppStore>()(
               case 'CandleHistory': {
                 const s = ensureSymbol(state.symbols, key, ev.marketSource)
                 // ev.data items share shape with CandleDto (date, OHLCV).
-                s.candles = ev.data
-                s.candleTimeframe = (ev.timeframe as Timeframe) ?? '1'
+                const nextTf = (ev.timeframe as Timeframe) ?? '1'
+                // Merge by date instead of overwriting: a WS candles snapshot
+                // can legitimately be shorter than the REST seed (e.g. a
+                // pre-market subscription where the server only sends the
+                // current session's bars). Naive replacement would erase
+                // the longer REST history; merging keeps both and lets new
+                // bars overwrite stale ones at the same date.
+                if (!s.candles || s.candleTimeframe !== nextTf) {
+                  // Fresh symbol or timeframe switch — existing data is
+                  // either absent or semantically incompatible with the new
+                  // timeframe, so the incoming batch is the full truth.
+                  s.candles = ev.data
+                } else {
+                  const byDate = new Map<string, CandleDto>()
+                  for (const c of s.candles) byDate.set(c.date, c)
+                  for (const c of ev.data) byDate.set(c.date, c)
+                  s.candles = Array.from(byDate.values()).sort((a, b) =>
+                    a.date.localeCompare(b.date),
+                  )
+                }
+                s.candleTimeframe = nextTf
                 break
               }
               case 'CandleTick': {
