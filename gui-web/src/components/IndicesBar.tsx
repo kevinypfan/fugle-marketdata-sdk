@@ -36,7 +36,7 @@ function IndicesCellImpl({ symbol }: { symbol: string }) {
               ? `${arrow(tone)}${Math.abs(change).toFixed(2)}`
               : '—'}
           </span>
-          <Sparkline data={history} tone={tone} width={60} height={20} />
+          <Sparkline data={history} tone={tone} width={160} height={22} />
         </div>
       </div>
       <div className="flex items-baseline justify-between gap-2">
