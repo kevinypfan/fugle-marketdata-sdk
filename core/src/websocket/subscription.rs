@@ -2,16 +2,26 @@
 
 use crate::models::SubscribeRequest;
 use indexmap::IndexMap;
+use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// Manages WebSocket subscription state with insertion order preservation
 ///
 /// Tracks active subscriptions and maintains their order for reconnection.
+/// Also tracks server-returned subscription ids so unsubscribe can send the
+/// correct id back to the server (Fugle's protocol requires the id it issued
+/// in the `subscribed` ack, not a client-side composite key).
+///
 /// Thread-safe with RwLock for concurrent access.
 pub struct SubscriptionManager {
-    /// Maps subscription key (channel:symbol) to SubscribeRequest
+    /// Maps subscription key (channel:symbol[:suffix]) to SubscribeRequest
     /// IndexMap preserves insertion order for ordered reconnection
     subscriptions: RwLock<IndexMap<String, SubscribeRequest>>,
+
+    /// Maps local subscription key to the server-assigned id from the
+    /// `subscribed` event. Empty until the server acks; fallback path in
+    /// unsubscribe uses the local key when a server id isn't recorded yet.
+    server_ids: RwLock<HashMap<String, String>>,
 }
 
 impl SubscriptionManager {
@@ -19,6 +29,7 @@ impl SubscriptionManager {
     pub fn new() -> Self {
         Self {
             subscriptions: RwLock::new(IndexMap::new()),
+            server_ids: RwLock::new(HashMap::new()),
         }
     }
 
@@ -32,13 +43,43 @@ impl SubscriptionManager {
         subs.insert(key, req);
     }
 
-    /// Remove a subscription from state
+    /// Remove a subscription from state (also drops any recorded server id)
     ///
     /// From CONTEXT.md: "unsubscribe() 在斷線期間立即從狀態移除"
     /// Removes immediately even if disconnected.
     pub fn unsubscribe(&self, key: &str) {
         let mut subs = self.subscriptions.write().unwrap();
         subs.shift_remove(key);
+        // Keep id map coherent — unsub drops any server id for this key. Use
+        // a separate write() to avoid holding both locks simultaneously.
+        drop(subs);
+        self.server_ids.write().unwrap().remove(key);
+    }
+
+    /// Record the server-assigned subscription id for a local key.
+    ///
+    /// Called when a `subscribed` event arrives from the server. Overwrites
+    /// any previous id for the same key (which is correct behavior: a fresh
+    /// server id replaces the old one, e.g. on reconnect).
+    pub fn record_server_id(&self, key: String, server_id: String) {
+        self.server_ids.write().unwrap().insert(key, server_id);
+    }
+
+    /// Remove and return the recorded server id for a key.
+    ///
+    /// Returns `None` if the ack hasn't arrived yet (rare race on fast
+    /// subscribe+unsubscribe), in which case the caller should fall back to
+    /// sending the local key as the id so the wire format stays valid.
+    pub fn take_server_id(&self, key: &str) -> Option<String> {
+        self.server_ids.write().unwrap().remove(key)
+    }
+
+    /// Clear the server id map.
+    ///
+    /// Called on reconnect — every server id is now stale because the server
+    /// will issue fresh ids on the new connection.
+    pub fn clear_server_ids(&self) {
+        self.server_ids.write().unwrap().clear();
     }
 
     /// Remove subscription by channel and symbol
@@ -70,10 +111,12 @@ impl SubscriptionManager {
         subs.len()
     }
 
-    /// Clear all subscriptions
+    /// Clear all subscriptions (and server id map)
     pub fn clear(&self) {
         let mut subs = self.subscriptions.write().unwrap();
         subs.clear();
+        drop(subs);
+        self.server_ids.write().unwrap().clear();
     }
 
     /// Get all subscription keys
@@ -226,5 +269,68 @@ mod tests {
 
         // Count should still be 1 (update, not duplicate)
         assert_eq!(manager.count(), 1);
+    }
+
+    #[test]
+    fn test_server_id_record_and_take() {
+        let manager = SubscriptionManager::new();
+
+        assert!(manager.take_server_id("trades:2330").is_none());
+
+        manager.record_server_id("trades:2330".into(), "sub-xyz".into());
+        assert_eq!(manager.take_server_id("trades:2330"), Some("sub-xyz".into()));
+
+        // take consumes, second call is None
+        assert!(manager.take_server_id("trades:2330").is_none());
+    }
+
+    #[test]
+    fn test_server_id_overwrites_on_reconnect() {
+        let manager = SubscriptionManager::new();
+
+        manager.record_server_id("trades:2330".into(), "sub-old".into());
+        // Reconnect scenario: server issues a fresh id for the same local key.
+        manager.record_server_id("trades:2330".into(), "sub-new".into());
+
+        assert_eq!(manager.take_server_id("trades:2330"), Some("sub-new".into()));
+    }
+
+    #[test]
+    fn test_unsubscribe_drops_server_id() {
+        let manager = SubscriptionManager::new();
+
+        manager.subscribe(SubscribeRequest::new(Channel::Trades, "2330"));
+        manager.record_server_id("trades:2330".into(), "sub-xyz".into());
+
+        manager.unsubscribe("trades:2330");
+
+        // After unsubscribe the id is gone, so a stale unsub wouldn't pick it up.
+        assert!(manager.take_server_id("trades:2330").is_none());
+    }
+
+    #[test]
+    fn test_clear_server_ids() {
+        let manager = SubscriptionManager::new();
+
+        manager.record_server_id("trades:2330".into(), "sub-a".into());
+        manager.record_server_id("books:2317".into(), "sub-b".into());
+
+        manager.clear_server_ids();
+
+        assert!(manager.take_server_id("trades:2330").is_none());
+        assert!(manager.take_server_id("books:2317").is_none());
+    }
+
+    #[test]
+    fn test_clear_also_clears_server_ids() {
+        let manager = SubscriptionManager::new();
+
+        manager.subscribe(SubscribeRequest::new(Channel::Trades, "2330"));
+        manager.record_server_id("trades:2330".into(), "sub-xyz".into());
+
+        manager.clear();
+
+        assert_eq!(manager.count(), 0);
+        assert!(manager.take_server_id("trades:2330").is_none());
     }
 }
