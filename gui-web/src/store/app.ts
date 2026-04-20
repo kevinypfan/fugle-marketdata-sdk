@@ -118,6 +118,14 @@ export interface AppStore {
     stock: ConnectionState | null
     futopt: ConnectionState | null
   }
+  /** Unix ms of the most recent data/snapshot batch received from each
+   *  market. The existing `conn` flag only tells you the socket handshook —
+   *  it doesn't tell you whether the server is actually pushing. Lets the
+   *  StatusBar distinguish "已連線 and live" from "已連線 but silent". */
+  dataStaleness: {
+    stock: number | null
+    futopt: number | null
+  }
   /** Live index values, keyed by symbol (e.g. 'IX0001', 'IX0043').
    *  `history` is a rolling buffer of recent values for the sparkline and
    *  doubles as a session-reference fallback when `previousClose` is not
@@ -317,6 +325,7 @@ export const useAppStore = create<AppStore>()(
       selected: null,
       symbols: {},
       conn: { stock: null, futopt: null },
+      dataStaleness: { stock: null, futopt: null },
       indices: {},
 
       hydrate: (snapshot) =>
@@ -463,6 +472,21 @@ export const useAppStore = create<AppStore>()(
 
       applyEvents: (batch) =>
         set((state) => {
+          // Stamp staleness once per batch per market — granularity is
+          // always-at-least-16ms (coalesce interval) so sub-tick precision
+          // is noise; save the N extra writes per event.
+          if (batch.length > 0) {
+            const now = Date.now()
+            let sawStock = false
+            let sawFutopt = false
+            for (const ev of batch) {
+              if (ev.marketSource === 'stock') sawStock = true
+              else if (ev.marketSource === 'futopt') sawFutopt = true
+              if (sawStock && sawFutopt) break
+            }
+            if (sawStock) state.dataStaleness.stock = now
+            if (sawFutopt) state.dataStaleness.futopt = now
+          }
           for (const ev of batch) {
             // Redirect canonical-symbol events to user-input key when an
             // alias is known (populated by applyFutoptTicker). If no alias
