@@ -490,7 +490,7 @@ impl WebSocketClient {
             .count();
 
         if auth_count != 1 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
+            return Err(pyo3::exceptions::PyTypeError::new_err(
                 "Provide exactly one of: api_key, bearer_token, sdk_token"
             ));
         }
