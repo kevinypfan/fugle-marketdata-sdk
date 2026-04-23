@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
-Record Official SDK Baseline Performance
+Record 2.x Pure-Python SDK Baseline Performance
 
-Records baseline latency metrics from the official fugle-marketdata-python SDK.
-Run this once with FUGLE_API_KEY to establish comparison baseline.
+Records baseline latency metrics from the pure-Python fugle-marketdata SDK
+(upstream: fugle-dev/fugle-marketdata-python, last 2.x release: 2.4.1) to
+compare against this Rust rewrite.
 
-Usage: python record_official_baseline.py
+NOTE ON PYPI NAME: Starting with 3.0.0, the PyPI project `fugle-marketdata`
+is this Rust rewrite. To get the 2.x pure-Python SDK, run this script from
+an isolated venv:
+    python -m venv .venv-official && source .venv-official/bin/activate
+    pip install 'fugle-marketdata<3'
+    # or: pip install ./fugle-marketdata-python  (from repo root)
+
+Usage: FUGLE_API_KEY=... python record_official_baseline.py
 Output: baseline.json with median latencies for each operation
 """
 import os
@@ -27,8 +35,8 @@ def main():
     try:
         from fugle_marketdata import RestClient
     except ImportError:
-        print("Error: fugle-marketdata not installed")
-        print("Install official SDK: pip install fugle-marketdata")
+        print("Error: fugle-marketdata not installed in this venv")
+        print("Install 2.x pure-Python SDK (see docstring): pip install 'fugle-marketdata<3'")
         return 1
 
     print("Recording official SDK baseline...")
@@ -82,7 +90,7 @@ def main():
     baseline_path = Path(__file__).parent / "baseline.json"
     with open(baseline_path, "w") as f:
         json.dump({
-            "sdk": "fugle-marketdata-python",
+            "sdk": "fugle-marketdata-python (2.x pure-Python)",
             "recorded_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "operations": results,
         }, f, indent=2)

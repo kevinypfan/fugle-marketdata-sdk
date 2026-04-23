@@ -2,13 +2,29 @@
 """
 VCR Recording Script for Official Fugle SDK Responses
 
-This script records API responses from the official fugle-marketdata-python SDK
-to VCR cassettes for fixture-based compatibility testing.
+This script records API responses from the pure-Python fugle-marketdata SDK
+(upstream: fugle-dev/fugle-marketdata-python, last 2.x release: 2.4.1) to VCR
+cassettes for fixture-based compatibility testing.
+
+NOTE ON PYPI NAME: Starting with 3.0.0, the PyPI project `fugle-marketdata`
+is this Rust-based rewrite. `pip install fugle-marketdata` in a fresh venv
+will land on the Rust impl, NOT the 2.x Python SDK. To record 2.x baseline
+responses you must explicitly pin or install from the vendored source.
 
 Usage:
-    1. Install official SDK: pip install fugle-marketdata
-    2. Set your API key: export FUGLE_API_KEY="your-key-here"
-    3. Run this script: python record_official_responses.py
+    1. Create an isolated venv (do not reuse the dev venv):
+         python -m venv .venv-official && source .venv-official/bin/activate
+
+    2. Install the 2.4.1 pure-Python SDK. Either:
+         pip install 'fugle-marketdata<3'
+       or, from the vendored checkout at repo root:
+         pip install ./fugle-marketdata-python
+
+    3. Set API key and VCR dep:
+         export FUGLE_API_KEY="your-key-here"
+         pip install vcrpy
+
+    4. Run this script: python tests/fixtures/record_official_responses.py
 
 The script will create YAML cassette files in the fixtures/ directory.
 These cassettes can then be used for deterministic testing without API calls.
@@ -25,18 +41,22 @@ if not API_KEY:
     print("FUGLE_API_KEY not set - VCR recording skipped")
     print("=" * 80)
     print()
-    print("To record official SDK responses:")
-    print("  1. Install official SDK:")
-    print("     pip install fugle-marketdata")
+    print("To record 2.x official SDK responses (see module docstring):")
+    print("  1. Create isolated venv:")
+    print("     python -m venv .venv-official && source .venv-official/bin/activate")
     print()
-    print("  2. Get API key from Fugle Developer Portal:")
+    print("  2. Install 2.x pure-Python SDK (NOT latest — latest is this Rust rewrite):")
+    print("     pip install 'fugle-marketdata<3' vcrpy")
+    print("     # or: pip install ./fugle-marketdata-python vcrpy")
+    print()
+    print("  3. Get API key from Fugle Developer Portal:")
     print("     https://developer.fugle.tw/")
     print("     → API Management → Create API Key")
     print()
-    print("  3. Export API key:")
+    print("  4. Export API key:")
     print("     export FUGLE_API_KEY='your-key-here'")
     print()
-    print("  4. Run this script:")
+    print("  5. Run this script:")
     print("     python tests/fixtures/record_official_responses.py")
     print()
     print("=" * 80)
@@ -53,8 +73,8 @@ except ImportError:
 try:
     from fugle_marketdata import RestClient
 except ImportError:
-    print("ERROR: fugle-marketdata not installed")
-    print("Install with: pip install fugle-marketdata")
+    print("ERROR: fugle-marketdata not installed in this venv")
+    print("Install 2.x pure-Python SDK (see docstring): pip install 'fugle-marketdata<3'")
     sys.exit(1)
 
 # Configure VCR
