@@ -1439,6 +1439,8 @@ pub struct FutOptWebSocketClient {
     callbacks: Arc<CallbackRegistry>,
     state: Arc<Mutex<Option<WebSocketState>>>,
     runtime: Arc<Mutex<Option<tokio::runtime::Runtime>>>,
+    message_thread_stop: Arc<AtomicBool>,
+    message_thread_handle: Arc<Mutex<Option<std::thread::JoinHandle<()>>>>,
 }
 
 impl FutOptWebSocketClient {
@@ -1456,6 +1458,56 @@ impl FutOptWebSocketClient {
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
+            message_thread_stop: Arc::new(AtomicBool::new(false)),
+            message_thread_handle: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn has_message_callbacks(&self) -> bool {
+        self.callbacks.count(crate::callback::EventType::Message) > 0
+    }
+
+    fn start_message_thread(&self, receiver: Arc<marketdata_core::MessageReceiver>) {
+        let callbacks = Arc::clone(&self.callbacks);
+        let stop_flag = Arc::clone(&self.message_thread_stop);
+        stop_flag.store(false, Ordering::SeqCst);
+
+        let handle = std::thread::Builder::new()
+            .name("futopt_ws_messages".to_string())
+            .spawn(move || {
+                while !stop_flag.load(Ordering::SeqCst) {
+                    match receiver.receive_timeout(Duration::from_millis(100)) {
+                        Ok(Some(msg)) => {
+                            Python::attach(|py| {
+                                if let Ok(dict) = message_to_dict(py, &msg) {
+                                    let args = pyo3::types::PyTuple::new(py, [dict.into_any()])
+                                        .expect("Failed to create tuple");
+                                    callbacks.invoke(
+                                        py,
+                                        crate::callback::EventType::Message,
+                                        &args,
+                                    );
+                                }
+                            });
+                        }
+                        Ok(None) => {}
+                        Err(_) => break,
+                    }
+                }
+            })
+            .expect("failed to spawn futopt_ws_messages thread");
+
+        if let Ok(mut guard) = self.message_thread_handle.lock() {
+            *guard = Some(handle);
+        }
+    }
+
+    fn stop_message_thread(&self) {
+        self.message_thread_stop.store(true, Ordering::SeqCst);
+        if let Ok(mut guard) = self.message_thread_handle.lock() {
+            if let Some(handle) = guard.take() {
+                let _ = handle.join();
+            }
         }
     }
 
@@ -1550,6 +1602,8 @@ impl FutOptWebSocketClient {
 
         match result {
             Ok(()) => {
+                let receiver_for_thread = Arc::clone(&receiver);
+
                 // Store state
                 let state = WebSocketState {
                     inner: Arc::new(ws_client),
@@ -1560,6 +1614,14 @@ impl FutOptWebSocketClient {
                     pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
                 })?;
                 *state_guard = Some(state);
+
+                // Start background message dispatch thread if callbacks registered.
+                // Without this, raw server messages (including authenticated acks
+                // and subscription events) never reach the `on("message", ...)`
+                // callback — the receiver just sits full.
+                if self.has_message_callbacks() {
+                    self.start_message_thread(receiver_for_thread);
+                }
 
                 // Spawn event listener thread for connection events
                 let callbacks_for_events = Arc::clone(&self.callbacks);
@@ -1619,6 +1681,9 @@ impl FutOptWebSocketClient {
     /// Disconnect from WebSocket server
     #[pyo3(signature = ())]
     pub fn disconnect(&self, _py: Python<'_>) -> PyResult<()> {
+        // Stop background message dispatch thread first.
+        self.stop_message_thread();
+
         let mut state_guard = self.state.lock().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e))
         })?;
