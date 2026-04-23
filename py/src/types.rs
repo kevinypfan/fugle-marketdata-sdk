@@ -18,6 +18,7 @@ pub fn quote_to_dict(py: Python<'_>, quote: &marketdata_core::Quote) -> PyResult
     dict.set_item("exchange", &quote.exchange)?;
     dict.set_item("market", &quote.market)?;
     dict.set_item("name", &quote.name)?;
+    dict.set_item("previousClose", quote.previous_close)?;
 
     // OHLC prices
     dict.set_item("openPrice", quote.open_price)?;

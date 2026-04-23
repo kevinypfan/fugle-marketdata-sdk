@@ -31,6 +31,10 @@ pub struct Quote {
     /// Stock name
     pub name: Option<String>,
 
+    /// Previous trading day's close price
+    #[serde(rename = "previousClose", default)]
+    pub previous_close: Option<f64>,
+
     // === OHLC prices with timestamps ===
     /// Open price
     #[serde(rename = "openPrice")]
@@ -225,6 +229,7 @@ mod tests {
             "market": "TSE",
             "symbol": "2330",
             "name": "台積電",
+            "previousClose": 580.0,
             "openPrice": 580.0,
             "openTime": 1705287000000,
             "highPrice": 585.0,
@@ -263,6 +268,7 @@ mod tests {
         let quote: Quote = serde_json::from_str(json).unwrap();
         assert_eq!(quote.symbol, "2330");
         assert_eq!(quote.name.as_deref(), Some("台積電"));
+        assert_eq!(quote.previous_close, Some(580.0));
         assert_eq!(quote.last_price, Some(583.0));
         assert_eq!(quote.bids.len(), 2);
         assert_eq!(quote.asks.len(), 2);
