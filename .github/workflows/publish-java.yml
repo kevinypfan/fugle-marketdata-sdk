@@ -2,8 +2,17 @@ name: Publish Java to GitHub Packages
 
 on:
   workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Version string to publish (e.g. 3.0.0-rc.3)'
+        required: false
+        default: '3.0.0-dev'
+        type: string
       dry-run:
         description: 'Dry run (skip actual publish)'
         required: false
@@ -56,7 +65,7 @@ jobs:
       - name: Publish to GitHub Packages
         if: ${{ github.event.inputs.dry-run != 'true' }}
         working-directory: bindings/java
-        run: ./gradlew publish
+        run: ./gradlew publish -PprojectVersion=${{ inputs.version }}
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,7 +74,8 @@ jobs:
         if: ${{ github.event.inputs.dry-run == 'true' }}
         working-directory: bindings/java
         run: |
-          ./gradlew build
+          ./gradlew build -PprojectVersion=${{ inputs.version }}
           echo "## Java Package (Dry Run)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Package built successfully but not published (dry run mode)" >> $GITHUB_STEP_SUMMARY
+          echo "Version: \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY

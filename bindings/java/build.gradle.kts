@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "tw.com.fugle"
-version = "3.0.0"
+version = providers.gradleProperty("projectVersion").getOrElse("3.0.0-dev")
 
 publishing {
     publications {

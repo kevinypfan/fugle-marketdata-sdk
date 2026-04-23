@@ -119,6 +119,8 @@ jobs:
     name: Publish to GitHub Packages (Java)
     needs: [extract-version, build-uniffi]
     uses: ./.github/workflows/publish-java.yml
+    with:
+      version: ${{ needs.extract-version.outputs.version }}
 
   # ==============================================================
   # Wave 2b: Package internal artifacts (prerelease channel only)
