@@ -9,21 +9,21 @@ use pyo3::create_exception;
 // Create a custom Python exception hierarchy for market data errors
 
 // Base exception for all market data errors
-create_exception!(marketdata_py, MarketDataError, PyException);
+create_exception!(fugle_marketdata, MarketDataError, PyException);
 
 // API-related errors
-create_exception!(marketdata_py, ApiError, MarketDataError, "API request failed");
-create_exception!(marketdata_py, RateLimitError, ApiError, "Rate limit exceeded");
+create_exception!(fugle_marketdata, ApiError, MarketDataError, "API request failed");
+create_exception!(fugle_marketdata, RateLimitError, ApiError, "Rate limit exceeded");
 
 // Authentication errors
-create_exception!(marketdata_py, AuthError, MarketDataError, "Authentication failed");
+create_exception!(fugle_marketdata, AuthError, MarketDataError, "Authentication failed");
 
 // Connection errors
-create_exception!(marketdata_py, ConnectionError, MarketDataError, "Connection failed");
-create_exception!(marketdata_py, TimeoutError, MarketDataError, "Operation timed out");
+create_exception!(fugle_marketdata, ConnectionError, MarketDataError, "Connection failed");
+create_exception!(fugle_marketdata, TimeoutError, MarketDataError, "Operation timed out");
 
 // WebSocket errors
-create_exception!(marketdata_py, WebSocketError, MarketDataError, "WebSocket operation failed");
+create_exception!(fugle_marketdata, WebSocketError, MarketDataError, "WebSocket operation failed");
 
 /// Convert marketdata_core error to PyErr with specific exception types
 ///

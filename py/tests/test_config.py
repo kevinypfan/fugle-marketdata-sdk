@@ -8,7 +8,7 @@ Tests:
 - WebSocketClient kwargs constructor with config params
 """
 import pytest
-from marketdata_py import (
+from fugle_marketdata import (
     RestClient,
     WebSocketClient,
     ReconnectConfig,

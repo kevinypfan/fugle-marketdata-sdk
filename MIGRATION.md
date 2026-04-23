@@ -259,7 +259,7 @@ just want a drop-in replacement.
 
 ```python
 import asyncio
-from marketdata_py import RestClient, WebSocketClient
+from fugle_marketdata import RestClient, WebSocketClient
 
 async def main():
     client = RestClient(api_key="your-api-key")
@@ -270,7 +270,7 @@ asyncio.run(main())
 ```
 
 ```python
-from marketdata_py import WebSocketClient
+from fugle_marketdata import WebSocketClient
 
 ws = WebSocketClient(api_key="your-api-key")
 
@@ -326,7 +326,7 @@ For a complete list of changes, see [CHANGELOG.md](CHANGELOG.md).
 
 **Before (v0.2.x):**
 ```python
-from marketdata_py import RestClient, WebSocketClient
+from fugle_marketdata import RestClient, WebSocketClient
 
 client = RestClient("your-api-key")
 client2 = RestClient.with_bearer_token("your-token")
@@ -335,7 +335,7 @@ ws = WebSocketClient("your-api-key")
 
 **After (v0.3.0):**
 ```python
-from marketdata_py import RestClient, WebSocketClient, ReconnectConfig, HealthCheckConfig
+from fugle_marketdata import RestClient, WebSocketClient, ReconnectConfig, HealthCheckConfig
 
 client = RestClient(api_key="your-api-key")
 client2 = RestClient(bearer_token="your-token")

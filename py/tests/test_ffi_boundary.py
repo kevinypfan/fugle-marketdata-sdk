@@ -29,7 +29,7 @@ class TestErrorHandlingBoundary:
     @pytest.mark.asyncio
     async def test_invalid_symbol_raises_typed_error(self, mock_api_key):
         """Invalid symbol should raise specific error type (not base MarketDataError)."""
-        from marketdata_py import RestClient, MarketDataError
+        from fugle_marketdata import RestClient, MarketDataError
 
         client = RestClient(mock_api_key)
 
@@ -48,7 +48,7 @@ class TestErrorHandlingBoundary:
     @pytest.mark.asyncio
     async def test_auth_error_type_mapping(self, mock_api_key):
         """Authentication failure should raise AuthError."""
-        from marketdata_py import RestClient, AuthError, MarketDataError
+        from fugle_marketdata import RestClient, AuthError, MarketDataError
 
         # Mock key will likely fail authentication
         client = RestClient(mock_api_key)
@@ -69,7 +69,7 @@ class TestErrorHandlingBoundary:
     @pytest.mark.asyncio
     async def test_error_message_no_corruption(self, mock_api_key):
         """Error messages should be valid strings (no memory corruption)."""
-        from marketdata_py import RestClient, MarketDataError
+        from fugle_marketdata import RestClient, MarketDataError
 
         client = RestClient(mock_api_key)
 
@@ -89,7 +89,7 @@ class TestErrorHandlingBoundary:
     @pytest.mark.asyncio
     async def test_error_args_accessible(self, mock_api_key):
         """Error args should contain message and error code."""
-        from marketdata_py import RestClient, MarketDataError
+        from fugle_marketdata import RestClient, MarketDataError
 
         client = RestClient(mock_api_key)
 
@@ -111,7 +111,7 @@ class TestPanicRecovery:
 
     def test_empty_api_key_doesnt_panic(self):
         """Empty API key should not cause panic (may succeed or fail gracefully)."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         # Empty API key should not panic - may accept empty string
         try:
@@ -126,7 +126,7 @@ class TestPanicRecovery:
     @pytest.mark.asyncio
     async def test_long_input_doesnt_overflow(self):
         """Very long input strings should not cause buffer overflow."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient("test_key")
 
@@ -141,7 +141,7 @@ class TestPanicRecovery:
     @pytest.mark.asyncio
     async def test_unicode_input_handled_safely(self):
         """Unicode input should be handled without panic."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient("test_key")
 
@@ -166,7 +166,7 @@ class TestMemorySafety:
 
     def test_client_cleanup_after_gc(self):
         """Client should be properly cleaned up after garbage collection."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         # Create multiple clients and delete them
         clients = [RestClient(f"key_{i}") for i in range(10)]
@@ -186,7 +186,7 @@ class TestMemorySafety:
 
     def test_concurrent_client_creation(self):
         """Multiple clients should not interfere with each other's memory."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         clients = [RestClient(f"key_{i}") for i in range(10)]
 
@@ -200,7 +200,7 @@ class TestMemorySafety:
     @pytest.mark.asyncio
     async def test_client_reuse_after_error(self):
         """Client should remain usable after error (no state corruption)."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient("test_key")
 
@@ -220,7 +220,7 @@ class TestMemorySafety:
     @pytest.mark.skipif(sys.version_info < (3, 9), reason="Requires Python 3.9+")
     async def test_buffer_protocol_safety(self):
         """Test that any buffer handling is memory safe."""
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient("test_key")
 
@@ -248,7 +248,7 @@ class TestGilSafety:
     async def test_blocking_call_releases_gil(self):
         """Async call should not block event loop."""
         import asyncio
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient("test_key")
         results = []
@@ -275,7 +275,7 @@ class TestGilSafety:
     async def test_multiple_clients_parallel(self):
         """Multiple concurrent async calls should not deadlock."""
         import asyncio
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         results = []
 

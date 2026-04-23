@@ -2,7 +2,7 @@
 """簡單的 REST API 範例"""
 
 import os
-from marketdata_py import RestClient
+from fugle_marketdata import RestClient
 
 # 從環境變數取得 API key
 api_key = os.environ.get("FUGLE_API_KEY")

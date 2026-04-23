@@ -6,7 +6,7 @@ eyeball-compare API surface and runtime behavior. The only intentional
 difference is the import path:
 
     Legacy:  from fugle_marketdata import WebSocketClient, RestClient
-    Ours:    from marketdata_py    import WebSocketClient, RestClient
+    Ours:    from fugle_marketdata    import WebSocketClient, RestClient
 
 Run individual sections, or all of them:
 
@@ -21,7 +21,7 @@ import os
 import sys
 import time
 
-from marketdata_py import (
+from fugle_marketdata import (
     RestClient,
     WebSocketClient,
     FugleAPIError,

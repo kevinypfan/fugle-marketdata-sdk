@@ -5,7 +5,7 @@ Unit tests run without API key, integration tests require FUGLE_API_KEY.
 """
 import asyncio
 import pytest
-from marketdata_py import (
+from fugle_marketdata import (
     WebSocketClient,
     MarketDataError,
     ConnectionError,

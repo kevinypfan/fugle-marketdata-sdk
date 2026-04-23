@@ -1,4 +1,4 @@
-"""Type stubs for marketdata_py
+"""Type stubs for fugle_marketdata
 
 Fugle Market Data SDK - Python bindings with full type annotations.
 """
@@ -76,7 +76,7 @@ class RestClient:
     Example:
         ```python
         import asyncio
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         async def main():
             client = RestClient("your-api-key")
@@ -1137,7 +1137,7 @@ class HealthCheckConfig:
 
     Example:
         ```python
-        from marketdata_py import HealthCheckConfig, WebSocketClient
+        from fugle_marketdata import HealthCheckConfig, WebSocketClient
 
         config = HealthCheckConfig(
             enabled=True,
@@ -1185,7 +1185,7 @@ class ReconnectConfig:
 
     Example:
         ```python
-        from marketdata_py import ReconnectConfig, WebSocketClient
+        from fugle_marketdata import ReconnectConfig, WebSocketClient
 
         config = ReconnectConfig(
             enabled=True,
@@ -1249,7 +1249,7 @@ class WebSocketClient:
 
     Example:
         ```python
-        from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+        from fugle_marketdata import WebSocketClient, ReconnectConfig, HealthCheckConfig
 
         # Basic usage
         ws = WebSocketClient(api_key="your-key")

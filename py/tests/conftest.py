@@ -1,7 +1,7 @@
-"""Pytest configuration for marketdata_py tests."""
+"""Pytest configuration for fugle_marketdata tests."""
 import os
 import pytest
-from marketdata_py import RestClient, WebSocketClient
+from fugle_marketdata import RestClient, WebSocketClient
 
 # Get API key from environment for integration tests
 API_KEY = os.environ.get("FUGLE_API_KEY", "test-api-key")

@@ -4,7 +4,7 @@ These tests verify that the REST client works correctly in Python asyncio contex
 Unit tests run without API key, integration tests require FUGLE_API_KEY.
 """
 import pytest
-from marketdata_py import (
+from fugle_marketdata import (
     RestClient,
     MarketDataError,
     ApiError,

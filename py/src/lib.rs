@@ -6,7 +6,7 @@
 //! # REST Client Example (Python)
 //!
 //! ```python
-//! from marketdata_py import RestClient
+//! from fugle_marketdata import RestClient
 //!
 //! # Create client with API key
 //! client = RestClient("your-api-key")
@@ -21,7 +21,7 @@
 //! # WebSocket Client Example (Python)
 //!
 //! ```python
-//! from marketdata_py import WebSocketClient
+//! from fugle_marketdata import WebSocketClient
 //!
 //! # Create WebSocket client
 //! ws = WebSocketClient("your-api-key")
@@ -46,7 +46,7 @@
 //! ```python
 //! # Future async API (Plan 02-02)
 //! import asyncio
-//! from marketdata_py import AsyncRestClient, AsyncWebSocketClient
+//! from fugle_marketdata import AsyncRestClient, AsyncWebSocketClient
 //!
 //! async def main():
 //!     # Async REST client
@@ -67,7 +67,7 @@
 //! # Exception Hierarchy
 //!
 //! ```python
-//! from marketdata_py import (
+//! from fugle_marketdata import (
 //!     MarketDataError,  # Base exception
 //!     ApiError,         # API request failed
 //!     RateLimitError,   # Rate limit exceeded (extends ApiError)
@@ -96,7 +96,7 @@ mod websocket;
 
 /// Python module for marketdata-core bindings
 #[pymodule]
-fn marketdata_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn fugle_marketdata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register the main RestClient class
     m.add_class::<client::RestClient>()?;
 

@@ -3,7 +3,7 @@
 
 import os
 import time
-from marketdata_py import WebSocketClient
+from fugle_marketdata import WebSocketClient
 
 # 從環境變數取得 API key
 api_key = os.environ.get("FUGLE_API_KEY")

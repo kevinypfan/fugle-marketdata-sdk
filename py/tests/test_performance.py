@@ -12,7 +12,7 @@ import pytest
 import asyncio
 import json
 from pathlib import Path
-from marketdata_py import RestClient
+from fugle_marketdata import RestClient
 
 # Skip if native library not available
 pytestmark = pytest.mark.benchmark

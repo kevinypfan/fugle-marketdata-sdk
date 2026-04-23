@@ -15,7 +15,7 @@ import os
 import sys
 import time
 import threading
-from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+from fugle_marketdata import WebSocketClient, ReconnectConfig, HealthCheckConfig
 
 # ============================================================
 # 設定

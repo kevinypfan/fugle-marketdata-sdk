@@ -1,77 +1,15 @@
+"""Deprecation shim — re-exports `fugle_marketdata` under the legacy
+`marketdata_py` name for pre-3.0 local installs. Will be removed in 3.1.0.
 """
-Fugle Market Data SDK - Python bindings
+import warnings
 
-Drop-in replacement for fugle-marketdata-python with Rust performance.
-
-Usage:
-    from marketdata_py import RestClient, WebSocketClient
-
-    # REST API (async)
-    async def main():
-        client = RestClient("your-api-key")
-        quote = await client.stock.intraday.quote("2330")
-        print(quote)
-
-    # WebSocket (async iterator)
-    async def stream():
-        ws = WebSocketClient("your-api-key")
-        await ws.stock.connect()
-        await ws.stock.subscribe("trades", "2330")
-        async for msg in ws.stock.messages():
-            print(msg)
-"""
-
-from .marketdata_py import (
-    # Clients
-    RestClient,
-    WebSocketClient,
-    # Sub-clients (for type hints)
-    StockClient,
-    StockIntradayClient,
-    FutOptClient,
-    FutOptIntradayClient,
-    StockWebSocketClient,
-    FutOptWebSocketClient,
-    # Iterators
-    MessageIterator,
-    # Exceptions
-    MarketDataError,
-    ApiError,
-    AuthError,
-    RateLimitError,
-    ConnectionError,
-    TimeoutError,
-    WebSocketError,
-    # Backward-compat alias for the legacy fugle-marketdata-python single
-    # exception class. Resolves to MarketDataError so `except FugleAPIError:`
-    # keeps catching every error variant.
-    FugleAPIError,
-    # Config
-    ReconnectConfig,
-    HealthCheckConfig,
+warnings.warn(
+    "`marketdata_py` is the pre-3.0 internal module name and is kept as a "
+    "compatibility shim. Use `from fugle_marketdata import ...` instead. "
+    "This shim will be removed in 3.1.0.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
-__version__ = "0.2.0"
-
-__all__ = [
-    "RestClient",
-    "WebSocketClient",
-    "StockClient",
-    "StockIntradayClient",
-    "FutOptClient",
-    "FutOptIntradayClient",
-    "StockWebSocketClient",
-    "FutOptWebSocketClient",
-    "MessageIterator",
-    "MarketDataError",
-    "ApiError",
-    "AuthError",
-    "RateLimitError",
-    "ConnectionError",
-    "TimeoutError",
-    "WebSocketError",
-    "FugleAPIError",
-    "ReconnectConfig",
-    "HealthCheckConfig",
-    "__version__",
-]
+from fugle_marketdata import *  # noqa: F401,F403,E402
+from fugle_marketdata import __all__  # noqa: E402

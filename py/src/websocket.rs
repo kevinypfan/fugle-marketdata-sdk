@@ -6,7 +6,7 @@
 //! # Example (Python)
 //!
 //! ```python
-//! from marketdata_py import WebSocketClient
+//! from fugle_marketdata import WebSocketClient
 //!
 //! # Create client with API key
 //! ws = WebSocketClient("your-api-key")
@@ -209,7 +209,7 @@ fn resolve_unsubscribe_args(
 /// # Example (Python)
 ///
 /// ```python
-/// from marketdata_py import ReconnectConfig
+/// from fugle_marketdata import ReconnectConfig
 ///
 /// config = ReconnectConfig(
 ///     enabled=True,
@@ -326,7 +326,7 @@ impl Default for ReconnectConfig {
 /// # Example (Python)
 ///
 /// ```python
-/// from marketdata_py import HealthCheckConfig, WebSocketClient
+/// from fugle_marketdata import HealthCheckConfig, WebSocketClient
 ///
 /// # Custom health check
 /// health_check = HealthCheckConfig(
@@ -419,7 +419,7 @@ impl Default for HealthCheckConfig {
 /// # Example (Python)
 ///
 /// ```python
-/// from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+/// from fugle_marketdata import WebSocketClient, ReconnectConfig, HealthCheckConfig
 ///
 /// # Create client with API key
 /// ws = WebSocketClient(api_key="your-api-key")

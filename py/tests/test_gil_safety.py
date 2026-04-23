@@ -25,7 +25,7 @@ class TestGilSafety:
         This test spawns multiple concurrent async tasks. If the GIL is held
         during await operations, tasks would block each other and timeout.
         """
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient(mock_api_key)
 
@@ -50,7 +50,7 @@ class TestGilSafety:
         This test mixes async and threaded sync operations. If GIL handling
         is incorrect, thread pool tasks would deadlock with async tasks.
         """
-        from marketdata_py import RestClient
+        from fugle_marketdata import RestClient
 
         client = RestClient(mock_api_key)
 
@@ -86,7 +86,7 @@ class TestGilSafety:
         This tests that the async iterator's __anext__ releases GIL properly.
         If GIL is held during recv(), other async tasks would be blocked.
         """
-        from marketdata_py import WebSocketClient
+        from fugle_marketdata import WebSocketClient
 
         ws = WebSocketClient(mock_api_key)
 
@@ -124,7 +124,7 @@ class TestGilSafety:
         This is a more direct test of the async iterator pattern.
         Creates a mock scenario where we test concurrent execution.
         """
-        from marketdata_py import WebSocketClient
+        from fugle_marketdata import WebSocketClient
 
         ws = WebSocketClient(mock_api_key)
 

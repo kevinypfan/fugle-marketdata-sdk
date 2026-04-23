@@ -20,20 +20,20 @@ import sys
 def test_import():
     """Test importing the module."""
     print("Test 1: Import module...")
-    import marketdata_py
-    print(f"  Module: {marketdata_py}")
-    print(f"  WebSocketClient: {marketdata_py.WebSocketClient}")
-    print(f"  StockWebSocketClient: {marketdata_py.StockWebSocketClient}")
-    print(f"  FutOptWebSocketClient: {marketdata_py.FutOptWebSocketClient}")
-    print(f"  MessageIterator: {marketdata_py.MessageIterator}")
+    import fugle_marketdata
+    print(f"  Module: {fugle_marketdata}")
+    print(f"  WebSocketClient: {fugle_marketdata.WebSocketClient}")
+    print(f"  StockWebSocketClient: {fugle_marketdata.StockWebSocketClient}")
+    print(f"  FutOptWebSocketClient: {fugle_marketdata.FutOptWebSocketClient}")
+    print(f"  MessageIterator: {fugle_marketdata.MessageIterator}")
     print("  OK\n")
-    return marketdata_py
+    return fugle_marketdata
 
 
-def test_client_creation(marketdata_py):
+def test_client_creation(fugle_marketdata):
     """Test WebSocket client creation."""
     print("Test 2: Create WebSocketClient...")
-    ws = marketdata_py.WebSocketClient("test-api-key")
+    ws = fugle_marketdata.WebSocketClient("test-api-key")
     print(f"  Client: {ws}")
 
     # Access stock and futopt getters
@@ -46,10 +46,10 @@ def test_client_creation(marketdata_py):
     return ws
 
 
-def test_callback_registration(marketdata_py):
+def test_callback_registration(fugle_marketdata):
     """Test callback registration."""
     print("Test 3: Test callback registration...")
-    ws = marketdata_py.WebSocketClient("test-api-key")
+    ws = fugle_marketdata.WebSocketClient("test-api-key")
 
     # Register callbacks
     messages_received = []
@@ -98,10 +98,10 @@ def test_callback_registration(marketdata_py):
     return True
 
 
-def test_not_connected_error(marketdata_py):
+def test_not_connected_error(fugle_marketdata):
     """Test error when not connected."""
     print("Test 4: Test not connected errors...")
-    ws = marketdata_py.WebSocketClient("test-api-key")
+    ws = fugle_marketdata.WebSocketClient("test-api-key")
     stock = ws.stock
 
     # is_connected should return False
@@ -136,14 +136,14 @@ def test_not_connected_error(marketdata_py):
     return True
 
 
-def test_futopt_client(marketdata_py):
+def test_futopt_client(fugle_marketdata):
     """Test FutOpt client."""
     print("Test 5: Test FutOpt client...")
-    ws = marketdata_py.WebSocketClient("test-api-key")
+    ws = fugle_marketdata.WebSocketClient("test-api-key")
     futopt = ws.futopt
 
     # Verify it's the correct type
-    assert isinstance(futopt, marketdata_py.FutOptWebSocketClient)
+    assert isinstance(futopt, fugle_marketdata.FutOptWebSocketClient)
     print(f"  FutOpt client type: {type(futopt)}")
 
     # Test callback registration
@@ -162,13 +162,13 @@ def test_futopt_client(marketdata_py):
     return True
 
 
-def test_gc_check(marketdata_py):
+def test_gc_check(fugle_marketdata):
     """Basic GC check - ensure no obvious memory leaks."""
     print("Test 6: Basic GC check...")
 
     # Create and destroy multiple clients
     for i in range(10):
-        ws = marketdata_py.WebSocketClient("test-api-key")
+        ws = fugle_marketdata.WebSocketClient("test-api-key")
         stock = ws.stock
         futopt = ws.futopt
 
@@ -197,10 +197,10 @@ def test_gc_check(marketdata_py):
     return True
 
 
-def test_subscriptions_list(marketdata_py):
+def test_subscriptions_list(fugle_marketdata):
     """Test subscriptions() returns empty list when not connected."""
     print("Test 7: Test subscriptions list...")
-    ws = marketdata_py.WebSocketClient("test-api-key")
+    ws = fugle_marketdata.WebSocketClient("test-api-key")
     stock = ws.stock
     futopt = ws.futopt
 
@@ -224,22 +224,22 @@ def main():
     print("=" * 60 + "\n")
 
     try:
-        marketdata_py = test_import()
-        test_client_creation(marketdata_py)
+        fugle_marketdata = test_import()
+        test_client_creation(fugle_marketdata)
 
-        if not test_callback_registration(marketdata_py):
+        if not test_callback_registration(fugle_marketdata):
             return 1
 
-        if not test_not_connected_error(marketdata_py):
+        if not test_not_connected_error(fugle_marketdata):
             return 1
 
-        if not test_futopt_client(marketdata_py):
+        if not test_futopt_client(fugle_marketdata):
             return 1
 
-        if not test_gc_check(marketdata_py):
+        if not test_gc_check(fugle_marketdata):
             return 1
 
-        if not test_subscriptions_list(marketdata_py):
+        if not test_subscriptions_list(fugle_marketdata):
             return 1
 
         print("=" * 60)

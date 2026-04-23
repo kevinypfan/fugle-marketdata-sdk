@@ -47,5 +47,5 @@ jobs:
       - name: Run Python tests
         working-directory: py
         run: |
-          python -c "import marketdata_py; print('Import successful')"
+          python -c "import fugle_marketdata; print('Import successful')"
         # pytest tests/ will be added in Phase 2

@@ -1,7 +1,7 @@
 """
 API Compatibility Tests for fugle-marketdata-python
 
-These tests verify that marketdata_py API matches the official SDK structure.
+These tests verify that fugle_marketdata API matches the official SDK structure.
 Reference: https://github.com/fugle-dev/fugle-marketdata-python
 
 Success Criterion #3: API compatibility with fugle-marketdata-python
@@ -11,7 +11,7 @@ async/await support while maintaining the same API structure.
 """
 import pytest
 import inspect
-from marketdata_py import RestClient, WebSocketClient
+from fugle_marketdata import RestClient, WebSocketClient
 
 
 class TestRestClientAPICompatibility:
@@ -377,7 +377,7 @@ class TestOfficialSDKExamplePatterns:
             data = client.stock.intraday.quote(symbol='2330')
 
         Our implementation:
-            from marketdata_py import RestClient
+            from fugle_marketdata import RestClient
             client = RestClient('YOUR_API_KEY')
             data = await client.stock.intraday.quote_async('2330')  # async!
         """
@@ -400,7 +400,7 @@ class TestOfficialSDKExamplePatterns:
             client.stock.subscribe({ 'channel': 'trades', 'symbol': '2330' })
 
         Our implementation:
-            from marketdata_py import WebSocketClient
+            from fugle_marketdata import WebSocketClient
             client = WebSocketClient('YOUR_API_KEY')
             client.stock.on('message', handle_message)
             await client.stock.connect_async()  # or client.stock.connect()
@@ -436,9 +436,9 @@ class TestOfficialSDKExamplePatterns:
 # ============================================================================
 #
 # This table documents the compatibility between official fugle-marketdata-python
-# SDK and our marketdata_py implementation:
+# SDK and our fugle_marketdata implementation:
 #
-# | Feature                          | Official SDK | marketdata_py | Notes                |
+# | Feature                          | Official SDK | fugle_marketdata | Notes                |
 # |----------------------------------|--------------|---------------|----------------------|
 # | **REST Client**                  |              |               |                      |
 # | RestClient(api_key)              | sync         | sync          | Constructor          |

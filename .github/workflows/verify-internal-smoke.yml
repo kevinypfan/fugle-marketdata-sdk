@@ -85,7 +85,7 @@ jobs:
       - name: Import + construct client
         run: |
           python -c "
-          from marketdata_py import RestClient, MarketDataError
+          from fugle_marketdata import RestClient, MarketDataError
           client = RestClient(api_key='smoke-test-token')
           assert hasattr(client, 'stock'), 'missing stock accessor'
           assert hasattr(client, 'futopt'), 'missing futopt accessor'

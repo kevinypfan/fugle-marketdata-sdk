@@ -6,7 +6,7 @@ license.workspace = true
 description = "Python bindings for marketdata-core"
 
 [lib]
-name = "marketdata_py"
+name = "fugle_marketdata"
 crate-type = ["cdylib"]
 
 [dependencies]

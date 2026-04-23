@@ -14,7 +14,7 @@ use crate::types;
 /// # Example (Python)
 ///
 /// ```python
-/// from marketdata_py import RestClient
+/// from fugle_marketdata import RestClient
 ///
 /// # Create client with API key
 /// client = RestClient("your-api-key")

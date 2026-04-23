@@ -1,5 +1,5 @@
 """
-Test script for marketdata_py REST client
+Test script for fugle_marketdata REST client
 
 This script tests:
 1. Module import
@@ -9,19 +9,19 @@ This script tests:
 """
 
 import os
-import marketdata_py
-from marketdata_py import RestClient, MarketDataError
+import fugle_marketdata
+from fugle_marketdata import RestClient, MarketDataError
 
 
 def test_import():
     """Test module can be imported"""
     print("Testing import...")
-    assert hasattr(marketdata_py, 'RestClient')
-    assert hasattr(marketdata_py, 'MarketDataError')
-    assert hasattr(marketdata_py, 'StockClient')
-    assert hasattr(marketdata_py, 'StockIntradayClient')
-    assert hasattr(marketdata_py, 'FutOptClient')
-    assert hasattr(marketdata_py, 'FutOptIntradayClient')
+    assert hasattr(fugle_marketdata, 'RestClient')
+    assert hasattr(fugle_marketdata, 'MarketDataError')
+    assert hasattr(fugle_marketdata, 'StockClient')
+    assert hasattr(fugle_marketdata, 'StockIntradayClient')
+    assert hasattr(fugle_marketdata, 'FutOptClient')
+    assert hasattr(fugle_marketdata, 'FutOptIntradayClient')
     print("  Import OK")
 
 
@@ -125,7 +125,7 @@ def test_api_call_with_invalid_key():
 def run_all_tests():
     """Run all tests"""
     print("=" * 60)
-    print("marketdata_py REST Client Tests")
+    print("fugle_marketdata REST Client Tests")
     print("=" * 60)
 
     test_import()

@@ -23,7 +23,7 @@ maturin develop
 
 ```bash
 maturin build --release
-pip install target/wheels/marketdata_py-*.whl
+pip install target/wheels/fugle_marketdata-*.whl
 ```
 
 ## Quick Start
@@ -31,7 +31,7 @@ pip install target/wheels/marketdata_py-*.whl
 ### REST API
 
 ```python
-from marketdata_py import RestClient, MarketDataError
+from fugle_marketdata import RestClient, MarketDataError
 
 # Create client with API key
 client = RestClient(api_key="your-api-key")
@@ -64,7 +64,7 @@ print(f"Futures Price: {futopt_quote['closePrice']}")
 ### WebSocket Streaming
 
 ```python
-from marketdata_py import WebSocketClient
+from fugle_marketdata import WebSocketClient
 import time
 
 # Create WebSocket client
@@ -125,7 +125,7 @@ for msg in stock2.messages():
 Three authentication methods are supported:
 
 ```python
-from marketdata_py import RestClient
+from fugle_marketdata import RestClient
 
 # 1. API Key (most common)
 client = RestClient(api_key="your-api-key")
@@ -144,7 +144,7 @@ client = RestClient(sdk_token="your-sdk-token")
 Control WebSocket automatic reconnection behavior:
 
 ```python
-from marketdata_py import WebSocketClient, ReconnectConfig
+from fugle_marketdata import WebSocketClient, ReconnectConfig
 
 # Create custom reconnect configuration
 reconnect = ReconnectConfig(
@@ -168,7 +168,7 @@ ws = WebSocketClient(api_key="your-key", reconnect=reconnect)
 Control WebSocket health check (ping-pong) behavior:
 
 ```python
-from marketdata_py import WebSocketClient, HealthCheckConfig
+from fugle_marketdata import WebSocketClient, HealthCheckConfig
 
 # Create custom health check configuration
 health_check = HealthCheckConfig(
@@ -188,7 +188,7 @@ ws = WebSocketClient(api_key="your-key", health_check=health_check)
 ### Combined Configuration
 
 ```python
-from marketdata_py import WebSocketClient, ReconnectConfig, HealthCheckConfig
+from fugle_marketdata import WebSocketClient, ReconnectConfig, HealthCheckConfig
 
 reconnect = ReconnectConfig(max_attempts=10, initial_delay_ms=2000)
 health_check = HealthCheckConfig(enabled=True, interval_ms=15000)
@@ -292,7 +292,7 @@ msg = messages.recv_timeout(5.0)  # Timeout in seconds
 All API errors raise `MarketDataError`:
 
 ```python
-from marketdata_py import RestClient, MarketDataError
+from fugle_marketdata import RestClient, MarketDataError
 
 client = RestClient(api_key="invalid-key")
 
@@ -325,7 +325,7 @@ except MarketDataError as e:
 ### Full REST Example
 
 ```python
-from marketdata_py import RestClient, MarketDataError
+from fugle_marketdata import RestClient, MarketDataError
 import os
 
 def main():
@@ -363,7 +363,7 @@ if __name__ == "__main__":
 ### Full WebSocket Example
 
 ```python
-from marketdata_py import WebSocketClient, MarketDataError
+from fugle_marketdata import WebSocketClient, MarketDataError
 import os
 import time
 
