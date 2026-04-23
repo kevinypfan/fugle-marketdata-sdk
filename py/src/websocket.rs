@@ -696,7 +696,7 @@ impl StockWebSocketClient {
     ///   - "connect" / "connected": Called when connection established
     ///   - "disconnect" / "disconnected" / "close": Called when connection closed
     ///   - "reconnect" / "reconnecting": Called when reconnecting
-    ///   - "error": Called with (message, code) when error occurs
+    ///   - "error": Called with a single `err` argument (WebSocketError instance) when error occurs
     ///
     /// Args:
     ///     event: Event type string
@@ -1493,7 +1493,7 @@ impl FutOptWebSocketClient {
     ///   - "connect" / "connected": Called when connection established
     ///   - "disconnect" / "disconnected" / "close": Called when connection closed
     ///   - "reconnect" / "reconnecting": Called when reconnecting
-    ///   - "error": Called with (message, code) when error occurs
+    ///   - "error": Called with a single `err` argument (WebSocketError instance) when error occurs
     ///
     /// Args:
     ///     event: Event type string

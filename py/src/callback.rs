@@ -201,17 +201,29 @@ impl CallbackRegistry {
     }
 
     /// Invoke error callbacks with message and code
+    /// Invoke error callbacks with a single exception-like argument, matching
+    /// the 2.4.1 SDK's `error(err)` callback arity. Constructs a
+    /// `WebSocketError` instance with `(message, code)` so user code can do
+    /// `on('error', lambda err: print(err))` or inspect `err.args`.
     pub fn invoke_error(&self, py: Python<'_>, message: &str, code: i32) {
-        use pyo3::IntoPyObject;
-        let msg_obj: Py<PyAny> = message.into_pyobject(py).expect("Failed to convert message").unbind().into_any();
-        let code_obj: Py<PyAny> = code.into_pyobject(py).expect("Failed to convert code").unbind().into_any();
-        let args = pyo3::types::PyTuple::new(py, [msg_obj, code_obj]).expect("Failed to create tuple");
+        let err = crate::errors::WebSocketError::new_err((message.to_string(), code));
+        let err_obj: Py<PyAny> = err.into_value(py).into_any();
+        let args = pyo3::types::PyTuple::new(py, [err_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Error, &args);
     }
 
-    /// Invoke authenticated callbacks (no args, parallels old SDK's `authenticated` event)
+    /// Invoke authenticated callbacks with the server's authenticated ack
+    /// message, matching the 2.4.1 SDK's `authenticated(message)` arity.
+    /// Core currently doesn't propagate the raw ack payload, so we pass a
+    /// minimal `{"event": "authenticated"}` dict; full payload propagation
+    /// can follow when core's `ConnectionEvent::Authenticated` carries data.
     pub fn invoke_authenticated(&self, py: Python<'_>) {
-        let args = pyo3::types::PyTuple::empty(py);
+        let msg_dict = pyo3::types::PyDict::new(py);
+        msg_dict
+            .set_item("event", "authenticated")
+            .expect("Failed to set event");
+        let msg_obj: Py<PyAny> = msg_dict.unbind().into_any();
+        let args = pyo3::types::PyTuple::new(py, [msg_obj]).expect("Failed to create tuple");
         self.invoke(py, EventType::Authenticated, &args);
     }
 
