@@ -1917,6 +1917,268 @@ impl FutOptIntradayClient {
             Err(e) => Err(errors::to_py_err(e)),
         }
     }
+
+    // ============================================================
+    // Methods B4 — drop-in parity with fugle-marketdata 2.4.1
+    //
+    // Official 2.4.1 exposes: futopt.intraday.{ticker, candles, trades, volumes}
+    // via **params. We expose typed sync + async pairs; the **kwargs
+    // forwarding layer (B2) will sit on top in a later commit.
+    // ============================================================
+
+    /// Get intraday ticker for a FutOpt contract
+    #[pyo3(signature = (symbol, after_hours=false))]
+    pub fn ticker_async<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        after_hours: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.ticker().symbol(&symbol);
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                builder.send()
+            })
+            .await
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(ticker) => Python::attach(|py| {
+                    let json_val = serde_json::to_value(&ticker).map_err(|e| {
+                        pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e))
+                    })?;
+                    types::json_value_to_py(py, &json_val)
+                }),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Sync sibling of `ticker()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, after_hours=false))]
+    pub fn ticker(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        after_hours: bool,
+    ) -> PyResult<Py<PyAny>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.ticker().symbol(&symbol);
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            builder.send()
+        });
+        match result {
+            Ok(ticker) => {
+                let json_val = serde_json::to_value(&ticker).map_err(|e| {
+                    pyo3::exceptions::PyValueError::new_err(format!("Serialization error: {}", e))
+                })?;
+                types::json_value_to_py(py, &json_val)
+            }
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Get intraday candles for a FutOpt contract
+    #[pyo3(signature = (symbol, timeframe="1".to_string(), after_hours=false))]
+    pub fn candles_async<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        timeframe: String,
+        after_hours: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday
+                    .candles()
+                    .symbol(&symbol)
+                    .timeframe(&timeframe);
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                builder.send()
+            })
+            .await
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(candles) => Python::attach(|py| types::candles_to_dict(py, &candles)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Sync sibling of `candles()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, timeframe="1".to_string(), after_hours=false))]
+    pub fn candles(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        timeframe: String,
+        after_hours: bool,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday
+                .candles()
+                .symbol(&symbol)
+                .timeframe(&timeframe);
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            builder.send()
+        });
+        match result {
+            Ok(candles) => types::candles_to_dict(py, &candles),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Get intraday trades for a FutOpt contract
+    #[pyo3(signature = (symbol, after_hours=false, offset=None, limit=None, is_trial=None))]
+    pub fn trades_async<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        after_hours: bool,
+        offset: Option<i32>,
+        limit: Option<i32>,
+        is_trial: Option<bool>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.trades().symbol(&symbol);
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                if let Some(o) = offset {
+                    builder = builder.offset(o);
+                }
+                if let Some(l) = limit {
+                    builder = builder.limit(l);
+                }
+                if let Some(t) = is_trial {
+                    builder = builder.is_trial(t);
+                }
+                builder.send()
+            })
+            .await
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(trades) => Python::attach(|py| types::trades_to_dict(py, &trades)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Sync sibling of `trades()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, after_hours=false, offset=None, limit=None, is_trial=None))]
+    pub fn trades(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        after_hours: bool,
+        offset: Option<i32>,
+        limit: Option<i32>,
+        is_trial: Option<bool>,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.trades().symbol(&symbol);
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            if let Some(o) = offset {
+                builder = builder.offset(o);
+            }
+            if let Some(l) = limit {
+                builder = builder.limit(l);
+            }
+            if let Some(t) = is_trial {
+                builder = builder.is_trial(t);
+            }
+            builder.send()
+        });
+        match result {
+            Ok(trades) => types::trades_to_dict(py, &trades),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
+
+    /// Get intraday volumes for a FutOpt contract
+    #[pyo3(signature = (symbol, after_hours=false))]
+    pub fn volumes_async<'py>(
+        &self,
+        py: Python<'py>,
+        symbol: String,
+        after_hours: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = self.inner.clone();
+        future_into_py(py, async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let futopt = client.futopt();
+                let intraday = futopt.intraday();
+                let mut builder = intraday.volumes().symbol(&symbol);
+                if after_hours {
+                    builder = builder.after_hours();
+                }
+                builder.send()
+            })
+            .await
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Task join error: {}", e)))?;
+
+            match result {
+                Ok(volumes) => Python::attach(|py| types::volumes_to_dict(py, &volumes)),
+                Err(e) => Err(errors::to_py_err(e)),
+            }
+        })
+    }
+
+    /// Sync sibling of `volumes()` for legacy fugle-marketdata callers.
+    #[pyo3(signature = (symbol, after_hours=false))]
+    pub fn volumes(
+        &self,
+        py: Python<'_>,
+        symbol: String,
+        after_hours: bool,
+    ) -> PyResult<Py<pyo3::types::PyDict>> {
+        let inner = self.inner.clone();
+        let result = py.detach(|| {
+            let futopt = inner.futopt();
+            let intraday = futopt.intraday();
+            let mut builder = intraday.volumes().symbol(&symbol);
+            if after_hours {
+                builder = builder.after_hours();
+            }
+            builder.send()
+        });
+        match result {
+            Ok(volumes) => types::volumes_to_dict(py, &volumes),
+            Err(e) => Err(errors::to_py_err(e)),
+        }
+    }
 }
 
 fn parse_futopt_type(s: &str) -> PyResult<marketdata_core::models::futopt::FutOptType> {
