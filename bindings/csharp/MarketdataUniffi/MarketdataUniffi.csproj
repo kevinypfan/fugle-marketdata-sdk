@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PackageId>MarketdataUniffi</PackageId>
-    <Version>0.3.0-dev</Version>
+    <Version>3.0.0</Version>
     <Authors>Zack Fan</Authors>
     <Description>UniFFI-generated bindings for Fugle Market Data SDK</Description>
     <PackageTags>fugle;marketdata;ffi;uniffi</PackageTags>

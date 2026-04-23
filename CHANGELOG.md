@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - TBD
+
+Major release — SDK graduates to 3.x. All language bindings bump together.
+
+### Python (fugle-marketdata on PyPI)
+
+Drop-in successor to the pure-Python `fugle-marketdata` 2.4.1 maintained at
+[fugle-dev/fugle-marketdata-python](https://github.com/fugle-dev/fugle-marketdata-python).
+`pip install -U fugle-marketdata` brings you to this Rust-based rewrite.
+
+#### Changed (BREAKING)
+- Import path renamed from `marketdata_py` to `fugle_marketdata`, matching
+  the 2.4.1 convention. A `marketdata_py` shim emits `DeprecationWarning`
+  and re-exports for one release; it will be removed in 3.1.0.
+- Exceptions now anchored at `fugle_marketdata.*` (previously
+  `marketdata_py.*`). Affects traceback display and pickling.
+
+#### Added
+- Version aligned with official 2.x series — this is the 3.0 major.
+
+### Node.js / Java / C# / Go
+
+All bindings bump from 0.3.x to 3.0.0 to share a unified SDK version across
+the workspace. No API changes in this version beyond the Python-specific
+rename above.
+
 ## [0.3.0] - 2026-02-16
 
 ### Added

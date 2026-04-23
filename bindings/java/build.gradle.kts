@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "tw.com.fugle"
-version = "0.3.0-dev"
+version = "3.0.0"
 
 publishing {
     publications {
