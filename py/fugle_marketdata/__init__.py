@@ -51,7 +51,14 @@ from .fugle_marketdata import (
     HealthCheckConfig,
 )
 
-__version__ = "0.2.0"
+from importlib.metadata import version as _pkg_version, PackageNotFoundError
+
+try:
+    __version__ = _pkg_version("fugle-marketdata")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
+
+del _pkg_version, PackageNotFoundError
 
 __all__ = [
     "RestClient",
