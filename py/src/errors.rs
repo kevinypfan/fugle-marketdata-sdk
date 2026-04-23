@@ -34,14 +34,24 @@ create_exception!(fugle_marketdata, WebSocketError, MarketDataError, "WebSocket 
 /// - Connection/WebSocket errors → WebSocketError
 /// - Other errors → MarketDataError (base exception)
 ///
-/// The error_code is available as the second element of args:
+/// The PyErr's exception instance exposes the following attributes, matching
+/// the 2.4.1 SDK's `FugleAPIError` contract:
+///
+/// - `message` — human-readable error message (str)
+/// - `status_code` — HTTP status for ApiError variants, else None
+/// - `url` — request URL (None; requires plumbing from HTTP client)
+/// - `params` — request params (None; requires plumbing from HTTP client)
+/// - `response_text` — raw response body (None; requires plumbing from HTTP client)
+///
+/// The legacy `args[0]` (message) and `args[1]` (internal error_code) are
+/// preserved for existing code paths.
+///
 /// ```python
 /// try:
 ///     quote = client.stock.intraday.quote("INVALID")
-/// except ApiError as e:
-///     message = e.args[0]
-///     error_code = e.args[1]  # error code is in args[1]
-///     print(f"Error {error_code}: {message}")
+/// except FugleAPIError as e:
+///     print(e.message)      # same as str(e)
+///     print(e.status_code)  # HTTP status for API errors, else None
 /// ```
 pub fn to_py_err(err: marketdata_core::MarketDataError) -> PyErr {
     use marketdata_core::MarketDataError as CoreError;
@@ -49,32 +59,41 @@ pub fn to_py_err(err: marketdata_core::MarketDataError) -> PyErr {
     let error_code = err.to_error_code();
     let message = err.to_string();
 
+    // Extract status_code before consuming `err` in the match below.
+    let status_code: Option<u16> = match &err {
+        CoreError::ApiError { status, .. } => Some(*status),
+        _ => None,
+    };
+
     // Map to specific exception types based on error variant
-    match err {
-        CoreError::AuthError { .. } => {
-            AuthError::new_err((message, error_code))
-        }
+    let pyerr = match err {
+        CoreError::AuthError { .. } => AuthError::new_err((message.clone(), error_code)),
         CoreError::ApiError { status, .. } => {
-            // Rate limit error for HTTP 429
             if status == 429 {
-                RateLimitError::new_err((message, error_code))
+                RateLimitError::new_err((message.clone(), error_code))
             } else {
-                ApiError::new_err((message, error_code))
+                ApiError::new_err((message.clone(), error_code))
             }
         }
-        CoreError::TimeoutError { .. } => {
-            TimeoutError::new_err((message, error_code))
-        }
+        CoreError::TimeoutError { .. } => TimeoutError::new_err((message.clone(), error_code)),
         CoreError::ConnectionError { .. }
         | CoreError::WebSocketError { .. }
-        | CoreError::ClientClosed => {
-            WebSocketError::new_err((message, error_code))
-        }
-        _ => {
-            // All other errors use base MarketDataError
-            MarketDataError::new_err((message, error_code))
-        }
-    }
+        | CoreError::ClientClosed => WebSocketError::new_err((message.clone(), error_code)),
+        _ => MarketDataError::new_err((message.clone(), error_code)),
+    };
+
+    // Attach 2.4.1-compatible attributes on the exception instance so
+    // `except FugleAPIError as e: e.status_code` works drop-in.
+    Python::attach(|py| {
+        let inst = pyerr.value(py);
+        let _ = inst.setattr("message", &message);
+        let _ = inst.setattr("status_code", status_code);
+        let _ = inst.setattr("url", py.None());
+        let _ = inst.setattr("params", py.None());
+        let _ = inst.setattr("response_text", py.None());
+    });
+
+    pyerr
 }
 
 /// Helper to get error_code from a MarketDataError
