@@ -111,6 +111,8 @@ jobs:
     needs: [extract-version, build-uniffi]
     if: needs.extract-version.outputs.channel == 'stable'
     uses: ./.github/workflows/publish-nuget.yml
+    with:
+      version: ${{ needs.extract-version.outputs.version }}
     secrets: inherit
 
   # Java runs on both channels — it's already on GitHub Packages with
@@ -192,12 +194,21 @@ jobs:
         working-directory: js
         run: npm ci
 
+      # Inject the tag-derived version into package.json before the local
+      # build below bakes it into js/index.js version-check literals. Must
+      # run after `npm ci` (which reads from package.json) and before
+      # `npm run build` (which regenerates index.js). --allow-same-version
+      # avoids error on stable builds where injected == current.
+      - name: Inject version into package.json
+        working-directory: js
+        run: npm version --no-git-tag-version --allow-same-version "${{ needs.extract-version.outputs.version }}"
+
       # Run a local build to generate js/index.js + js/index.d.ts + the loader.
       # We keep the default (pre-prepublish) loader so the resulting tarball
       # resolves .node files by process.platform rather than via
-      # optionalDependencies (which wouldn't be installable offline). Pack-time
-      # package.json stays untouched, which is critical — its `files` array
-      # already includes `*.node`.
+      # optionalDependencies (which wouldn't be installable offline).
+      # package.json is the one artifact we DO want modified (via the inject
+      # step above) — its `files` array already includes `*.node`.
       - name: Local build (generates index.js + loader)
         working-directory: js
         run: npm run build
@@ -266,7 +277,7 @@ jobs:
 
       - name: Pack .nupkg
         working-directory: bindings/csharp/MarketdataUniffi
-        run: dotnet pack -c Release -o nupkg
+        run: dotnet pack -c Release -p:Version=${{ needs.extract-version.outputs.version }} -o nupkg
 
       - name: Upload as internal artifact
         uses: actions/upload-artifact@v4
