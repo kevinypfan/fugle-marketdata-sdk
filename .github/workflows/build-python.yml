@@ -32,9 +32,6 @@ jobs:
           # Debian 10+, Ubuntu 18.04+ — the broadest compatibility so
           # downstream packages pinning the 2_17 baseline stay happy.
           #
-          # openssl-sys vendored build needs perl-IPC-Cmd / perl-Digest-SHA
-          # (not in CentOS 7 default image); installed via
-          # before-script-linux. See Build wheels step below.
           - os: ubuntu-latest
             target: x86_64
             manylinux: '2_17'
@@ -89,16 +86,6 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           args: --release -m py/Cargo.toml --out dist
-          # manylinux2014 (CentOS 7) ships a minimal perl that lacks
-          # several stdlib modules openssl-src's bundled OpenSSL 3.5.x
-          # Configure + Makefile.in use (Time::Piece, IPC::Cmd,
-          # Digest::SHA, File::Compare, Data::Dumper, …). `perl-core` is
-          # a metapackage that pulls the full stdlib set in one go —
-          # OpenSSL's own recommended fix for minimal RHEL-family images
-          # (see openssl/openssl#28579). maturin-action skips this hook
-          # on non-Linux matrix entries.
-          before-script-linux: |
-            yum install -y perl-core
 
       # Regression guard — if the Linux wheel ever ships without the
       # manylinux_2_17 ABI tag, fail the build loudly. Historically this

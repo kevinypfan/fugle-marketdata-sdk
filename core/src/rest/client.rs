@@ -2,8 +2,7 @@
 
 use super::auth::Auth;
 use crate::errors::MarketDataError;
-use crate::tls::{build_native_tls_connector, TlsConfig};
-use std::sync::Arc;
+use crate::tls::{build_rustls_config, TlsConfig};
 
 /// Main REST client with connection pooling via ureq Agent
 ///
@@ -37,12 +36,12 @@ impl RestClient {
     /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
     /// ```
     pub fn new(auth: Auth) -> Self {
-        // Building a default native-tls connector can only realistically fail
-        // if the system trust store is unavailable (exotic containers). That's
-        // unrecoverable for us — panic at construction so consumers get a
-        // clear failure mode instead of an opaque error on first request.
+        // Building a default rustls config can only realistically fail if the
+        // crypto provider installs unexpectedly differently (extremely rare).
+        // Panic at construction so consumers get a clear failure mode instead
+        // of an opaque error on first request.
         Self::with_tls(auth, TlsConfig::default())
-            .expect("default native-tls connector should build on supported platforms")
+            .expect("default rustls config should build on supported platforms")
     }
 
     /// Create a REST client with custom TLS configuration (custom root CA
@@ -51,11 +50,11 @@ impl RestClient {
     ///
     /// Returns a `ConfigError` if the PEM in `tls.root_cert_pem` is malformed.
     pub fn with_tls(auth: Auth, tls: TlsConfig) -> Result<Self, MarketDataError> {
-        let connector = build_native_tls_connector(&tls)?;
+        let tls_config = build_rustls_config(&tls)?;
         let builder = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(30))
             .timeout_write(std::time::Duration::from_secs(30))
-            .tls_connector(Arc::new(connector));
+            .tls_config(tls_config);
 
         Ok(Self {
             agent: builder.build(),

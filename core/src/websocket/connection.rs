@@ -17,15 +17,14 @@ use tokio::time::{sleep, timeout, Duration};
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 
-/// Build the `Connector` used by both call sites below. Always native-tls
-/// — the library's own default would also be native-tls given our
-/// tokio-tungstenite feature matrix, so passing it explicitly is a no-op
-/// behavior-wise and keeps REST/WS symmetric.
+/// Build the rustls `Connector` used by both call sites below. Sharing
+/// the same `Arc<ClientConfig>` across reconnects keeps the OS trust
+/// store load (done once via `rustls-native-certs`) amortized.
 fn tls_connector_for(
     config: &ConnectionConfig,
 ) -> Result<Connector, MarketDataError> {
-    let connector = crate::tls::build_native_tls_connector(&config.tls)?;
-    Ok(Connector::NativeTls(connector))
+    let client_config = crate::tls::build_rustls_config(&config.tls)?;
+    Ok(Connector::Rustls(client_config))
 }
 
 /// Type alias for WebSocket write half
