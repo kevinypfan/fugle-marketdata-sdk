@@ -74,7 +74,7 @@ pub struct HealthCheckOptions {
 /// Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
 /// baseUrl is optional for custom endpoint override.
 #[napi(object)]
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct RestClientOptions {
     /// API key for authentication
     pub api_key: Option<String>,
@@ -84,6 +84,12 @@ pub struct RestClientOptions {
     pub sdk_token: Option<String>,
     /// Override base URL (optional)
     pub base_url: Option<String>,
+    /// Additional root CA (PEM bytes). Appended to the OS trust store;
+    /// chains signed by either this CA or an OS-trusted root are accepted.
+    pub tls_root_cert_pem: Option<napi::bindgen_prelude::Uint8Array>,
+    /// Disable ALL TLS verification (chain + hostname + expiry).
+    /// Dev/testing only — exposes MITM risk. Defaults to false.
+    pub tls_accept_invalid_certs: Option<bool>,
 }
 
 /// WebSocket client options
@@ -91,7 +97,7 @@ pub struct RestClientOptions {
 /// Exactly ONE of apiKey, bearerToken, or sdkToken must be provided.
 /// reconnect and healthCheck are optional configuration objects.
 #[napi(object)]
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct WebSocketClientOptions {
     /// API key for authentication
     pub api_key: Option<String>,
@@ -105,6 +111,11 @@ pub struct WebSocketClientOptions {
     pub reconnect: Option<ReconnectOptions>,
     /// Health check configuration (optional)
     pub health_check: Option<HealthCheckOptions>,
+    /// Additional root CA (PEM bytes). Appended to the OS trust store.
+    pub tls_root_cert_pem: Option<napi::bindgen_prelude::Uint8Array>,
+    /// Disable ALL TLS verification (chain + hostname + expiry).
+    /// Dev/testing only — exposes MITM risk. Defaults to false.
+    pub tls_accept_invalid_certs: Option<bool>,
 }
 
 /// Command sent to WebSocket worker thread
@@ -169,6 +180,7 @@ pub struct WebSocketClient {
     base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
+    tls_config: marketdata_core::TlsConfig,
     // Shared state for child clients — created once in constructor so that
     // every `ws.stock` / `ws.futopt` getter access shares the same Arcs.
     stock_callbacks: Arc<Mutex<EventCallbacks>>,
@@ -274,11 +286,20 @@ impl WebSocketClient {
             marketdata_core::HealthCheckConfig::default()
         };
 
+        // Build TLS config from options. Default config matches previous
+        // behaviour (OS trust store, no overrides); custom CA / accept_invalid
+        // flow through to the worker thread's ConnectionConfig.
+        let tls_config = marketdata_core::TlsConfig {
+            root_cert_pem: options.tls_root_cert_pem.map(|arr| arr.to_vec()),
+            accept_invalid_certs: options.tls_accept_invalid_certs.unwrap_or(false),
+        };
+
         Ok(Self {
             api_key,
             base_url: options.base_url,
             reconnect_config: reconnect_cfg,
             health_check_config: health_check_cfg,
+            tls_config,
             stock_callbacks: Arc::new(Mutex::new(EventCallbacks::default())),
             stock_connected: Arc::new(AtomicBool::new(false)),
             stock_closed: Arc::new(AtomicBool::new(false)),
@@ -302,6 +323,7 @@ impl WebSocketClient {
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            self.tls_config.clone(),
             Arc::clone(&self.stock_callbacks),
             Arc::clone(&self.stock_connected),
             Arc::clone(&self.stock_closed),
@@ -319,6 +341,7 @@ impl WebSocketClient {
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            self.tls_config.clone(),
             Arc::clone(&self.futopt_callbacks),
             Arc::clone(&self.futopt_connected),
             Arc::clone(&self.futopt_closed),
@@ -355,6 +378,7 @@ pub struct StockWebSocketClient {
     base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
+    tls_config: marketdata_core::TlsConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
     connected: Arc<AtomicBool>,
     closed: Arc<AtomicBool>,
@@ -372,6 +396,7 @@ impl StockWebSocketClient {
         base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
+        tls_config: marketdata_core::TlsConfig,
         callbacks: Arc<Mutex<EventCallbacks>>,
         connected: Arc<AtomicBool>,
         closed: Arc<AtomicBool>,
@@ -382,6 +407,7 @@ impl StockWebSocketClient {
             base_url,
             reconnect_config,
             health_check_config,
+            tls_config,
             callbacks,
             connected,
             closed,
@@ -463,6 +489,7 @@ impl StockWebSocketClient {
         let base_url = self.base_url.clone();
         let reconnect_config = self.reconnect_config.clone();
         let health_check_config = self.health_check_config.clone();
+        let tls_config = self.tls_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
         let connected = Arc::clone(&self.connected);
         let closed = Arc::clone(&self.closed);
@@ -501,13 +528,14 @@ impl StockWebSocketClient {
                 // stock streaming path (legacy SDK parity); otherwise fall back
                 // to the production Fugle endpoint.
                 let auth = AuthRequest::with_api_key(&api_key);
-                let config = match base_url {
+                let mut config = match base_url {
                     Some(base) => {
                         let url = format!("{}/stock/streaming", base.trim_end_matches('/'));
                         ConnectionConfig::new(url, auth)
                     }
                     None => ConnectionConfig::fugle_stock(auth),
                 };
+                config.tls = tls_config;
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 // Connect (core's connect().await returns once authenticated)
@@ -867,6 +895,7 @@ pub struct FutOptWebSocketClient {
     base_url: Option<String>,
     reconnect_config: marketdata_core::ReconnectionConfig,
     health_check_config: marketdata_core::HealthCheckConfig,
+    tls_config: marketdata_core::TlsConfig,
     callbacks: Arc<Mutex<EventCallbacks>>,
     connected: Arc<AtomicBool>,
     closed: Arc<AtomicBool>,
@@ -882,6 +911,7 @@ impl FutOptWebSocketClient {
         base_url: Option<String>,
         reconnect_config: marketdata_core::ReconnectionConfig,
         health_check_config: marketdata_core::HealthCheckConfig,
+        tls_config: marketdata_core::TlsConfig,
         callbacks: Arc<Mutex<EventCallbacks>>,
         connected: Arc<AtomicBool>,
         closed: Arc<AtomicBool>,
@@ -892,6 +922,7 @@ impl FutOptWebSocketClient {
             base_url,
             reconnect_config,
             health_check_config,
+            tls_config,
             callbacks,
             connected,
             closed,
@@ -952,6 +983,7 @@ impl FutOptWebSocketClient {
         let base_url = self.base_url.clone();
         let reconnect_config = self.reconnect_config.clone();
         let health_check_config = self.health_check_config.clone();
+        let tls_config = self.tls_config.clone();
         let callbacks = Arc::clone(&self.callbacks);
         let connected = Arc::clone(&self.connected);
         let closed = Arc::clone(&self.closed);
@@ -987,13 +1019,14 @@ impl FutOptWebSocketClient {
                 // Build connection config. If base_url is provided, append the
                 // futopt streaming path (legacy SDK parity).
                 let auth = AuthRequest::with_api_key(&api_key);
-                let config = match base_url {
+                let mut config = match base_url {
                     Some(base) => {
                         let url = format!("{}/futopt/streaming", base.trim_end_matches('/'));
                         ConnectionConfig::new(url, auth)
                     }
                     None => ConnectionConfig::fugle_futopt(auth),
                 };
+                config.tls = tls_config;
                 let client = CoreClient::with_full_config(config, reconnect_config, health_check_config);
 
                 let connect_result = rt.block_on(async {

@@ -41,6 +41,23 @@ impl RestClient {
             inner: CoreRestClient::new(auth),
         }
     }
+
+    /// Create a new REST client with custom TLS configuration
+    pub fn with_tls(
+        auth: Auth,
+        tls: marketdata_core::TlsConfig,
+    ) -> Result<Self, MarketDataError> {
+        Ok(Self {
+            inner: CoreRestClient::with_tls(auth, tls)?,
+        })
+    }
+
+    /// Override the base URL (consumes and returns a new instance)
+    pub fn with_base_url(self, url: &str) -> Self {
+        Self {
+            inner: self.inner.base_url(url),
+        }
+    }
 }
 
 #[uniffi::export]

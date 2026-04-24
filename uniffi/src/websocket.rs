@@ -159,6 +159,7 @@ pub struct WebSocketClient {
     shutdown: Arc<AtomicBool>,
     reconnect_config: Option<marketdata_core::ReconnectionConfig>,
     health_check_config: Option<marketdata_core::HealthCheckConfig>,
+    tls_config: Option<marketdata_core::TlsConfig>,
     /// Tokio runtime for sync wrappers (C++ feature). Kept alive for background tasks.
     #[cfg(feature = "cpp")]
     sync_runtime: std::sync::Mutex<Option<tokio::runtime::Runtime>>,
@@ -173,6 +174,7 @@ impl WebSocketClient {
         reconnect_config: Option<marketdata_core::ReconnectionConfig>,
         health_check_config: Option<marketdata_core::HealthCheckConfig>,
         base_url: Option<String>,
+        tls_config: Option<marketdata_core::TlsConfig>,
     ) -> Arc<Self> {
         Arc::new(Self {
             inner: Arc::new(Mutex::new(None)),
@@ -184,6 +186,7 @@ impl WebSocketClient {
             shutdown: Arc::new(AtomicBool::new(false)),
             reconnect_config,
             health_check_config,
+            tls_config,
             #[cfg(feature = "cpp")]
             sync_runtime: std::sync::Mutex::new(None),
         })
@@ -199,7 +202,7 @@ impl WebSocketClient {
     /// * `listener` - Callback interface for receiving WebSocket events
     #[uniffi::constructor]
     pub fn new(api_key: String, listener: Arc<dyn WebSocketListener>) -> Arc<Self> {
-        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock, None, None, None)
+        Self::new_internal(api_key, listener, WebSocketEndpoint::Stock, None, None, None, None)
     }
 
     /// Create a new WebSocket client for a specific endpoint
@@ -214,7 +217,7 @@ impl WebSocketClient {
         listener: Arc<dyn WebSocketListener>,
         endpoint: WebSocketEndpoint,
     ) -> Arc<Self> {
-        Self::new_internal(api_key, listener, endpoint, None, None, None)
+        Self::new_internal(api_key, listener, endpoint, None, None, None, None)
     }
 
     /// Create a new WebSocket client with full configuration
@@ -240,6 +243,7 @@ impl WebSocketClient {
             reconnect_config.map(|c| c.to_core()),
             health_check_config.map(|c| c.to_core()),
             None,
+            None,
         )
     }
 
@@ -260,6 +264,42 @@ impl WebSocketClient {
             reconnect_config.map(|c| c.to_core()),
             health_check_config.map(|c| c.to_core()),
             Some(base_url),
+            None,
+        )
+    }
+
+    /// Create a new WebSocket client with full configuration including TLS.
+    ///
+    /// All optional parameters can be None to use defaults. This is the
+    /// TLS-aware variant of `new_with_url` — use this when you need to
+    /// pin a custom CA or disable cert verification.
+    ///
+    /// # Arguments
+    /// * `api_key` - Fugle API key for authentication
+    /// * `listener` - Callback interface for receiving WebSocket events
+    /// * `endpoint` - The market data endpoint (Stock or FutOpt)
+    /// * `base_url` - Optional base URL override
+    /// * `reconnect_config` - Optional reconnection configuration
+    /// * `health_check_config` - Optional health check configuration
+    /// * `tls` - Optional TLS customization (custom CA or accept_invalid_certs)
+    #[uniffi::constructor]
+    pub fn new_with_full_config(
+        api_key: String,
+        listener: Arc<dyn WebSocketListener>,
+        endpoint: WebSocketEndpoint,
+        base_url: Option<String>,
+        reconnect_config: Option<ReconnectConfigRecord>,
+        health_check_config: Option<HealthCheckConfigRecord>,
+        tls: Option<crate::tls::TlsConfigRecord>,
+    ) -> Arc<Self> {
+        Self::new_internal(
+            api_key,
+            listener,
+            endpoint,
+            reconnect_config.map(|c| c.to_core()),
+            health_check_config.map(|c| c.to_core()),
+            base_url,
+            tls.map(|t| t.to_core()),
         )
     }
 
@@ -309,7 +349,7 @@ impl WebSocketClient {
         let auth = AuthRequest::with_api_key(&self.api_key);
 
         // Create connection config based on endpoint (with optional custom base URL)
-        let config = if let Some(ref url) = self.base_url {
+        let mut config = if let Some(ref url) = self.base_url {
             let ws_url = match self.endpoint {
                 WebSocketEndpoint::Stock => format!("{}/stock/streaming", url),
                 WebSocketEndpoint::FutOpt => format!("{}/futopt/streaming", url),
@@ -321,6 +361,10 @@ impl WebSocketClient {
                 WebSocketEndpoint::FutOpt => ConnectionConfig::fugle_futopt(auth),
             }
         };
+        // Apply TLS customization if provided (custom CA / accept_invalid_certs).
+        if let Some(ref tls) = self.tls_config {
+            config.tls = tls.clone();
+        }
 
         // Create core WebSocket client with optional reconnection/health-check config
         let core_ws = if let (Some(rc), Some(hc)) = (&self.reconnect_config, &self.health_check_config) {

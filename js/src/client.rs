@@ -108,12 +108,18 @@ impl RestClient {
             marketdata_core::rest::Auth::SdkToken(options.sdk_token.unwrap())
         };
 
-        // Create client with optional base_url
-        let inner = if let Some(url) = options.base_url {
-            marketdata_core::RestClient::new(auth).base_url(&url)
-        } else {
-            marketdata_core::RestClient::new(auth)
+        // Build TLS config from optional kwargs. When both are default we
+        // use `with_tls(TlsConfig::default())` — same path `new(auth)` takes
+        // internally, so behaviour is preserved for consumers not touching TLS.
+        let tls = marketdata_core::TlsConfig {
+            root_cert_pem: options.tls_root_cert_pem.map(|arr| arr.to_vec()),
+            accept_invalid_certs: options.tls_accept_invalid_certs.unwrap_or(false),
         };
+
+        let mut inner = marketdata_core::RestClient::with_tls(auth, tls).map_err(to_napi_error)?;
+        if let Some(url) = options.base_url {
+            inner = inner.base_url(&url);
+        }
 
         Ok(Self { inner })
     }
@@ -1350,6 +1356,8 @@ mod tests {
             bearer_token: None,
             sdk_token: None,
             base_url: None,
+            tls_root_cert_pem: None,
+            tls_accept_invalid_certs: None,
         }
     }
 
@@ -1368,6 +1376,8 @@ mod tests {
             bearer_token: Some("test-token".to_string()),
             sdk_token: None,
             base_url: None,
+            tls_root_cert_pem: None,
+            tls_accept_invalid_certs: None,
         };
         let client = RestClient::new(options).unwrap();
         let _ = client.stock();
@@ -1380,6 +1390,8 @@ mod tests {
             bearer_token: None,
             sdk_token: None,
             base_url: Some("https://custom.api".to_string()),
+            tls_root_cert_pem: None,
+            tls_accept_invalid_certs: None,
         };
         let client = RestClient::new(options).unwrap();
         let _ = client.stock();
@@ -1392,6 +1404,8 @@ mod tests {
             bearer_token: None,
             sdk_token: None,
             base_url: None,
+            tls_root_cert_pem: None,
+            tls_accept_invalid_certs: None,
         };
         let result = RestClient::new(options);
         assert!(result.is_err());
@@ -1407,6 +1421,8 @@ mod tests {
             bearer_token: Some("token".to_string()),
             sdk_token: None,
             base_url: None,
+            tls_root_cert_pem: None,
+            tls_accept_invalid_certs: None,
         };
         let result = RestClient::new(options);
         assert!(result.is_err());
