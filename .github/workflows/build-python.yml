@@ -4,12 +4,11 @@ on:
   workflow_call:
     inputs:
       version:
-        required: false
+        required: true
         type: string
-        default: 'dev'
     outputs:
       version:
-        description: "Package version from Cargo.toml"
+        description: "Resolved PEP 440 version used for the wheel"
         value: ${{ jobs.build.outputs.version }}
   workflow_dispatch:
     inputs:
@@ -70,12 +69,38 @@ jobs:
           workspaces: py -> target
           shared-key: python-release
 
-      - name: Extract version from Cargo.toml
+      # Translate the tag-derived version into PEP 440 form and bake it
+      # into py/pyproject.toml. maturin reads [project] version here,
+      # authoritative over Cargo.toml when present.
+      #
+      #   v3.0.0-rc.10  →  3.0.0rc10   (prerelease)
+      #   v3.0.0        →  3.0.0       (stable, pass-through)
+      #   anything else →  fail-fast (beta/alpha/dev not yet supported)
+      - name: Resolve build version
         id: version
         shell: bash
         run: |
-          VERSION=$(grep -A1 '\[workspace.package\]' Cargo.toml | grep 'version' | cut -d'"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          TAG="${{ inputs.version }}"
+          if [[ -z "$TAG" || "$TAG" == "dev" ]]; then
+            # Manual workflow_dispatch fallback — use the in-tree workspace value
+            TAG=$(grep -A1 '\[workspace.package\]' Cargo.toml | grep 'version' | cut -d'"' -f2)
+          fi
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            PY_VERSION=$(echo "$TAG" | sed -E 's/-rc\.([0-9]+)$/rc\1/')
+          else
+            echo "::error::Unsupported version format: $TAG (accepts X.Y.Z or X.Y.Z-rc.N)"
+            exit 1
+          fi
+          echo "version=$PY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved PEP 440 version: $PY_VERSION (from $TAG)"
+
+      - name: Inject version into pyproject.toml
+        shell: bash
+        run: |
+          # sed -i.bak + rm .bak: portable across Linux (GNU sed) and macOS (BSD sed).
+          # Both are in the matrix; GitHub Actions Linux uses GNU, macOS uses BSD.
+          sed -i.bak -E "s/^version = \"[^\"]+\"/version = \"${{ steps.version.outputs.version }}\"/" py/pyproject.toml
+          rm py/pyproject.toml.bak
 
       # Pinned to v1.51.0 — the floating `@v1` tag is stuck at the 2021
       # release and its docker-pull path is broken on current runners

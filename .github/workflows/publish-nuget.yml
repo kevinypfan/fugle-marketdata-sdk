@@ -2,6 +2,11 @@ name: Publish C# to NuGet
 
 on:
   workflow_call:
+    inputs:
+      version:
+        description: 'SemVer version (e.g., 3.0.0). Passed to dotnet pack as -p:Version.'
+        required: true
+        type: string
     secrets:
       NUGET_API_KEY:
         # See publish-nodejs.yml — optional for fork compatibility, the
@@ -9,6 +14,11 @@ on:
         required: false
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Version to pack (e.g., 3.0.0). Defaults to "dev" for debug dispatches.'
+        required: false
+        type: string
+        default: 'dev'
       dry-run:
         description: 'Dry run (skip actual push)'
         required: false
@@ -54,7 +64,7 @@ jobs:
       - name: Pack NuGet package
         working-directory: bindings/csharp/MarketdataUniffi
         run: |
-          dotnet pack -c Release -o nupkg
+          dotnet pack -c Release -p:Version=${{ inputs.version }} -o nupkg
           echo "## NuGet Package" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Package | Size |" >> $GITHUB_STEP_SUMMARY

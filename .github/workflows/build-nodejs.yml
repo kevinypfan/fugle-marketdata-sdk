@@ -4,13 +4,12 @@ on:
   workflow_call:
     inputs:
       version:
-        description: 'Version for artifact naming'
-        required: false
+        description: 'SemVer version (e.g., 3.0.0 or 3.0.0-rc.10). Injected into package.json before napi build.'
+        required: true
         type: string
-        default: 'dev'
     outputs:
       version:
-        description: 'Extracted version from package.json'
+        description: 'Resolved version used for artifact naming'
         value: ${{ jobs.version.outputs.version }}
   workflow_dispatch:
     inputs:
@@ -32,12 +31,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from package.json
+      - name: Resolve build version
         id: version
         run: |
-          VERSION=$(node -p "require('./js/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
+          TAG="${{ inputs.version }}"
+          if [[ -z "$TAG" || "$TAG" == "dev" ]]; then
+            # Manual workflow_dispatch fallback
+            TAG=$(node -p "require('./js/package.json').version")
+          fi
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "Resolved npm version: $TAG"
 
   build:
     name: Build (${{ matrix.target }})
@@ -134,6 +137,13 @@ jobs:
       - name: Install dependencies
         working-directory: js
         run: npm ci
+
+      # Inject version BEFORE `napi prepublish` (below) stamps sub-package
+      # manifests. --allow-same-version avoids error on stable builds where
+      # the injected value equals the current package.json literal.
+      - name: Inject version into package.json
+        working-directory: js
+        run: npm version --no-git-tag-version --allow-same-version "${{ needs.version.outputs.version }}"
 
       # Download all built artifacts
       - name: Download all artifacts
