@@ -75,7 +75,7 @@ jobs:
         run: |
           gh release download "$TAG" \
             --repo "${{ github.repository }}" \
-            --pattern 'fugle_marketdata-*-linux_x86_64.whl' \
+            --pattern 'fugle_marketdata-*linux*x86_64.whl' \
             --dir ./wheels
 
       - name: Install wheel
