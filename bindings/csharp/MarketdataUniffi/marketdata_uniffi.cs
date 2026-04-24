@@ -219,7 +219,7 @@ struct UniffiRustCallStatus
 }
 
 // Base class for all uniffi exceptions
-internal class UniffiException : System.Exception
+public class UniffiException : System.Exception
 {
     public UniffiException()
         : base() { }
@@ -228,43 +228,43 @@ internal class UniffiException : System.Exception
         : base(message) { }
 }
 
-internal class UndeclaredErrorException : UniffiException
+public class UndeclaredErrorException : UniffiException
 {
     public UndeclaredErrorException(string message)
         : base(message) { }
 }
 
-internal class PanicException : UniffiException
+public class PanicException : UniffiException
 {
     public PanicException(string message)
         : base(message) { }
 }
 
-internal class AllocationException : UniffiException
+public class AllocationException : UniffiException
 {
     public AllocationException(string message)
         : base(message) { }
 }
 
-internal class InternalException : UniffiException
+public class InternalException : UniffiException
 {
     public InternalException(string message)
         : base(message) { }
 }
 
-internal class InvalidEnumException : InternalException
+public class InvalidEnumException : InternalException
 {
     public InvalidEnumException(string message)
         : base(message) { }
 }
 
-internal class UniffiContractVersionException : UniffiException
+public class UniffiContractVersionException : UniffiException
 {
     public UniffiContractVersionException(string message)
         : base(message) { }
 }
 
-internal class UniffiContractChecksumException : UniffiException
+public class UniffiContractChecksumException : UniffiException
 {
     public UniffiContractChecksumException(string message)
         : base(message) { }
@@ -3532,7 +3532,7 @@ class FfiConverterByteArray : FfiConverterRustBuffer<byte[]>
 /// <summary>
 /// FutOpt market data client
 /// </summary>
-internal interface IFutOptClient
+public interface IFutOptClient
 {
     /// <summary>
     /// Access historical data endpoints
@@ -3548,7 +3548,7 @@ internal interface IFutOptClient
 /// <summary>
 /// FutOpt market data client
 /// </summary>
-internal class FutOptClient : IFutOptClient, IDisposable
+public class FutOptClient : IFutOptClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -3732,7 +3732,7 @@ class FfiConverterTypeFutOptClient : FfiConverter<FutOptClient, IntPtr>
 ///
 /// Provides access to historical candles and daily data for futures and options.
 /// </summary>
-internal interface IFutOptHistoricalClient
+public interface IFutOptHistoricalClient
 {
     /// <summary>
     /// Get historical candles for a contract (sync/blocking)
@@ -3781,7 +3781,7 @@ internal interface IFutOptHistoricalClient
 ///
 /// Provides access to historical candles and daily data for futures and options.
 /// </summary>
-internal class FutOptHistoricalClient : IFutOptHistoricalClient, IDisposable
+public class FutOptHistoricalClient : IFutOptHistoricalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -4089,7 +4089,7 @@ class FfiConverterTypeFutOptHistoricalClient : FfiConverter<FutOptHistoricalClie
 /// <summary>
 /// FutOpt intraday endpoints with typed model returns
 /// </summary>
-internal interface IFutOptIntradayClient
+public interface IFutOptIntradayClient
 {
     /// <summary>
     /// Get candlestick data for a contract (sync/blocking)
@@ -4187,7 +4187,7 @@ internal interface IFutOptIntradayClient
 /// <summary>
 /// FutOpt intraday endpoints with typed model returns
 /// </summary>
-internal class FutOptIntradayClient : IFutOptIntradayClient, IDisposable
+public class FutOptIntradayClient : IFutOptIntradayClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -4780,7 +4780,7 @@ class FfiConverterTypeFutOptIntradayClient : FfiConverter<FutOptIntradayClient, 
 ///
 /// Wraps the core RestClient and provides Arc-wrapped sub-clients for FFI safety.
 /// </summary>
-internal interface IRestClient
+public interface IRestClient
 {
     /// <summary>
     /// Access FutOpt (futures and options) endpoints
@@ -4798,7 +4798,7 @@ internal interface IRestClient
 ///
 /// Wraps the core RestClient and provides Arc-wrapped sub-clients for FFI safety.
 /// </summary>
-internal class RestClient : IRestClient, IDisposable
+public class RestClient : IRestClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -4980,7 +4980,7 @@ class FfiConverterTypeRestClient : FfiConverter<RestClient, IntPtr>
 /// <summary>
 /// Stock market data client
 /// </summary>
-internal interface IStockClient
+public interface IStockClient
 {
     /// <summary>
     /// Access corporate actions endpoints
@@ -5011,7 +5011,7 @@ internal interface IStockClient
 /// <summary>
 /// Stock market data client
 /// </summary>
-internal class StockClient : IStockClient, IDisposable
+public class StockClient : IStockClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -5249,7 +5249,7 @@ class FfiConverterTypeStockClient : FfiConverter<StockClient, IntPtr>
 ///
 /// Provides access to capital changes, dividends, and listing applicants (IPO).
 /// </summary>
-internal interface IStockCorporateActionsClient
+public interface IStockCorporateActionsClient
 {
     /// <summary>
     /// Get capital structure changes (sync/blocking)
@@ -5305,7 +5305,7 @@ internal interface IStockCorporateActionsClient
 ///
 /// Provides access to capital changes, dividends, and listing applicants (IPO).
 /// </summary>
-internal class StockCorporateActionsClient : IStockCorporateActionsClient, IDisposable
+public class StockCorporateActionsClient : IStockCorporateActionsClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -5675,7 +5675,7 @@ class FfiConverterTypeStockCorporateActionsClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-internal interface IStockHistoricalClient
+public interface IStockHistoricalClient
 {
     /// <summary>
     /// Get historical candles for a symbol (sync/blocking)
@@ -5727,7 +5727,7 @@ internal interface IStockHistoricalClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-internal class StockHistoricalClient : IStockHistoricalClient, IDisposable
+public class StockHistoricalClient : IStockHistoricalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -6027,7 +6027,7 @@ class FfiConverterTypeStockHistoricalClient : FfiConverter<StockHistoricalClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-internal interface IStockIntradayClient
+public interface IStockIntradayClient
 {
     /// <summary>
     /// Get candlestick data for a symbol (sync/blocking)
@@ -6124,7 +6124,7 @@ internal interface IStockIntradayClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-internal class StockIntradayClient : IStockIntradayClient, IDisposable
+public class StockIntradayClient : IStockIntradayClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -6660,7 +6660,7 @@ class FfiConverterTypeStockIntradayClient : FfiConverter<StockIntradayClient, In
 /// Provides access to quotes, movers (gainers/losers), and most active stocks
 /// across entire markets.
 /// </summary>
-internal interface IStockSnapshotClient
+public interface IStockSnapshotClient
 {
     /// <summary>
     /// Get most actively traded stocks (sync/blocking)
@@ -6718,7 +6718,7 @@ internal interface IStockSnapshotClient
 /// Provides access to quotes, movers (gainers/losers), and most active stocks
 /// across entire markets.
 /// </summary>
-internal class StockSnapshotClient : IStockSnapshotClient, IDisposable
+public class StockSnapshotClient : IStockSnapshotClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -7074,7 +7074,7 @@ class FfiConverterTypeStockSnapshotClient : FfiConverter<StockSnapshotClient, In
 ///
 /// Provides access to SMA, RSI, KDJ, MACD, and Bollinger Bands indicators.
 /// </summary>
-internal interface IStockTechnicalClient
+public interface IStockTechnicalClient
 {
     /// <summary>
     /// Get Bollinger Bands (sync/blocking)
@@ -7208,7 +7208,7 @@ internal interface IStockTechnicalClient
 ///
 /// Provides access to SMA, RSI, KDJ, MACD, and Bollinger Bands indicators.
 /// </summary>
-internal class StockTechnicalClient : IStockTechnicalClient, IDisposable
+public class StockTechnicalClient : IStockTechnicalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -7778,7 +7778,7 @@ class FfiConverterTypeStockTechnicalClient : FfiConverter<StockTechnicalClient, 
 /// Wraps the core WebSocketClient and forwards messages to the provided
 /// WebSocketListener implementation via a background task.
 /// </summary>
-internal interface IWebSocketClient
+public interface IWebSocketClient
 {
     /// <exception cref="MarketDataException"></exception>
     Task Connect();
@@ -7813,7 +7813,7 @@ internal interface IWebSocketClient
 /// Wraps the core WebSocketClient and forwards messages to the provided
 /// WebSocketListener implementation via a background task.
 /// </summary>
-internal class WebSocketClient : IWebSocketClient, IDisposable
+public class WebSocketClient : IWebSocketClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -8343,7 +8343,7 @@ class FfiConverterTypeWebSocketClient : FfiConverter<WebSocketClient, IntPtr>
 /// }
 /// ```
 /// </summary>
-internal interface WebSocketListener
+public interface WebSocketListener
 {
     /// <summary>
     /// Called when WebSocket connection is established
@@ -8402,7 +8402,7 @@ internal interface WebSocketListener
 /// }
 /// ```
 /// </summary>
-internal class WebSocketListenerImpl : WebSocketListener, IDisposable
+public class WebSocketListenerImpl : WebSocketListener, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -8906,7 +8906,7 @@ class FfiConverterTypeWebSocketListener : FfiConverter<WebSocketListener, IntPtr
 /// <summary>
 /// Single active entry
 /// </summary>
-internal record Active(
+public record Active(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -8980,7 +8980,7 @@ class FfiConverterTypeActive : FfiConverterRustBuffer<Active>
 /// <summary>
 /// Actives response
 /// </summary>
-internal record ActivesResponse(string @date, string @time, string @market, List<Active> @data) { }
+public record ActivesResponse(string @date, string @time, string @market, List<Active> @data) { }
 
 class FfiConverterTypeActivesResponse : FfiConverterRustBuffer<ActivesResponse>
 {
@@ -9017,7 +9017,7 @@ class FfiConverterTypeActivesResponse : FfiConverterRustBuffer<ActivesResponse>
 /// <summary>
 /// Bollinger Bands data point
 /// </summary>
-internal record BbDataPoint(string @date, double @upper, double @middle, double @lower) { }
+public record BbDataPoint(string @date, double @upper, double @middle, double @lower) { }
 
 class FfiConverterTypeBbDataPoint : FfiConverterRustBuffer<BbDataPoint>
 {
@@ -9054,7 +9054,7 @@ class FfiConverterTypeBbDataPoint : FfiConverterRustBuffer<BbDataPoint>
 /// <summary>
 /// Bollinger Bands response
 /// </summary>
-internal record BbResponse(
+public record BbResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -9112,7 +9112,7 @@ class FfiConverterTypeBbResponse : FfiConverterRustBuffer<BbResponse>
 /// <summary>
 /// Capital change entry
 /// </summary>
-internal record CapitalChange(
+public record CapitalChange(
     string @symbol,
     string? @name,
     string @date,
@@ -9166,7 +9166,7 @@ class FfiConverterTypeCapitalChange : FfiConverterRustBuffer<CapitalChange>
 /// <summary>
 /// Capital changes response
 /// </summary>
-internal record CapitalChangesResponse(
+public record CapitalChangesResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -9209,7 +9209,7 @@ class FfiConverterTypeCapitalChangesResponse : FfiConverterRustBuffer<CapitalCha
 /// <summary>
 /// Dividend entry
 /// </summary>
-internal record Dividend(
+public record Dividend(
     string @symbol,
     string? @name,
     string? @exDividendDate,
@@ -9263,7 +9263,7 @@ class FfiConverterTypeDividend : FfiConverterRustBuffer<Dividend>
 /// <summary>
 /// Dividends response
 /// </summary>
-internal record DividendsResponse(
+public record DividendsResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -9306,7 +9306,7 @@ class FfiConverterTypeDividendsResponse : FfiConverterRustBuffer<DividendsRespon
 /// <summary>
 /// FutOpt daily data
 /// </summary>
-internal record FutOptDailyData(
+public record FutOptDailyData(
     string @date,
     double @open,
     double @high,
@@ -9364,7 +9364,7 @@ class FfiConverterTypeFutOptDailyData : FfiConverterRustBuffer<FutOptDailyData>
 /// <summary>
 /// FutOpt daily response
 /// </summary>
-internal record FutOptDailyResponse(
+public record FutOptDailyResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9407,7 +9407,7 @@ class FfiConverterTypeFutOptDailyResponse : FfiConverterRustBuffer<FutOptDailyRe
 /// <summary>
 /// FutOpt historical candle
 /// </summary>
-internal record FutOptHistoricalCandle(
+public record FutOptHistoricalCandle(
     string @date,
     double @open,
     double @high,
@@ -9470,7 +9470,7 @@ class FfiConverterTypeFutOptHistoricalCandle : FfiConverterRustBuffer<FutOptHist
 /// <summary>
 /// FutOpt historical candles response
 /// </summary>
-internal record FutOptHistoricalCandlesResponse(
+public record FutOptHistoricalCandlesResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9520,7 +9520,7 @@ class FfiConverterTypeFutOptHistoricalCandlesResponse
 /// <summary>
 /// FutOpt last trade info
 /// </summary>
-internal record FutOptLastTrade(double @price, long @size, long @time) { }
+public record FutOptLastTrade(double @price, long @size, long @time) { }
 
 class FfiConverterTypeFutOptLastTrade : FfiConverterRustBuffer<FutOptLastTrade>
 {
@@ -9554,7 +9554,7 @@ class FfiConverterTypeFutOptLastTrade : FfiConverterRustBuffer<FutOptLastTrade>
 /// <summary>
 /// FutOpt price level
 /// </summary>
-internal record FutOptPriceLevel(double @price, long @size) { }
+public record FutOptPriceLevel(double @price, long @size) { }
 
 class FfiConverterTypeFutOptPriceLevel : FfiConverterRustBuffer<FutOptPriceLevel>
 {
@@ -9586,7 +9586,7 @@ class FfiConverterTypeFutOptPriceLevel : FfiConverterRustBuffer<FutOptPriceLevel
 /// <summary>
 /// FutOpt quote
 /// </summary>
-internal record FutOptQuote(
+public record FutOptQuote(
     string @date,
     string? @contractType,
     string? @exchange,
@@ -9712,7 +9712,7 @@ class FfiConverterTypeFutOptQuote : FfiConverterRustBuffer<FutOptQuote>
 /// <summary>
 /// FutOpt ticker
 /// </summary>
-internal record FutOptTicker(
+public record FutOptTicker(
     string @date,
     string? @contractType,
     string? @exchange,
@@ -9786,7 +9786,7 @@ class FfiConverterTypeFutOptTicker : FfiConverterRustBuffer<FutOptTicker>
 /// <summary>
 /// FutOpt total stats
 /// </summary>
-internal record FutOptTotalStats(long @tradeVolume, long? @totalBidMatch, long? @totalAskMatch) { }
+public record FutOptTotalStats(long @tradeVolume, long? @totalBidMatch, long? @totalAskMatch) { }
 
 class FfiConverterTypeFutOptTotalStats : FfiConverterRustBuffer<FutOptTotalStats>
 {
@@ -9832,7 +9832,7 @@ class FfiConverterTypeFutOptTotalStats : FfiConverterRustBuffer<FutOptTotalStats
 /// <param name="max_missed_pongs">
 /// Maximum missed pongs before disconnect (default: 2, min: 1)
 /// </param>
-internal record HealthCheckConfigRecord(
+public record HealthCheckConfigRecord(
     /// <summary>
     /// Whether health check is enabled (default: false)
     /// </summary>
@@ -9880,7 +9880,7 @@ class FfiConverterTypeHealthCheckConfigRecord : FfiConverterRustBuffer<HealthChe
 /// <summary>
 /// Single historical candle
 /// </summary>
-internal record HistoricalCandle(
+public record HistoricalCandle(
     string @date,
     double @open,
     double @high,
@@ -9939,7 +9939,7 @@ class FfiConverterTypeHistoricalCandle : FfiConverterRustBuffer<HistoricalCandle
 /// <summary>
 /// Historical candles response
 /// </summary>
-internal record HistoricalCandlesResponse(
+public record HistoricalCandlesResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9994,7 +9994,7 @@ class FfiConverterTypeHistoricalCandlesResponse : FfiConverterRustBuffer<Histori
 /// <summary>
 /// Single intraday candle
 /// </summary>
-internal record IntradayCandle(
+public record IntradayCandle(
     double @open,
     double @high,
     double @low,
@@ -10048,7 +10048,7 @@ class FfiConverterTypeIntradayCandle : FfiConverterRustBuffer<IntradayCandle>
 /// <summary>
 /// Intraday candles response
 /// </summary>
-internal record IntradayCandlesResponse(
+public record IntradayCandlesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -10103,7 +10103,7 @@ class FfiConverterTypeIntradayCandlesResponse : FfiConverterRustBuffer<IntradayC
 /// <summary>
 /// KDJ data point
 /// </summary>
-internal record KdjDataPoint(string @date, double @k, double @d, double @j) { }
+public record KdjDataPoint(string @date, double @k, double @d, double @j) { }
 
 class FfiConverterTypeKdjDataPoint : FfiConverterRustBuffer<KdjDataPoint>
 {
@@ -10140,7 +10140,7 @@ class FfiConverterTypeKdjDataPoint : FfiConverterRustBuffer<KdjDataPoint>
 /// <summary>
 /// KDJ response
 /// </summary>
-internal record KdjResponse(
+public record KdjResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -10194,7 +10194,7 @@ class FfiConverterTypeKdjResponse : FfiConverterRustBuffer<KdjResponse>
 /// <summary>
 /// Listing applicant entry
 /// </summary>
-internal record ListingApplicant(
+public record ListingApplicant(
     string @symbol,
     string? @name,
     string? @applicationDate,
@@ -10245,7 +10245,7 @@ class FfiConverterTypeListingApplicant : FfiConverterRustBuffer<ListingApplicant
 /// <summary>
 /// Listing applicants response
 /// </summary>
-internal record ListingApplicantsResponse(
+public record ListingApplicantsResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -10288,7 +10288,7 @@ class FfiConverterTypeListingApplicantsResponse : FfiConverterRustBuffer<Listing
 /// <summary>
 /// MACD data point
 /// </summary>
-internal record MacdDataPoint(
+public record MacdDataPoint(
     string @date,
     double @macd,
     double @signalValue,
@@ -10330,7 +10330,7 @@ class FfiConverterTypeMacdDataPoint : FfiConverterRustBuffer<MacdDataPoint>
 /// <summary>
 /// MACD response
 /// </summary>
-internal record MacdResponse(
+public record MacdResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -10392,7 +10392,7 @@ class FfiConverterTypeMacdResponse : FfiConverterRustBuffer<MacdResponse>
 /// <summary>
 /// Single mover entry
 /// </summary>
-internal record Mover(
+public record Mover(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -10466,7 +10466,7 @@ class FfiConverterTypeMover : FfiConverterRustBuffer<Mover>
 /// <summary>
 /// Movers response
 /// </summary>
-internal record MoversResponse(string @date, string @time, string @market, List<Mover> @data) { }
+public record MoversResponse(string @date, string @time, string @market, List<Mover> @data) { }
 
 class FfiConverterTypeMoversResponse : FfiConverterRustBuffer<MoversResponse>
 {
@@ -10503,7 +10503,7 @@ class FfiConverterTypeMoversResponse : FfiConverterRustBuffer<MoversResponse>
 /// <summary>
 /// Bid/Ask price level for order book
 /// </summary>
-internal record PriceLevel(double @price, long @size) { }
+public record PriceLevel(double @price, long @size) { }
 
 class FfiConverterTypePriceLevel : FfiConverterRustBuffer<PriceLevel>
 {
@@ -10534,7 +10534,7 @@ class FfiConverterTypePriceLevel : FfiConverterRustBuffer<PriceLevel>
 /// <summary>
 /// FutOpt product
 /// </summary>
-internal record Product(
+public record Product(
     string? @productType,
     string? @exchange,
     string @symbol,
@@ -10624,7 +10624,7 @@ class FfiConverterTypeProduct : FfiConverterRustBuffer<Product>
 /// <summary>
 /// FutOpt products response
 /// </summary>
-internal record ProductsResponse(
+public record ProductsResponse(
     string? @date,
     string? @productType,
     string? @session,
@@ -10675,7 +10675,7 @@ class FfiConverterTypeProductsResponse : FfiConverterRustBuffer<ProductsResponse
 /// <summary>
 /// Real-time stock quote
 /// </summary>
-internal record Quote(
+public record Quote(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -10876,7 +10876,7 @@ class FfiConverterTypeQuote : FfiConverterRustBuffer<Quote>
 /// <param name="max_delay_ms">
 /// Maximum reconnection delay in milliseconds (default: 60000)
 /// </param>
-internal record ReconnectConfigRecord(
+public record ReconnectConfigRecord(
     /// <summary>
     /// Maximum reconnection attempts (default: 5, min: 1)
     /// </summary>
@@ -10924,7 +10924,7 @@ class FfiConverterTypeReconnectConfigRecord : FfiConverterRustBuffer<ReconnectCo
 /// <summary>
 /// RSI data point
 /// </summary>
-internal record RsiDataPoint(string @date, double @rsi) { }
+public record RsiDataPoint(string @date, double @rsi) { }
 
 class FfiConverterTypeRsiDataPoint : FfiConverterRustBuffer<RsiDataPoint>
 {
@@ -10955,7 +10955,7 @@ class FfiConverterTypeRsiDataPoint : FfiConverterRustBuffer<RsiDataPoint>
 /// <summary>
 /// RSI response
 /// </summary>
-internal record RsiResponse(
+public record RsiResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -11009,7 +11009,7 @@ class FfiConverterTypeRsiResponse : FfiConverterRustBuffer<RsiResponse>
 /// <summary>
 /// SMA data point
 /// </summary>
-internal record SmaDataPoint(string @date, double @sma) { }
+public record SmaDataPoint(string @date, double @sma) { }
 
 class FfiConverterTypeSmaDataPoint : FfiConverterRustBuffer<SmaDataPoint>
 {
@@ -11040,7 +11040,7 @@ class FfiConverterTypeSmaDataPoint : FfiConverterRustBuffer<SmaDataPoint>
 /// <summary>
 /// SMA response
 /// </summary>
-internal record SmaResponse(
+public record SmaResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -11094,7 +11094,7 @@ class FfiConverterTypeSmaResponse : FfiConverterRustBuffer<SmaResponse>
 /// <summary>
 /// Single snapshot quote
 /// </summary>
-internal record SnapshotQuote(
+public record SnapshotQuote(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -11168,7 +11168,7 @@ class FfiConverterTypeSnapshotQuote : FfiConverterRustBuffer<SnapshotQuote>
 /// <summary>
 /// Snapshot quotes response
 /// </summary>
-internal record SnapshotQuotesResponse(
+public record SnapshotQuotesResponse(
     string @date,
     string @time,
     string @market,
@@ -11211,7 +11211,7 @@ class FfiConverterTypeSnapshotQuotesResponse : FfiConverterRustBuffer<SnapshotQu
 /// <summary>
 /// Historical stats response
 /// </summary>
-internal record StatsResponse(
+public record StatsResponse(
     string @date,
     string @dataType,
     string @exchange,
@@ -11305,7 +11305,7 @@ class FfiConverterTypeStatsResponse : FfiConverterRustBuffer<StatsResponse>
 /// <summary>
 /// Streaming message (simplified for FFI)
 /// </summary>
-internal record StreamMessage(
+public record StreamMessage(
     string @event,
     string? @channel,
     string? @symbol,
@@ -11359,7 +11359,7 @@ class FfiConverterTypeStreamMessage : FfiConverterRustBuffer<StreamMessage>
 /// <summary>
 /// Stock ticker info
 /// </summary>
-internal record Ticker(
+public record Ticker(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11544,7 +11544,7 @@ class FfiConverterTypeTicker : FfiConverterRustBuffer<Ticker>
 /// Equivalent to `curl -k` / `wscat --no-check`. Do not use in
 /// production.
 /// </param>
-internal record TlsConfigRecord(
+public record TlsConfigRecord(
     /// <summary>
     /// PEM-encoded additional root CA bytes. Appended to the OS trust
     /// store; chains signed by either this CA or any OS-trusted root
@@ -11588,7 +11588,7 @@ class FfiConverterTypeTlsConfigRecord : FfiConverterRustBuffer<TlsConfigRecord>
 /// <summary>
 /// Total trading statistics
 /// </summary>
-internal record TotalStats(
+public record TotalStats(
     double @tradeValue,
     long @tradeVolume,
     long? @tradeVolumeAtBid,
@@ -11638,7 +11638,7 @@ class FfiConverterTypeTotalStats : FfiConverterRustBuffer<TotalStats>
 /// <summary>
 /// Single trade execution
 /// </summary>
-internal record Trade(double? @bid, double? @ask, double @price, long @size, long @time) { }
+public record Trade(double? @bid, double? @ask, double @price, long @size, long @time) { }
 
 class FfiConverterTypeTrade : FfiConverterRustBuffer<Trade>
 {
@@ -11678,7 +11678,7 @@ class FfiConverterTypeTrade : FfiConverterRustBuffer<Trade>
 /// <summary>
 /// Trade execution info
 /// </summary>
-internal record TradeInfo(double? @bid, double? @ask, double @price, long @size, long @time) { }
+public record TradeInfo(double? @bid, double? @ask, double @price, long @size, long @time) { }
 
 class FfiConverterTypeTradeInfo : FfiConverterRustBuffer<TradeInfo>
 {
@@ -11718,7 +11718,7 @@ class FfiConverterTypeTradeInfo : FfiConverterRustBuffer<TradeInfo>
 /// <summary>
 /// Trades response
 /// </summary>
-internal record TradesResponse(
+public record TradesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11768,7 +11768,7 @@ class FfiConverterTypeTradesResponse : FfiConverterRustBuffer<TradesResponse>
 /// <summary>
 /// Trading halt status
 /// </summary>
-internal record TradingHalt(bool @isHalted, long? @time) { }
+public record TradingHalt(bool @isHalted, long? @time) { }
 
 class FfiConverterTypeTradingHalt : FfiConverterRustBuffer<TradingHalt>
 {
@@ -11799,7 +11799,7 @@ class FfiConverterTypeTradingHalt : FfiConverterRustBuffer<TradingHalt>
 /// <summary>
 /// Volume at a specific price level
 /// </summary>
-internal record VolumeAtPrice(
+public record VolumeAtPrice(
     double @price,
     long @volume,
     long? @volumeAtBid,
@@ -11841,7 +11841,7 @@ class FfiConverterTypeVolumeAtPrice : FfiConverterRustBuffer<VolumeAtPrice>
 /// <summary>
 /// Volumes response
 /// </summary>
-internal record VolumesResponse(
+public record VolumesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11896,7 +11896,7 @@ class FfiConverterTypeVolumesResponse : FfiConverterRustBuffer<VolumesResponse>
 ///
 /// Note: This is a FLAT enum per UniFFI constraints - no nested error types.
 /// </summary>
-internal class MarketDataException : UniffiException
+public class MarketDataException : UniffiException
 {
     MarketDataException()
         : base() { }
@@ -12212,7 +12212,7 @@ class FfiConverterTypeMarketDataError
 /// <summary>
 /// Endpoint type for WebSocket connection
 /// </summary>
-internal enum WebSocketEndpoint : int
+public enum WebSocketEndpoint : int
 {
     /// <summary>
     /// Stock market data endpoint
@@ -14063,7 +14063,7 @@ internal static class _UniFFIAsync
     }
 }
 #pragma warning restore 8625
-internal static class MarketdataUniffiMethods
+public static class MarketdataUniffiMethods
 {
     /// <summary>
     /// Create a REST client with API key authentication
