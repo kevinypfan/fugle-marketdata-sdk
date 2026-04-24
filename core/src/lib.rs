@@ -33,10 +33,14 @@ pub mod errors;
 pub mod models;
 pub mod rest;
 pub mod runtime;
+pub mod tls;
 pub mod websocket;
 
 // Re-export error types
 pub use errors::MarketDataError;
+
+// Re-export TLS config
+pub use tls::TlsConfig;
 
 // Re-export REST client types
 pub use rest::{Auth, RestClient};

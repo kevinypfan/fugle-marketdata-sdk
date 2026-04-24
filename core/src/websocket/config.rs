@@ -1,6 +1,7 @@
 //! WebSocket connection configuration types
 
 use crate::models::AuthRequest;
+use crate::tls::TlsConfig;
 use std::time::Duration;
 
 /// Configuration for WebSocket connection
@@ -17,6 +18,11 @@ pub struct ConnectionConfig {
 
     /// Read timeout for messages (default: 30 seconds)
     pub read_timeout: Duration,
+
+    /// Optional TLS customization (custom CA / accept invalid certs).
+    /// Default means "use the OS trust store" — identical to pre-3.0.1
+    /// behaviour.
+    pub tls: TlsConfig,
 }
 
 impl ConnectionConfig {
@@ -27,6 +33,7 @@ impl ConnectionConfig {
             auth,
             connect_timeout: Duration::from_secs(30),
             read_timeout: Duration::from_secs(30),
+            tls: TlsConfig::default(),
         }
     }
 
@@ -37,6 +44,7 @@ impl ConnectionConfig {
             auth,
             connect_timeout: Duration::from_secs(30),
             read_timeout: Duration::from_secs(30),
+            tls: TlsConfig::default(),
         }
     }
 
@@ -81,6 +89,7 @@ pub struct ConnectionConfigBuilder {
     auth: AuthRequest,
     connect_timeout: Duration,
     read_timeout: Duration,
+    tls: TlsConfig,
 }
 
 impl ConnectionConfigBuilder {
@@ -96,6 +105,12 @@ impl ConnectionConfigBuilder {
         self
     }
 
+    /// Replace the TLS config wholesale
+    pub fn tls(mut self, tls: TlsConfig) -> Self {
+        self.tls = tls;
+        self
+    }
+
     /// Build the configuration
     pub fn build(self) -> ConnectionConfig {
         ConnectionConfig {
@@ -103,6 +118,7 @@ impl ConnectionConfigBuilder {
             auth: self.auth,
             connect_timeout: self.connect_timeout,
             read_timeout: self.read_timeout,
+            tls: self.tls,
         }
     }
 }

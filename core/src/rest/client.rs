@@ -1,6 +1,9 @@
 //! REST client for Fugle marketdata API
 
 use super::auth::Auth;
+use crate::errors::MarketDataError;
+use crate::tls::{build_native_tls_connector, TlsConfig};
+use std::sync::Arc;
 
 /// Main REST client with connection pooling via ureq Agent
 ///
@@ -34,16 +37,31 @@ impl RestClient {
     /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
     /// ```
     pub fn new(auth: Auth) -> Self {
-        let agent = ureq::AgentBuilder::new()
-            .timeout_read(std::time::Duration::from_secs(30))
-            .timeout_write(std::time::Duration::from_secs(30))
-            .build();
+        // Safe: build_native_tls_connector only errors on user-supplied input
+        // (TlsConfig::default() has no such input), and `new` shouldn't fail.
+        Self::with_tls(auth, TlsConfig::default())
+            .expect("default TlsConfig should never fail to build")
+    }
 
-        Self {
-            agent,
+    /// Create a REST client with custom TLS configuration (custom root CA
+    /// or "accept invalid certs"). Prefer `new()` for production usage
+    /// against public Fugle endpoints.
+    ///
+    /// Returns a `ConfigError` if the PEM in `tls.root_cert_pem` is malformed.
+    pub fn with_tls(auth: Auth, tls: TlsConfig) -> Result<Self, MarketDataError> {
+        let mut builder = ureq::AgentBuilder::new()
+            .timeout_read(std::time::Duration::from_secs(30))
+            .timeout_write(std::time::Duration::from_secs(30));
+
+        if let Some(connector) = build_native_tls_connector(&tls)? {
+            builder = builder.tls_connector(Arc::new(connector));
+        }
+
+        Ok(Self {
+            agent: builder.build(),
             auth,
             base_url: "https://api.fugle.tw/marketdata/v1.0".to_string(),
-        }
+        })
     }
 
     /// Override the base URL (useful for testing or custom endpoints)

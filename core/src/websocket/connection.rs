@@ -14,8 +14,18 @@ use tokio::sync::mpsc as tokio_mpsc;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Duration};
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
+
+/// Build the optional `Connector` used by both call sites below. Returns
+/// `None` when TLS config is in its default shape so tokio-tungstenite
+/// uses the library default — identical to pre-3.0.1 behaviour.
+fn tls_connector_for(
+    config: &ConnectionConfig,
+) -> Result<Option<Connector>, MarketDataError> {
+    let connector = crate::tls::build_native_tls_connector(&config.tls)?;
+    Ok(connector.map(Connector::NativeTls))
+}
 
 /// Type alias for WebSocket write half
 type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
@@ -311,10 +321,11 @@ impl WebSocketClient {
         }
         let _ = self.event_tx.send(ConnectionEvent::Connecting);
 
-        // Connect to WebSocket
+        // Connect to WebSocket (with optional TLS customization).
+        let tls_connector = tls_connector_for(&self.config)?;
         let connect_result = timeout(
             self.config.connect_timeout,
-            connect_async(&self.config.url),
+            connect_async_tls_with_config(&self.config.url, None, false, tls_connector),
         )
         .await;
 
@@ -1411,7 +1422,12 @@ async fn try_connect(
     let _ = event_tx.send(ConnectionEvent::Connecting);
 
     // Connect to WebSocket
-    let connect_result = timeout(config.connect_timeout, connect_async(&config.url)).await;
+    let tls_connector = tls_connector_for(&config)?;
+    let connect_result = timeout(
+        config.connect_timeout,
+        connect_async_tls_with_config(&config.url, None, false, tls_connector),
+    )
+    .await;
 
     let (ws_stream, _response) = match connect_result {
         Ok(Ok((stream, response))) => (stream, response),
