@@ -139,6 +139,37 @@ FugleRestClient client = FugleRestClient.builder()
     .build();
 ```
 
+## Advanced: Custom TLS / self-signed servers
+
+For connecting to servers with a private CA (enterprise deployments) or
+self-signed certs (dev / staging), the underlying UniFFI bindings expose
+TLS-aware factory functions. `FugleRestClient.builder()` will gain
+builder-style support in a future release; for now use the raw
+`com.fugle.marketdata.uniffi` factories:
+
+```java
+import com.fugle.marketdata.uniffi.*;
+
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+// Pin a custom CA (production-safe when your server cert is properly
+// issued by this CA and has matching SANs).
+byte[] caPem = Files.readAllBytes(Paths.get("/path/to/ca.crt"));
+TlsConfigRecord tls = new TlsConfigRecord(caPem, false);
+RestClient client = Marketdata.newRestClientWithApiKeyAndTls(
+    "your-api-key", null /* baseUrl */, tls);
+
+// Disable ALL TLS verification — dev / testing only. Exposes MITM risk.
+TlsConfigRecord insecure = new TlsConfigRecord(null, true);
+RestClient devClient = Marketdata.newRestClientWithApiKeyAndTls(
+    "your-api-key", "wss://192.0.2.1/v1.0", insecure);
+```
+
+For WebSocket use `Marketdata.newWebsocketClientWithFullConfig(...)` —
+same pattern, accepts `Option<TlsConfigRecord>` plus reconnect/health
+check configs.
+
 ## API Reference
 
 ### FugleRestClient

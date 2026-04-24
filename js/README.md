@@ -253,6 +253,34 @@ try {
 }
 ```
 
+## Custom TLS / self-signed servers
+
+For connecting to servers with a private CA (enterprise deployments) or
+self-signed certs (dev / staging), both `RestClient` and
+`WebSocketClient` accept optional TLS fields:
+
+```javascript
+const { readFileSync } = require('fs');
+
+// Pin a custom CA (production-safe when your server cert has proper
+// SANs and is issued by this CA).
+const client = new RestClient({
+  apiKey: 'your-api-key',
+  tlsRootCertPem: readFileSync('/path/to/ca.crt'),
+});
+
+// Disable ALL TLS verification — dev / testing only. Exposes MITM risk.
+const insecureClient = new RestClient({
+  apiKey: 'your-api-key',
+  baseUrl: 'wss://192.0.2.1/v1.0',
+  tlsAcceptInvalidCerts: true,
+});
+```
+
+Same fields work on `WebSocketClient`. When neither field is set the
+client uses the OS trust store (rustls loads it via
+`rustls-native-certs`).
+
 ## Error Codes
 
 | Code | Error | Description |

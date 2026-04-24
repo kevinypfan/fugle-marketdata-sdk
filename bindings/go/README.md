@@ -197,6 +197,45 @@ client, err := mkt.NewRestClientWithBearerToken("your-bearer-token")
 client, err := mkt.NewRestClientWithSdkToken("your-sdk-token")
 ```
 
+## Advanced: Custom TLS / self-signed servers
+
+For connecting to servers with a private CA (enterprise deployments) or
+self-signed certs (dev / staging), the `NewRestClient*AndTls` variants
+and the WebSocket full-config factory accept an optional
+`TlsConfigRecord`:
+
+```go
+import (
+    "os"
+    mkt "github.com/fugle-dev/fugle-marketdata-go"
+)
+
+// Pin a custom CA (production-safe when your server cert is properly
+// issued by this CA and has matching SANs).
+caPem, err := os.ReadFile("/path/to/ca.crt")
+if err != nil { /* ... */ }
+
+tls := mkt.TlsConfigRecord{
+    RootCertPem:        &caPem,
+    AcceptInvalidCerts: false,
+}
+client, err := mkt.NewRestClientWithApiKeyAndTls(
+    "your-api-key", nil /* baseUrl */, tls)
+
+// Disable ALL TLS verification — dev / testing only. Exposes MITM risk.
+baseUrl := "wss://192.0.2.1/v1.0"
+insecure := mkt.TlsConfigRecord{
+    RootCertPem:        nil,
+    AcceptInvalidCerts: true,
+}
+devClient, err := mkt.NewRestClientWithApiKeyAndTls(
+    "your-api-key", &baseUrl, insecure)
+```
+
+For WebSocket use `NewWebsocketClientWithFullConfig(...)` — same pattern,
+accepts an optional `TlsConfigRecord` plus reconnect/health check
+configs.
+
 ## API Reference
 
 ### RestClient

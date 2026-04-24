@@ -134,6 +134,34 @@ using var client = RestClient.WithBearerToken("your-bearer-token");
 using var client = RestClient.WithSdkToken("your-sdk-token");
 ```
 
+## Advanced: Custom TLS / self-signed servers
+
+For connecting to servers with a private CA (enterprise deployments) or
+self-signed certs (dev / staging), the underlying UniFFI bindings expose
+TLS-aware factory functions. `RestClient` will gain direct support in a
+future release; for now use the raw `MarketdataUniffi` namespace:
+
+```csharp
+using MarketdataUniffi;
+
+using System.IO;
+
+// Pin a custom CA (production-safe when your server cert is properly
+// issued by this CA and has matching SANs).
+byte[] caPem = File.ReadAllBytes("/path/to/ca.crt");
+var tls = new TlsConfigRecord(caPem, false);
+var client = MarketdataUniffiMethods.NewRestClientWithApiKeyAndTls(
+    "your-api-key", baseUrl: null, tls: tls);
+
+// Disable ALL TLS verification — dev / testing only. Exposes MITM risk.
+var insecure = new TlsConfigRecord(null, true);
+var devClient = MarketdataUniffiMethods.NewRestClientWithApiKeyAndTls(
+    "your-api-key", baseUrl: "wss://192.0.2.1/v1.0", tls: insecure);
+```
+
+For WebSocket use `NewWebsocketClientWithFullConfig(...)` — same pattern,
+accepts optional `TlsConfigRecord` plus reconnect/health check configs.
+
 ## API Reference
 
 ### RestClient
