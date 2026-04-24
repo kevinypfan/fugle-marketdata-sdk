@@ -27,18 +27,19 @@ jobs:
       matrix:
         include:
           # Linux x86_64 — builds inside PyPA's manylinux2014 docker image
-          # (glibc 2.17 baseline), producing a portable wheel with the
-          # manylinux_2_17_x86_64 ABI tag. Covers RHEL 7+, Debian 10+,
-          # Ubuntu 18.04+. Previously was 'off' due to a now-fixed v1
-          # docker bug; @v1.51.0 resolves that. Explicit '2_17' pin (vs
-          # 'auto') keeps behaviour stable across future action upgrades.
+          # (CentOS 7, glibc 2.17 baseline), producing a portable wheel
+          # with the manylinux_2_17_x86_64 ABI tag. Covers RHEL 7+,
+          # Debian 10+, Ubuntu 18.04+ — the broadest compatibility so
+          # downstream packages pinning the 2_17 baseline stay happy.
+          #
+          # openssl-sys vendored build needs perl-IPC-Cmd / perl-Digest-SHA
+          # (not in CentOS 7 default image); installed via
+          # before-script-linux. See Build wheels step below.
           - os: ubuntu-latest
             target: x86_64
             manylinux: '2_17'
           # Linux aarch64 — native arm64 runner (ubuntu-24.04-arm, free
-          # for public repos since 2025). maturin-action pulls the
-          # matching manylinux2014_aarch64 image for consistent glibc
-          # 2.17 baseline.
+          # for public repos since 2025). Same manylinux2014 baseline.
           - os: ubuntu-24.04-arm
             target: aarch64
             manylinux: '2_17'
@@ -88,6 +89,15 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
           args: --release -m py/Cargo.toml --out dist
+          # manylinux2014 (CentOS 7) ships a minimal perl that lacks
+          # IPC::Cmd / Digest::SHA, which openssl-sys's vendored OpenSSL
+          # Configure needs. Install them before maturin runs. No-op on
+          # non-manylinux hosts (macOS/Windows) because before-script-linux
+          # is ignored there by the action.
+          before-script-linux: |
+            if command -v yum >/dev/null 2>&1; then
+              yum install -y perl-IPC-Cmd perl-Digest-SHA
+            fi
 
       # Regression guard — if the Linux wheel ever ships without the
       # manylinux_2_17 ABI tag, fail the build loudly. Historically this
