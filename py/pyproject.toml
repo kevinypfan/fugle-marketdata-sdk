@@ -6,7 +6,10 @@ build-backend = "maturin"
 name = "fugle-marketdata"
 version = "3.0.0"
 description = "Python bindings for Fugle marketdata-core"
-requires-python = ">=3.8"
+requires-python = ">=3.7"
+dependencies = [
+    "importlib-metadata>=4.0; python_version < '3.8'",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
