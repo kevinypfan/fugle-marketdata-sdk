@@ -22,22 +22,15 @@ pub struct TlsConfig {
     pub accept_invalid_certs: bool,
 }
 
-impl TlsConfig {
-    pub fn is_default(&self) -> bool {
-        self.root_cert_pem.is_none() && !self.accept_invalid_certs
-    }
-}
-
-/// Build a configured [`native_tls::TlsConnector`], or `None` when the
-/// config is in its default state (caller should then fall through to
-/// the library's default TLS path).
+/// Build a [`native_tls::TlsConnector`] honoring any custom root CA or
+/// `accept_invalid_certs` flag in `tls`. On default config this returns
+/// a connector that uses the system trust store — equivalent to
+/// `native_tls::TlsConnector::new()`. ureq's `native-tls` feature is
+/// builder-only (no default fallback), so REST callers MUST always
+/// install this connector via `AgentBuilder::tls_connector`.
 pub fn build_native_tls_connector(
     tls: &TlsConfig,
-) -> Result<Option<native_tls::TlsConnector>, MarketDataError> {
-    if tls.is_default() {
-        return Ok(None);
-    }
-
+) -> Result<native_tls::TlsConnector, MarketDataError> {
     let mut builder = native_tls::TlsConnector::builder();
 
     if let Some(pem) = &tls.root_cert_pem {
@@ -54,11 +47,9 @@ pub fn build_native_tls_connector(
         // JS/Java/C#) are responsible for surfacing this to the user.
     }
 
-    let connector = builder.build().map_err(|e| {
+    builder.build().map_err(|e| {
         MarketDataError::ConfigError(format!("TlsConnector build failed: {e}"))
-    })?;
-
-    Ok(Some(connector))
+    })
 }
 
 #[cfg(test)]
@@ -66,11 +57,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_config_returns_none() {
+    fn default_config_builds_connector() {
         let cfg = TlsConfig::default();
-        assert!(cfg.is_default());
-        let got = build_native_tls_connector(&cfg).expect("default should not error");
-        assert!(got.is_none());
+        let _ = build_native_tls_connector(&cfg).expect("default should always build");
     }
 
     #[test]
@@ -79,8 +68,7 @@ mod tests {
             accept_invalid_certs: true,
             ..Default::default()
         };
-        let got = build_native_tls_connector(&cfg).expect("should build");
-        assert!(got.is_some());
+        let _ = build_native_tls_connector(&cfg).expect("should build");
     }
 
     #[test]

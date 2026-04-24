@@ -37,10 +37,12 @@ impl RestClient {
     /// let client = RestClient::new(Auth::SdkToken("my-token".to_string()));
     /// ```
     pub fn new(auth: Auth) -> Self {
-        // Safe: build_native_tls_connector only errors on user-supplied input
-        // (TlsConfig::default() has no such input), and `new` shouldn't fail.
+        // Building a default native-tls connector can only realistically fail
+        // if the system trust store is unavailable (exotic containers). That's
+        // unrecoverable for us — panic at construction so consumers get a
+        // clear failure mode instead of an opaque error on first request.
         Self::with_tls(auth, TlsConfig::default())
-            .expect("default TlsConfig should never fail to build")
+            .expect("default native-tls connector should build on supported platforms")
     }
 
     /// Create a REST client with custom TLS configuration (custom root CA
@@ -49,13 +51,11 @@ impl RestClient {
     ///
     /// Returns a `ConfigError` if the PEM in `tls.root_cert_pem` is malformed.
     pub fn with_tls(auth: Auth, tls: TlsConfig) -> Result<Self, MarketDataError> {
-        let mut builder = ureq::AgentBuilder::new()
+        let connector = build_native_tls_connector(&tls)?;
+        let builder = ureq::AgentBuilder::new()
             .timeout_read(std::time::Duration::from_secs(30))
-            .timeout_write(std::time::Duration::from_secs(30));
-
-        if let Some(connector) = build_native_tls_connector(&tls)? {
-            builder = builder.tls_connector(Arc::new(connector));
-        }
+            .timeout_write(std::time::Duration::from_secs(30))
+            .tls_connector(Arc::new(connector));
 
         Ok(Self {
             agent: builder.build(),

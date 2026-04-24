@@ -17,14 +17,15 @@ use tokio::time::{sleep, timeout, Duration};
 use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 
-/// Build the optional `Connector` used by both call sites below. Returns
-/// `None` when TLS config is in its default shape so tokio-tungstenite
-/// uses the library default — identical to pre-3.0.1 behaviour.
+/// Build the `Connector` used by both call sites below. Always native-tls
+/// — the library's own default would also be native-tls given our
+/// tokio-tungstenite feature matrix, so passing it explicitly is a no-op
+/// behavior-wise and keeps REST/WS symmetric.
 fn tls_connector_for(
     config: &ConnectionConfig,
-) -> Result<Option<Connector>, MarketDataError> {
+) -> Result<Connector, MarketDataError> {
     let connector = crate::tls::build_native_tls_connector(&config.tls)?;
-    Ok(connector.map(Connector::NativeTls))
+    Ok(Connector::NativeTls(connector))
 }
 
 /// Type alias for WebSocket write half
@@ -325,7 +326,7 @@ impl WebSocketClient {
         let tls_connector = tls_connector_for(&self.config)?;
         let connect_result = timeout(
             self.config.connect_timeout,
-            connect_async_tls_with_config(&self.config.url, None, false, tls_connector),
+            connect_async_tls_with_config(&self.config.url, None, false, Some(tls_connector)),
         )
         .await;
 
@@ -1425,7 +1426,7 @@ async fn try_connect(
     let tls_connector = tls_connector_for(&config)?;
     let connect_result = timeout(
         config.connect_timeout,
-        connect_async_tls_with_config(&config.url, None, false, tls_connector),
+        connect_async_tls_with_config(&config.url, None, false, Some(tls_connector)),
     )
     .await;
 
