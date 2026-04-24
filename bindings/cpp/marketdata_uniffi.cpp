@@ -18,10 +18,19 @@ void ensure_initialized() {
     if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key() != 2560) {
         throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
+    if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls() != 17616) {
+        throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
     if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token() != 30582) {
         throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
+    if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls() != 21309) {
+        throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
     if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token() != 14209) {
+        throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls() != 25673) {
         throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (uniffi_marketdata_uniffi_checksum_func_new_websocket_client() != 17568) {
@@ -109,6 +118,9 @@ void ensure_initialized() {
         throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint() != 35702) {
+        throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
+    }
+    if (uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config() != 39727) {
         throw std::runtime_error("UniFFI API checksum mismatch: try cleaning and rebuilding your project");
     }
     if (uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url() != 63549) {
@@ -402,7 +414,53 @@ void FfiConverterString::write(RustStream &stream, const std::string &val) {
 uint64_t FfiConverterString::allocation_size(const std::string &val) {
     return static_cast<uint64_t>(sizeof(int32_t) + val.length());
 }
+std::vector<uint8_t> FfiConverterBytes::lift(RustBuffer buf) {
+    auto stream = RustStream(&buf);
+    auto ret = read(stream);
+
+    rustbuffer_free(buf);
+
+    return ret;
+}
+
+RustBuffer FfiConverterBytes::lower(const std::vector<uint8_t> &val) {
+    auto buf = rustbuffer_alloc(allocation_size(val));
+    auto stream = RustStream(&buf);
+
+    write(stream, val);
+
+    return buf;
+}
+
+std::vector<uint8_t> FfiConverterBytes::read(RustStream &stream) {
+    std::vector<uint8_t> ret;
+    int32_t count;
+    stream >> count;
+
+    ret.reserve(count);
+
+    for (decltype(count) i = 0; i < count; i++) {
+        uint8_t elem;
+        stream >> elem;
+        ret.push_back(elem);
+    }
+
+    return ret;
+}
+
+void FfiConverterBytes::write(RustStream &stream, const std::vector<uint8_t> &val) {
+    stream << static_cast<int32_t>(val.size());
+
+    for (auto &elem : val) {
+        stream << elem;
+    }
+}
+
+uint64_t FfiConverterBytes::allocation_size(const std::vector<uint8_t> &val) {
+    return static_cast<uint64_t>(sizeof(int32_t) + sizeof(uint8_t) * val.size());
+}
 } // namespace uniffi
+
 
 
 
@@ -819,6 +877,12 @@ std::shared_ptr<WebSocketClient> WebSocketClient::new_with_endpoint(const std::s
         nullptr, uniffi::FfiConverterString::lower(api_key), uniffi::FfiConverterWebSocketListener::lower(listener), uniffi::FfiConverterWebSocketEndpoint::lower(endpoint))));
 }
 
+std::shared_ptr<WebSocketClient> WebSocketClient::new_with_full_config(const std::string &api_key, const std::shared_ptr<WebSocketListener> &listener, const WebSocketEndpoint &endpoint, std::optional<std::string> base_url, std::optional<ReconnectConfigRecord> reconnect_config, std::optional<HealthCheckConfigRecord> health_check_config, std::optional<TlsConfigRecord> tls) {
+    return std::shared_ptr<WebSocketClient>(new WebSocketClient(uniffi::rust_call(
+        uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config,
+        nullptr, uniffi::FfiConverterString::lower(api_key), uniffi::FfiConverterWebSocketListener::lower(listener), uniffi::FfiConverterWebSocketEndpoint::lower(endpoint), uniffi::FfiConverterOptionalString::lower(base_url), uniffi::FfiConverterOptionalTypeReconnectConfigRecord::lower(reconnect_config), uniffi::FfiConverterOptionalTypeHealthCheckConfigRecord::lower(health_check_config), uniffi::FfiConverterOptionalTypeTlsConfigRecord::lower(tls))));
+}
+
 std::shared_ptr<WebSocketClient> WebSocketClient::new_with_url(const std::string &api_key, const std::shared_ptr<WebSocketListener> &listener, const WebSocketEndpoint &endpoint, const std::string &base_url, std::optional<ReconnectConfigRecord> reconnect_config, std::optional<HealthCheckConfigRecord> health_check_config) {
     return std::shared_ptr<WebSocketClient>(new WebSocketClient(uniffi::rust_call(
         uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url,
@@ -1160,7 +1224,11 @@ void *WebSocketListenerImpl::_uniffi_internal_clone_pointer() const {
 
 
 
+
+
+
 namespace uniffi {
+
 
 
 
@@ -2573,7 +2641,7 @@ IntradayCandle FfiConverterTypeIntradayCandle::read(RustStream &stream) {
         FfiConverterDouble::read(stream),
         FfiConverterInt64::read(stream),
         FfiConverterOptionalDouble::read(stream),
-        FfiConverterInt64::read(stream)
+        FfiConverterString::read(stream)
     };
 }
 
@@ -2584,7 +2652,7 @@ void FfiConverterTypeIntradayCandle::write(RustStream &stream, const IntradayCan
     FfiConverterDouble::write(stream, val.close);
     FfiConverterInt64::write(stream, val.volume);
     FfiConverterOptionalDouble::write(stream, val.average);
-    FfiConverterInt64::write(stream, val.time);
+    FfiConverterString::write(stream, val.date);
 }
 
 uint64_t FfiConverterTypeIntradayCandle::allocation_size(const IntradayCandle &val) {
@@ -2596,7 +2664,7 @@ uint64_t FfiConverterTypeIntradayCandle::allocation_size(const IntradayCandle &v
         FfiConverterDouble::allocation_size(val.close) +
         FfiConverterInt64::allocation_size(val.volume) +
         FfiConverterOptionalDouble::allocation_size(val.average) +
-        FfiConverterInt64::allocation_size(val.time);
+        FfiConverterString::allocation_size(val.date);
     
 }
 
@@ -4017,6 +4085,45 @@ uint64_t FfiConverterTypeTicker::allocation_size(const Ticker &val) {
 }
 
 
+TlsConfigRecord FfiConverterTypeTlsConfigRecord::lift(RustBuffer buf) {
+    auto stream = RustStream(&buf);
+    auto ret = FfiConverterTypeTlsConfigRecord::read(stream);
+
+    rustbuffer_free(buf);
+
+    return std::move(ret);
+}
+
+RustBuffer FfiConverterTypeTlsConfigRecord::lower(const TlsConfigRecord &val) {
+    auto buf = rustbuffer_alloc(allocation_size(val));
+    auto stream = RustStream(&buf);
+
+    FfiConverterTypeTlsConfigRecord::write(stream, val);
+
+    return std::move(buf);
+}
+
+TlsConfigRecord FfiConverterTypeTlsConfigRecord::read(RustStream &stream) {
+    return {
+        FfiConverterOptionalBytes::read(stream),
+        FfiConverterBool::read(stream)
+    };
+}
+
+void FfiConverterTypeTlsConfigRecord::write(RustStream &stream, const TlsConfigRecord &val) {
+    FfiConverterOptionalBytes::write(stream, val.root_cert_pem);
+    FfiConverterBool::write(stream, val.accept_invalid_certs);
+}
+
+uint64_t FfiConverterTypeTlsConfigRecord::allocation_size(const TlsConfigRecord &val) {
+    
+    return 
+        FfiConverterOptionalBytes::allocation_size(val.root_cert_pem) +
+        FfiConverterBool::allocation_size(val.accept_invalid_certs);
+    
+}
+
+
 TotalStats FfiConverterTypeTotalStats::lift(RustBuffer buf) {
     auto stream = RustStream(&buf);
     auto ret = FfiConverterTypeTotalStats::read(stream);
@@ -4924,6 +5031,53 @@ uint64_t FfiConverterOptionalString::allocation_size(const std::optional<std::st
     return ret;
 }
 
+std::optional<std::vector<uint8_t>> FfiConverterOptionalBytes::lift(RustBuffer buf) {
+    auto stream = RustStream(&buf);
+    auto ret = FfiConverterOptionalBytes::read(stream);
+
+    rustbuffer_free(buf);
+
+    return ret;
+}
+
+RustBuffer FfiConverterOptionalBytes::lower(const std::optional<std::vector<uint8_t>>& val) {
+    auto buf = rustbuffer_alloc(FfiConverterOptionalBytes::allocation_size(val));
+    auto stream = RustStream(&buf);
+
+    FfiConverterOptionalBytes::write(stream, val);
+
+    return buf;
+}
+
+std::optional<std::vector<uint8_t>> FfiConverterOptionalBytes::read(RustStream &stream) {
+    char has_value;
+
+    stream.get(has_value);
+    if (has_value) {
+        return std::make_optional(FfiConverterBytes::read(stream));
+    } else {
+        return std::nullopt;
+    }
+}
+
+void FfiConverterOptionalBytes::write(RustStream &stream, const std::optional<std::vector<uint8_t>>& value) {
+    stream.put(static_cast<uint8_t>(!!value));
+
+    if (value) {
+        FfiConverterBytes::write(stream, value.value());
+    }
+}
+
+uint64_t FfiConverterOptionalBytes::allocation_size(const std::optional<std::vector<uint8_t>> &val) {
+    uint64_t ret = 1;
+
+    if (val) {
+        ret += FfiConverterBytes::allocation_size(val.value());
+    }
+
+    return ret;
+}
+
 std::optional<FutOptLastTrade> FfiConverterOptionalTypeFutOptLastTrade::lift(RustBuffer buf) {
     auto stream = RustStream(&buf);
     auto ret = FfiConverterOptionalTypeFutOptLastTrade::read(stream);
@@ -5107,6 +5261,53 @@ uint64_t FfiConverterOptionalTypeReconnectConfigRecord::allocation_size(const st
 
     if (val) {
         ret += FfiConverterTypeReconnectConfigRecord::allocation_size(val.value());
+    }
+
+    return ret;
+}
+
+std::optional<TlsConfigRecord> FfiConverterOptionalTypeTlsConfigRecord::lift(RustBuffer buf) {
+    auto stream = RustStream(&buf);
+    auto ret = FfiConverterOptionalTypeTlsConfigRecord::read(stream);
+
+    rustbuffer_free(buf);
+
+    return ret;
+}
+
+RustBuffer FfiConverterOptionalTypeTlsConfigRecord::lower(const std::optional<TlsConfigRecord>& val) {
+    auto buf = rustbuffer_alloc(FfiConverterOptionalTypeTlsConfigRecord::allocation_size(val));
+    auto stream = RustStream(&buf);
+
+    FfiConverterOptionalTypeTlsConfigRecord::write(stream, val);
+
+    return buf;
+}
+
+std::optional<TlsConfigRecord> FfiConverterOptionalTypeTlsConfigRecord::read(RustStream &stream) {
+    char has_value;
+
+    stream.get(has_value);
+    if (has_value) {
+        return std::make_optional(FfiConverterTypeTlsConfigRecord::read(stream));
+    } else {
+        return std::nullopt;
+    }
+}
+
+void FfiConverterOptionalTypeTlsConfigRecord::write(RustStream &stream, const std::optional<TlsConfigRecord>& value) {
+    stream.put(static_cast<uint8_t>(!!value));
+
+    if (value) {
+        FfiConverterTypeTlsConfigRecord::write(stream, value.value());
+    }
+}
+
+uint64_t FfiConverterOptionalTypeTlsConfigRecord::allocation_size(const std::optional<TlsConfigRecord> &val) {
+    uint64_t ret = 1;
+
+    if (val) {
+        ret += FfiConverterTypeTlsConfigRecord::allocation_size(val.value());
     }
 
     return ret;
@@ -6284,6 +6485,15 @@ std::shared_ptr<RestClient> new_rest_client_with_api_key(const std::string &api_
 }
 
 
+std::shared_ptr<RestClient> new_rest_client_with_api_key_and_tls(const std::string &api_key, std::optional<std::string> base_url, const TlsConfigRecord &tls) {
+    auto ret = uniffi::rust_call(
+        uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls,
+        uniffi::FfiConverterMarketDataError::lift, uniffi::FfiConverterString::lower(api_key), uniffi::FfiConverterOptionalString::lower(base_url), uniffi::FfiConverterTypeTlsConfigRecord::lower(tls));
+
+    return uniffi::FfiConverterRestClient::lift(ret);
+}
+
+
 std::shared_ptr<RestClient> new_rest_client_with_bearer_token(const std::string &bearer_token) {
     auto ret = uniffi::rust_call(
         uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token,
@@ -6293,10 +6503,28 @@ std::shared_ptr<RestClient> new_rest_client_with_bearer_token(const std::string 
 }
 
 
+std::shared_ptr<RestClient> new_rest_client_with_bearer_token_and_tls(const std::string &bearer_token, std::optional<std::string> base_url, const TlsConfigRecord &tls) {
+    auto ret = uniffi::rust_call(
+        uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls,
+        uniffi::FfiConverterMarketDataError::lift, uniffi::FfiConverterString::lower(bearer_token), uniffi::FfiConverterOptionalString::lower(base_url), uniffi::FfiConverterTypeTlsConfigRecord::lower(tls));
+
+    return uniffi::FfiConverterRestClient::lift(ret);
+}
+
+
 std::shared_ptr<RestClient> new_rest_client_with_sdk_token(const std::string &sdk_token) {
     auto ret = uniffi::rust_call(
         uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token,
         uniffi::FfiConverterMarketDataError::lift, uniffi::FfiConverterString::lower(sdk_token));
+
+    return uniffi::FfiConverterRestClient::lift(ret);
+}
+
+
+std::shared_ptr<RestClient> new_rest_client_with_sdk_token_and_tls(const std::string &sdk_token, std::optional<std::string> base_url, const TlsConfigRecord &tls) {
+    auto ret = uniffi::rust_call(
+        uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls,
+        uniffi::FfiConverterMarketDataError::lift, uniffi::FfiConverterString::lower(sdk_token), uniffi::FfiConverterOptionalString::lower(base_url), uniffi::FfiConverterTypeTlsConfigRecord::lower(tls));
 
     return uniffi::FfiConverterRestClient::lift(ret);
 }

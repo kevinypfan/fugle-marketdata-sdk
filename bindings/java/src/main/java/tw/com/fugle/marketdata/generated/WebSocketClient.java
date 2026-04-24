@@ -125,16 +125,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
   }
 
   
-    /**
-     * Connect to the WebSocket server
-     *
-     * Establishes connection, authenticates, and starts a background task
-     * to forward messages to the listener.
-     *
-     * # Errors
-     *
-     * Returns error if connection or authentication fails.
-     */
     @Override
     
     public CompletableFuture<Void> connect(){
@@ -156,11 +146,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     }
 
   
-    /**
-     * Disconnect from the WebSocket server
-     *
-     * Gracefully closes the connection and stops the message forwarding task.
-     */
     @Override
     
     public CompletableFuture<Void> disconnect(){
@@ -248,12 +233,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     
 
   
-    /**
-     * Send a ping message to the server
-     *
-     * # Arguments
-     * * `state` - Optional state string echoed back in the pong response
-     */
     @Override
     
     public CompletableFuture<Void> ping(String state){
@@ -275,9 +254,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     }
 
   
-    /**
-     * Query the server for current subscriptions
-     */
     @Override
     
     public CompletableFuture<Void> querySubscriptions(){
@@ -299,17 +275,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     }
 
   
-    /**
-     * Subscribe to a channel for a symbol
-     *
-     * # Arguments
-     * * `channel` - Channel name (e.g., "trades", "candles", "books")
-     * * `symbol` - Symbol to subscribe (e.g., "2330")
-     *
-     * # Errors
-     *
-     * Returns error if not connected or subscription fails.
-     */
     @Override
     
     public CompletableFuture<Void> subscribe(String channel, String symbol){
@@ -331,17 +296,6 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     }
 
   
-    /**
-     * Unsubscribe from a channel for a symbol
-     *
-     * # Arguments
-     * * `channel` - Channel name
-     * * `symbol` - Symbol to unsubscribe
-     *
-     * # Errors
-     *
-     * Returns error if not connected.
-     */
     @Override
     
     public CompletableFuture<Void> unsubscribe(String channel, String symbol){
@@ -407,6 +361,41 @@ public class WebSocketClient implements AutoCloseable, WebSocketClientInterface 
     UniffiHelpers.uniffiRustCall( _status -> {
         return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_endpoint(
             FfiConverterString.INSTANCE.lower(apiKey), FfiConverterTypeWebSocketListener.INSTANCE.lower(listener), FfiConverterTypeWebSocketEndpoint.INSTANCE.lower(endpoint), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Create a new WebSocket client with full configuration including TLS.
+     *
+     * All optional parameters can be None to use defaults. This is the
+     * TLS-aware variant of `new_with_url` — use this when you need to
+     * pin a custom CA or disable cert verification.
+     *
+     * # Arguments
+     * * `api_key` - Fugle API key for authentication
+     * * `listener` - Callback interface for receiving WebSocket events
+     * * `endpoint` - The market data endpoint (Stock or FutOpt)
+     * * `base_url` - Optional base URL override
+     * * `reconnect_config` - Optional reconnection configuration
+     * * `health_check_config` - Optional health check configuration
+     * * `tls` - Optional TLS customization (custom CA or accept_invalid_certs)
+     */public static WebSocketClient newWithFullConfig(String apiKey, WebSocketListener listener, WebSocketEndpoint endpoint, String baseUrl, ReconnectConfigRecord reconnectConfig, HealthCheckConfigRecord healthCheckConfig, TlsConfigRecord tls)  {
+            try {
+                return FfiConverterTypeWebSocketClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCall( _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config(
+            FfiConverterString.INSTANCE.lower(apiKey), FfiConverterTypeWebSocketListener.INSTANCE.lower(listener), FfiConverterTypeWebSocketEndpoint.INSTANCE.lower(endpoint), FfiConverterOptionalString.INSTANCE.lower(baseUrl), FfiConverterOptionalTypeReconnectConfigRecord.INSTANCE.lower(reconnectConfig), FfiConverterOptionalTypeHealthCheckConfigRecord.INSTANCE.lower(healthCheckConfig), FfiConverterOptionalTypeTlsConfigRecord.INSTANCE.lower(tls), _status);
     })
     );
             } catch (RuntimeException _e) {

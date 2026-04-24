@@ -15,7 +15,7 @@ public class IntradayCandle {
     private Double close;
     private Long volume;
     private Double average;
-    private Long time;
+    private String date;
 
     public IntradayCandle(
         Double open, 
@@ -24,7 +24,7 @@ public class IntradayCandle {
         Double close, 
         Long volume, 
         Double average, 
-        Long time
+        String date
     ) {
         
         this.open = open;
@@ -39,7 +39,7 @@ public class IntradayCandle {
         
         this.average = average;
         
-        this.time = time;
+        this.date = date;
     }
     
     public Double open() {
@@ -66,8 +66,8 @@ public class IntradayCandle {
         return this.average;
     }
     
-    public Long time() {
-        return this.time;
+    public String date() {
+        return this.date;
     }
     public void setOpen(Double open) {
         this.open = open;
@@ -87,8 +87,8 @@ public class IntradayCandle {
     public void setAverage(Double average) {
         this.average = average;
     }
-    public void setTime(Long time) {
-        this.time = time;
+    public void setDate(String date) {
+        this.date = date;
     }
 
     
@@ -110,7 +110,7 @@ public class IntradayCandle {
               
               Objects.equals(average, t.average) && 
               
-              Objects.equals(time, t.time)
+              Objects.equals(date, t.date)
               
             );
         };
@@ -119,7 +119,7 @@ public class IntradayCandle {
 
     @Override
     public int hashCode() {
-        return Objects.hash(open, high, low, close, volume, average, time);
+        return Objects.hash(open, high, low, close, volume, average, date);
     }
 }
 

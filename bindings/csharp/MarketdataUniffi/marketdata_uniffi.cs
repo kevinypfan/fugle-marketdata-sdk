@@ -219,7 +219,7 @@ struct UniffiRustCallStatus
 }
 
 // Base class for all uniffi exceptions
-public class UniffiException : System.Exception
+internal class UniffiException : System.Exception
 {
     public UniffiException()
         : base() { }
@@ -228,43 +228,43 @@ public class UniffiException : System.Exception
         : base(message) { }
 }
 
-public class UndeclaredErrorException : UniffiException
+internal class UndeclaredErrorException : UniffiException
 {
     public UndeclaredErrorException(string message)
         : base(message) { }
 }
 
-public class PanicException : UniffiException
+internal class PanicException : UniffiException
 {
     public PanicException(string message)
         : base(message) { }
 }
 
-public class AllocationException : UniffiException
+internal class AllocationException : UniffiException
 {
     public AllocationException(string message)
         : base(message) { }
 }
 
-public class InternalException : UniffiException
+internal class InternalException : UniffiException
 {
     public InternalException(string message)
         : base(message) { }
 }
 
-public class InvalidEnumException : InternalException
+internal class InvalidEnumException : InternalException
 {
     public InvalidEnumException(string message)
         : base(message) { }
 }
 
-public class UniffiContractVersionException : UniffiException
+internal class UniffiContractVersionException : UniffiException
 {
     public UniffiContractVersionException(string message)
         : base(message) { }
 }
 
-public class UniffiContractChecksumException : UniffiException
+internal class UniffiContractChecksumException : UniffiException
 {
     public UniffiContractChecksumException(string message)
         : base(message) { }
@@ -1574,6 +1574,18 @@ static class _UniFFILib
     );
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config(
+        RustBuffer @apiKey,
+        IntPtr @listener,
+        RustBuffer @endpoint,
+        RustBuffer @baseUrl,
+        RustBuffer @reconnectConfig,
+        RustBuffer @healthCheckConfig,
+        RustBuffer @tls,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(
         RustBuffer @apiKey,
         IntPtr @listener,
@@ -1696,14 +1708,38 @@ static class _UniFFILib
     );
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls(
+        RustBuffer @apiKey,
+        RustBuffer @baseUrl,
+        RustBuffer @tls,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token(
         RustBuffer @bearerToken,
         ref UniffiRustCallStatus _uniffi_out_err
     );
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls(
+        RustBuffer @bearerToken,
+        RustBuffer @baseUrl,
+        RustBuffer @tls,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token(
         RustBuffer @sdkToken,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls(
+        RustBuffer @sdkToken,
+        RustBuffer @baseUrl,
+        RustBuffer @tls,
         ref UniffiRustCallStatus _uniffi_out_err
     );
 
@@ -2008,10 +2044,19 @@ static class _UniFFILib
     public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls();
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls();
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token();
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern ushort uniffi_marketdata_uniffi_checksum_func_new_websocket_client();
@@ -2269,6 +2314,9 @@ static class _UniFFILib
     public static extern ushort uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
+    public static extern ushort uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config();
+
+    [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
     public static extern ushort uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url();
 
     [DllImport("marketdata_uniffi", CallingConvention = CallingConvention.Cdecl)]
@@ -2300,6 +2348,16 @@ static class _UniFFILib
         }
         {
             var checksum =
+                _UniFFILib.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls();
+            if (checksum != 17616)
+            {
+                throw new UniffiContractChecksumException(
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls` checksum `17616`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token();
             if (checksum != 30582)
             {
@@ -2310,11 +2368,31 @@ static class _UniFFILib
         }
         {
             var checksum =
+                _UniFFILib.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls();
+            if (checksum != 21309)
+            {
+                throw new UniffiContractChecksumException(
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls` checksum `21309`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token();
             if (checksum != 14209)
             {
                 throw new UniffiContractChecksumException(
                     $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token` checksum `14209`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum =
+                _UniFFILib.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls();
+            if (checksum != 25673)
+            {
+                throw new UniffiContractChecksumException(
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls` checksum `25673`, library returned `{checksum}`"
                 );
             }
         }
@@ -2998,20 +3076,20 @@ static class _UniFFILib
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_connect();
-            if (checksum != 52173)
+            if (checksum != 34522)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_connect` checksum `52173`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_connect` checksum `34522`, library returned `{checksum}`"
                 );
             }
         }
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_disconnect();
-            if (checksum != 33142)
+            if (checksum != 57258)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_disconnect` checksum `33142`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_disconnect` checksum `57258`, library returned `{checksum}`"
                 );
             }
         }
@@ -3038,40 +3116,40 @@ static class _UniFFILib
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_ping();
-            if (checksum != 13903)
+            if (checksum != 51664)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_ping` checksum `13903`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_ping` checksum `51664`, library returned `{checksum}`"
                 );
             }
         }
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions();
-            if (checksum != 5989)
+            if (checksum != 20069)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions` checksum `5989`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions` checksum `20069`, library returned `{checksum}`"
                 );
             }
         }
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_subscribe();
-            if (checksum != 63126)
+            if (checksum != 39559)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_subscribe` checksum `63126`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_subscribe` checksum `39559`, library returned `{checksum}`"
                 );
             }
         }
         {
             var checksum =
                 _UniFFILib.uniffi_marketdata_uniffi_checksum_method_websocketclient_unsubscribe();
-            if (checksum != 9652)
+            if (checksum != 21735)
             {
                 throw new UniffiContractChecksumException(
-                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_unsubscribe` checksum `9652`, library returned `{checksum}`"
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_method_websocketclient_unsubscribe` checksum `21735`, library returned `{checksum}`"
                 );
             }
         }
@@ -3162,6 +3240,16 @@ static class _UniFFILib
             {
                 throw new UniffiContractChecksumException(
                     $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint` checksum `35702`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum =
+                _UniFFILib.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config();
+            if (checksum != 39727)
+            {
+                throw new UniffiContractChecksumException(
+                    $"uniffi.marketdata_uniffi: uniffi bindings expected function `uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config` checksum `39727`, library returned `{checksum}`"
                 );
             }
         }
@@ -3419,10 +3507,32 @@ class FfiConverterString : FfiConverter<string, RustBuffer>
     }
 }
 
+class FfiConverterByteArray : FfiConverterRustBuffer<byte[]>
+{
+    public static FfiConverterByteArray INSTANCE = new FfiConverterByteArray();
+
+    public override byte[] Read(BigEndianStream stream)
+    {
+        var length = stream.ReadInt();
+        return stream.ReadBytes(length);
+    }
+
+    public override int AllocationSize(byte[] value)
+    {
+        return 4 + value.Length;
+    }
+
+    public override void Write(byte[] value, BigEndianStream stream)
+    {
+        stream.WriteInt(value.Length);
+        stream.WriteBytes(value);
+    }
+}
+
 /// <summary>
 /// FutOpt market data client
 /// </summary>
-public interface IFutOptClient
+internal interface IFutOptClient
 {
     /// <summary>
     /// Access historical data endpoints
@@ -3438,7 +3548,7 @@ public interface IFutOptClient
 /// <summary>
 /// FutOpt market data client
 /// </summary>
-public class FutOptClient : IFutOptClient, IDisposable
+internal class FutOptClient : IFutOptClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -3622,7 +3732,7 @@ class FfiConverterTypeFutOptClient : FfiConverter<FutOptClient, IntPtr>
 ///
 /// Provides access to historical candles and daily data for futures and options.
 /// </summary>
-public interface IFutOptHistoricalClient
+internal interface IFutOptHistoricalClient
 {
     /// <summary>
     /// Get historical candles for a contract (sync/blocking)
@@ -3671,7 +3781,7 @@ public interface IFutOptHistoricalClient
 ///
 /// Provides access to historical candles and daily data for futures and options.
 /// </summary>
-public class FutOptHistoricalClient : IFutOptHistoricalClient, IDisposable
+internal class FutOptHistoricalClient : IFutOptHistoricalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -3979,7 +4089,7 @@ class FfiConverterTypeFutOptHistoricalClient : FfiConverter<FutOptHistoricalClie
 /// <summary>
 /// FutOpt intraday endpoints with typed model returns
 /// </summary>
-public interface IFutOptIntradayClient
+internal interface IFutOptIntradayClient
 {
     /// <summary>
     /// Get candlestick data for a contract (sync/blocking)
@@ -4077,7 +4187,7 @@ public interface IFutOptIntradayClient
 /// <summary>
 /// FutOpt intraday endpoints with typed model returns
 /// </summary>
-public class FutOptIntradayClient : IFutOptIntradayClient, IDisposable
+internal class FutOptIntradayClient : IFutOptIntradayClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -4670,7 +4780,7 @@ class FfiConverterTypeFutOptIntradayClient : FfiConverter<FutOptIntradayClient, 
 ///
 /// Wraps the core RestClient and provides Arc-wrapped sub-clients for FFI safety.
 /// </summary>
-public interface IRestClient
+internal interface IRestClient
 {
     /// <summary>
     /// Access FutOpt (futures and options) endpoints
@@ -4688,7 +4798,7 @@ public interface IRestClient
 ///
 /// Wraps the core RestClient and provides Arc-wrapped sub-clients for FFI safety.
 /// </summary>
-public class RestClient : IRestClient, IDisposable
+internal class RestClient : IRestClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -4870,7 +4980,7 @@ class FfiConverterTypeRestClient : FfiConverter<RestClient, IntPtr>
 /// <summary>
 /// Stock market data client
 /// </summary>
-public interface IStockClient
+internal interface IStockClient
 {
     /// <summary>
     /// Access corporate actions endpoints
@@ -4901,7 +5011,7 @@ public interface IStockClient
 /// <summary>
 /// Stock market data client
 /// </summary>
-public class StockClient : IStockClient, IDisposable
+internal class StockClient : IStockClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -5139,7 +5249,7 @@ class FfiConverterTypeStockClient : FfiConverter<StockClient, IntPtr>
 ///
 /// Provides access to capital changes, dividends, and listing applicants (IPO).
 /// </summary>
-public interface IStockCorporateActionsClient
+internal interface IStockCorporateActionsClient
 {
     /// <summary>
     /// Get capital structure changes (sync/blocking)
@@ -5195,7 +5305,7 @@ public interface IStockCorporateActionsClient
 ///
 /// Provides access to capital changes, dividends, and listing applicants (IPO).
 /// </summary>
-public class StockCorporateActionsClient : IStockCorporateActionsClient, IDisposable
+internal class StockCorporateActionsClient : IStockCorporateActionsClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -5565,7 +5675,7 @@ class FfiConverterTypeStockCorporateActionsClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-public interface IStockHistoricalClient
+internal interface IStockHistoricalClient
 {
     /// <summary>
     /// Get historical candles for a symbol (sync/blocking)
@@ -5617,7 +5727,7 @@ public interface IStockHistoricalClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-public class StockHistoricalClient : IStockHistoricalClient, IDisposable
+internal class StockHistoricalClient : IStockHistoricalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -5917,7 +6027,7 @@ class FfiConverterTypeStockHistoricalClient : FfiConverter<StockHistoricalClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-public interface IStockIntradayClient
+internal interface IStockIntradayClient
 {
     /// <summary>
     /// Get candlestick data for a symbol (sync/blocking)
@@ -6014,7 +6124,7 @@ public interface IStockIntradayClient
 /// - Async methods are preferred for best performance (non-blocking)
 /// - Sync methods block the calling thread (simpler API for scripting)
 /// </summary>
-public class StockIntradayClient : IStockIntradayClient, IDisposable
+internal class StockIntradayClient : IStockIntradayClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -6550,7 +6660,7 @@ class FfiConverterTypeStockIntradayClient : FfiConverter<StockIntradayClient, In
 /// Provides access to quotes, movers (gainers/losers), and most active stocks
 /// across entire markets.
 /// </summary>
-public interface IStockSnapshotClient
+internal interface IStockSnapshotClient
 {
     /// <summary>
     /// Get most actively traded stocks (sync/blocking)
@@ -6608,7 +6718,7 @@ public interface IStockSnapshotClient
 /// Provides access to quotes, movers (gainers/losers), and most active stocks
 /// across entire markets.
 /// </summary>
-public class StockSnapshotClient : IStockSnapshotClient, IDisposable
+internal class StockSnapshotClient : IStockSnapshotClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -6964,7 +7074,7 @@ class FfiConverterTypeStockSnapshotClient : FfiConverter<StockSnapshotClient, In
 ///
 /// Provides access to SMA, RSI, KDJ, MACD, and Bollinger Bands indicators.
 /// </summary>
-public interface IStockTechnicalClient
+internal interface IStockTechnicalClient
 {
     /// <summary>
     /// Get Bollinger Bands (sync/blocking)
@@ -7098,7 +7208,7 @@ public interface IStockTechnicalClient
 ///
 /// Provides access to SMA, RSI, KDJ, MACD, and Bollinger Bands indicators.
 /// </summary>
-public class StockTechnicalClient : IStockTechnicalClient, IDisposable
+internal class StockTechnicalClient : IStockTechnicalClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -7668,26 +7778,10 @@ class FfiConverterTypeStockTechnicalClient : FfiConverter<StockTechnicalClient, 
 /// Wraps the core WebSocketClient and forwards messages to the provided
 /// WebSocketListener implementation via a background task.
 /// </summary>
-public interface IWebSocketClient
+internal interface IWebSocketClient
 {
-    /// <summary>
-    /// Connect to the WebSocket server
-    ///
-    /// Establishes connection, authenticates, and starts a background task
-    /// to forward messages to the listener.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if connection or authentication fails.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     Task Connect();
-
-    /// <summary>
-    /// Disconnect from the WebSocket server
-    ///
-    /// Gracefully closes the connection and stops the message forwarding task.
-    /// </summary>
     Task Disconnect();
 
     /// <summary>
@@ -7700,46 +7794,15 @@ public interface IWebSocketClient
     /// </summary>
     bool IsConnected();
 
-    /// <summary>
-    /// Send a ping message to the server
-    ///
-    /// # Arguments
-    /// * `state` - Optional state string echoed back in the pong response
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     Task Ping(string? @state);
 
-    /// <summary>
-    /// Query the server for current subscriptions
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     Task QuerySubscriptions();
 
-    /// <summary>
-    /// Subscribe to a channel for a symbol
-    ///
-    /// # Arguments
-    /// * `channel` - Channel name (e.g., "trades", "candles", "books")
-    /// * `symbol` - Symbol to subscribe (e.g., "2330")
-    ///
-    /// # Errors
-    ///
-    /// Returns error if not connected or subscription fails.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     Task Subscribe(string @channel, string @symbol);
 
-    /// <summary>
-    /// Unsubscribe from a channel for a symbol
-    ///
-    /// # Arguments
-    /// * `channel` - Channel name
-    /// * `symbol` - Symbol to unsubscribe
-    ///
-    /// # Errors
-    ///
-    /// Returns error if not connected.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     Task Unsubscribe(string @channel, string @symbol);
 }
@@ -7750,7 +7813,7 @@ public interface IWebSocketClient
 /// Wraps the core WebSocketClient and forwards messages to the provided
 /// WebSocketListener implementation via a background task.
 /// </summary>
-public class WebSocketClient : IWebSocketClient, IDisposable
+internal class WebSocketClient : IWebSocketClient, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -7884,16 +7947,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         }
     }
 
-    /// <summary>
-    /// Connect to the WebSocket server
-    ///
-    /// Establishes connection, authenticates, and starts a background task
-    /// to forward messages to the listener.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if connection or authentication fails.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     public async Task Connect()
     {
@@ -7920,11 +7973,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         );
     }
 
-    /// <summary>
-    /// Disconnect from the WebSocket server
-    ///
-    /// Gracefully closes the connection and stops the message forwarding task.
-    /// </summary>
     public async Task Disconnect()
     {
         await _UniFFIAsync.UniffiRustCallAsync(
@@ -7986,12 +8034,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         );
     }
 
-    /// <summary>
-    /// Send a ping message to the server
-    ///
-    /// # Arguments
-    /// * `state` - Optional state string echoed back in the pong response
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     public async Task Ping(string? @state)
     {
@@ -8019,9 +8061,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         );
     }
 
-    /// <summary>
-    /// Query the server for current subscriptions
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     public async Task QuerySubscriptions()
     {
@@ -8048,17 +8087,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         );
     }
 
-    /// <summary>
-    /// Subscribe to a channel for a symbol
-    ///
-    /// # Arguments
-    /// * `channel` - Channel name (e.g., "trades", "candles", "books")
-    /// * `symbol` - Symbol to subscribe (e.g., "2330")
-    ///
-    /// # Errors
-    ///
-    /// Returns error if not connected or subscription fails.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     public async Task Subscribe(string @channel, string @symbol)
     {
@@ -8087,17 +8115,6 @@ public class WebSocketClient : IWebSocketClient, IDisposable
         );
     }
 
-    /// <summary>
-    /// Unsubscribe from a channel for a symbol
-    ///
-    /// # Arguments
-    /// * `channel` - Channel name
-    /// * `symbol` - Symbol to unsubscribe
-    ///
-    /// # Errors
-    ///
-    /// Returns error if not connected.
-    /// </summary>
     /// <exception cref="MarketDataException"></exception>
     public async Task Unsubscribe(string @channel, string @symbol)
     {
@@ -8184,6 +8201,53 @@ public class WebSocketClient : IWebSocketClient, IDisposable
                         FfiConverterString.INSTANCE.Lower(@apiKey),
                         FfiConverterTypeWebSocketListener.INSTANCE.Lower(@listener),
                         FfiConverterTypeWebSocketEndpoint.INSTANCE.Lower(@endpoint),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
+    /// Create a new WebSocket client with full configuration including TLS.
+    ///
+    /// All optional parameters can be None to use defaults. This is the
+    /// TLS-aware variant of `new_with_url` — use this when you need to
+    /// pin a custom CA or disable cert verification.
+    ///
+    /// # Arguments
+    /// * `api_key` - Fugle API key for authentication
+    /// * `listener` - Callback interface for receiving WebSocket events
+    /// * `endpoint` - The market data endpoint (Stock or FutOpt)
+    /// * `base_url` - Optional base URL override
+    /// * `reconnect_config` - Optional reconnection configuration
+    /// * `health_check_config` - Optional health check configuration
+    /// * `tls` - Optional TLS customization (custom CA or accept_invalid_certs)
+    /// </summary>
+    public static WebSocketClient NewWithFullConfig(
+        string @apiKey,
+        WebSocketListener @listener,
+        WebSocketEndpoint @endpoint,
+        string? @baseUrl,
+        ReconnectConfigRecord? @reconnectConfig,
+        HealthCheckConfigRecord? @healthCheckConfig,
+        TlsConfigRecord? @tls
+    )
+    {
+        return new WebSocketClient(
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config(
+                        FfiConverterString.INSTANCE.Lower(@apiKey),
+                        FfiConverterTypeWebSocketListener.INSTANCE.Lower(@listener),
+                        FfiConverterTypeWebSocketEndpoint.INSTANCE.Lower(@endpoint),
+                        FfiConverterOptionalString.INSTANCE.Lower(@baseUrl),
+                        FfiConverterOptionalTypeReconnectConfigRecord.INSTANCE.Lower(
+                            @reconnectConfig
+                        ),
+                        FfiConverterOptionalTypeHealthCheckConfigRecord.INSTANCE.Lower(
+                            @healthCheckConfig
+                        ),
+                        FfiConverterOptionalTypeTlsConfigRecord.INSTANCE.Lower(@tls),
                         ref _status
                     )
             )
@@ -8279,7 +8343,7 @@ class FfiConverterTypeWebSocketClient : FfiConverter<WebSocketClient, IntPtr>
 /// }
 /// ```
 /// </summary>
-public interface WebSocketListener
+internal interface WebSocketListener
 {
     /// <summary>
     /// Called when WebSocket connection is established
@@ -8338,7 +8402,7 @@ public interface WebSocketListener
 /// }
 /// ```
 /// </summary>
-public class WebSocketListenerImpl : WebSocketListener, IDisposable
+internal class WebSocketListenerImpl : WebSocketListener, IDisposable
 {
     protected IntPtr pointer;
     private int _wasDestroyed = 0;
@@ -8842,7 +8906,7 @@ class FfiConverterTypeWebSocketListener : FfiConverter<WebSocketListener, IntPtr
 /// <summary>
 /// Single active entry
 /// </summary>
-public record Active(
+internal record Active(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -8916,7 +8980,7 @@ class FfiConverterTypeActive : FfiConverterRustBuffer<Active>
 /// <summary>
 /// Actives response
 /// </summary>
-public record ActivesResponse(string @date, string @time, string @market, List<Active> @data) { }
+internal record ActivesResponse(string @date, string @time, string @market, List<Active> @data) { }
 
 class FfiConverterTypeActivesResponse : FfiConverterRustBuffer<ActivesResponse>
 {
@@ -8953,7 +9017,7 @@ class FfiConverterTypeActivesResponse : FfiConverterRustBuffer<ActivesResponse>
 /// <summary>
 /// Bollinger Bands data point
 /// </summary>
-public record BbDataPoint(string @date, double @upper, double @middle, double @lower) { }
+internal record BbDataPoint(string @date, double @upper, double @middle, double @lower) { }
 
 class FfiConverterTypeBbDataPoint : FfiConverterRustBuffer<BbDataPoint>
 {
@@ -8990,7 +9054,7 @@ class FfiConverterTypeBbDataPoint : FfiConverterRustBuffer<BbDataPoint>
 /// <summary>
 /// Bollinger Bands response
 /// </summary>
-public record BbResponse(
+internal record BbResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -9048,7 +9112,7 @@ class FfiConverterTypeBbResponse : FfiConverterRustBuffer<BbResponse>
 /// <summary>
 /// Capital change entry
 /// </summary>
-public record CapitalChange(
+internal record CapitalChange(
     string @symbol,
     string? @name,
     string @date,
@@ -9102,7 +9166,7 @@ class FfiConverterTypeCapitalChange : FfiConverterRustBuffer<CapitalChange>
 /// <summary>
 /// Capital changes response
 /// </summary>
-public record CapitalChangesResponse(
+internal record CapitalChangesResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -9145,7 +9209,7 @@ class FfiConverterTypeCapitalChangesResponse : FfiConverterRustBuffer<CapitalCha
 /// <summary>
 /// Dividend entry
 /// </summary>
-public record Dividend(
+internal record Dividend(
     string @symbol,
     string? @name,
     string? @exDividendDate,
@@ -9199,7 +9263,7 @@ class FfiConverterTypeDividend : FfiConverterRustBuffer<Dividend>
 /// <summary>
 /// Dividends response
 /// </summary>
-public record DividendsResponse(
+internal record DividendsResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -9242,7 +9306,7 @@ class FfiConverterTypeDividendsResponse : FfiConverterRustBuffer<DividendsRespon
 /// <summary>
 /// FutOpt daily data
 /// </summary>
-public record FutOptDailyData(
+internal record FutOptDailyData(
     string @date,
     double @open,
     double @high,
@@ -9300,7 +9364,7 @@ class FfiConverterTypeFutOptDailyData : FfiConverterRustBuffer<FutOptDailyData>
 /// <summary>
 /// FutOpt daily response
 /// </summary>
-public record FutOptDailyResponse(
+internal record FutOptDailyResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9343,7 +9407,7 @@ class FfiConverterTypeFutOptDailyResponse : FfiConverterRustBuffer<FutOptDailyRe
 /// <summary>
 /// FutOpt historical candle
 /// </summary>
-public record FutOptHistoricalCandle(
+internal record FutOptHistoricalCandle(
     string @date,
     double @open,
     double @high,
@@ -9406,7 +9470,7 @@ class FfiConverterTypeFutOptHistoricalCandle : FfiConverterRustBuffer<FutOptHist
 /// <summary>
 /// FutOpt historical candles response
 /// </summary>
-public record FutOptHistoricalCandlesResponse(
+internal record FutOptHistoricalCandlesResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9456,7 +9520,7 @@ class FfiConverterTypeFutOptHistoricalCandlesResponse
 /// <summary>
 /// FutOpt last trade info
 /// </summary>
-public record FutOptLastTrade(double @price, long @size, long @time) { }
+internal record FutOptLastTrade(double @price, long @size, long @time) { }
 
 class FfiConverterTypeFutOptLastTrade : FfiConverterRustBuffer<FutOptLastTrade>
 {
@@ -9490,7 +9554,7 @@ class FfiConverterTypeFutOptLastTrade : FfiConverterRustBuffer<FutOptLastTrade>
 /// <summary>
 /// FutOpt price level
 /// </summary>
-public record FutOptPriceLevel(double @price, long @size) { }
+internal record FutOptPriceLevel(double @price, long @size) { }
 
 class FfiConverterTypeFutOptPriceLevel : FfiConverterRustBuffer<FutOptPriceLevel>
 {
@@ -9522,7 +9586,7 @@ class FfiConverterTypeFutOptPriceLevel : FfiConverterRustBuffer<FutOptPriceLevel
 /// <summary>
 /// FutOpt quote
 /// </summary>
-public record FutOptQuote(
+internal record FutOptQuote(
     string @date,
     string? @contractType,
     string? @exchange,
@@ -9648,7 +9712,7 @@ class FfiConverterTypeFutOptQuote : FfiConverterRustBuffer<FutOptQuote>
 /// <summary>
 /// FutOpt ticker
 /// </summary>
-public record FutOptTicker(
+internal record FutOptTicker(
     string @date,
     string? @contractType,
     string? @exchange,
@@ -9722,7 +9786,7 @@ class FfiConverterTypeFutOptTicker : FfiConverterRustBuffer<FutOptTicker>
 /// <summary>
 /// FutOpt total stats
 /// </summary>
-public record FutOptTotalStats(long @tradeVolume, long? @totalBidMatch, long? @totalAskMatch) { }
+internal record FutOptTotalStats(long @tradeVolume, long? @totalBidMatch, long? @totalAskMatch) { }
 
 class FfiConverterTypeFutOptTotalStats : FfiConverterRustBuffer<FutOptTotalStats>
 {
@@ -9768,7 +9832,7 @@ class FfiConverterTypeFutOptTotalStats : FfiConverterRustBuffer<FutOptTotalStats
 /// <param name="max_missed_pongs">
 /// Maximum missed pongs before disconnect (default: 2, min: 1)
 /// </param>
-public record HealthCheckConfigRecord(
+internal record HealthCheckConfigRecord(
     /// <summary>
     /// Whether health check is enabled (default: false)
     /// </summary>
@@ -9816,7 +9880,7 @@ class FfiConverterTypeHealthCheckConfigRecord : FfiConverterRustBuffer<HealthChe
 /// <summary>
 /// Single historical candle
 /// </summary>
-public record HistoricalCandle(
+internal record HistoricalCandle(
     string @date,
     double @open,
     double @high,
@@ -9875,7 +9939,7 @@ class FfiConverterTypeHistoricalCandle : FfiConverterRustBuffer<HistoricalCandle
 /// <summary>
 /// Historical candles response
 /// </summary>
-public record HistoricalCandlesResponse(
+internal record HistoricalCandlesResponse(
     string @symbol,
     string? @dataType,
     string? @exchange,
@@ -9930,14 +9994,14 @@ class FfiConverterTypeHistoricalCandlesResponse : FfiConverterRustBuffer<Histori
 /// <summary>
 /// Single intraday candle
 /// </summary>
-public record IntradayCandle(
+internal record IntradayCandle(
     double @open,
     double @high,
     double @low,
     double @close,
     long @volume,
     double? @average,
-    long @time
+    string @date
 ) { }
 
 class FfiConverterTypeIntradayCandle : FfiConverterRustBuffer<IntradayCandle>
@@ -9953,7 +10017,7 @@ class FfiConverterTypeIntradayCandle : FfiConverterRustBuffer<IntradayCandle>
             @close: FfiConverterDouble.INSTANCE.Read(stream),
             @volume: FfiConverterInt64.INSTANCE.Read(stream),
             @average: FfiConverterOptionalDouble.INSTANCE.Read(stream),
-            @time: FfiConverterInt64.INSTANCE.Read(stream)
+            @date: FfiConverterString.INSTANCE.Read(stream)
         );
     }
 
@@ -9966,7 +10030,7 @@ class FfiConverterTypeIntradayCandle : FfiConverterRustBuffer<IntradayCandle>
             + FfiConverterDouble.INSTANCE.AllocationSize(value.@close)
             + FfiConverterInt64.INSTANCE.AllocationSize(value.@volume)
             + FfiConverterOptionalDouble.INSTANCE.AllocationSize(value.@average)
-            + FfiConverterInt64.INSTANCE.AllocationSize(value.@time);
+            + FfiConverterString.INSTANCE.AllocationSize(value.@date);
     }
 
     public override void Write(IntradayCandle value, BigEndianStream stream)
@@ -9977,14 +10041,14 @@ class FfiConverterTypeIntradayCandle : FfiConverterRustBuffer<IntradayCandle>
         FfiConverterDouble.INSTANCE.Write(value.@close, stream);
         FfiConverterInt64.INSTANCE.Write(value.@volume, stream);
         FfiConverterOptionalDouble.INSTANCE.Write(value.@average, stream);
-        FfiConverterInt64.INSTANCE.Write(value.@time, stream);
+        FfiConverterString.INSTANCE.Write(value.@date, stream);
     }
 }
 
 /// <summary>
 /// Intraday candles response
 /// </summary>
-public record IntradayCandlesResponse(
+internal record IntradayCandlesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -10039,7 +10103,7 @@ class FfiConverterTypeIntradayCandlesResponse : FfiConverterRustBuffer<IntradayC
 /// <summary>
 /// KDJ data point
 /// </summary>
-public record KdjDataPoint(string @date, double @k, double @d, double @j) { }
+internal record KdjDataPoint(string @date, double @k, double @d, double @j) { }
 
 class FfiConverterTypeKdjDataPoint : FfiConverterRustBuffer<KdjDataPoint>
 {
@@ -10076,7 +10140,7 @@ class FfiConverterTypeKdjDataPoint : FfiConverterRustBuffer<KdjDataPoint>
 /// <summary>
 /// KDJ response
 /// </summary>
-public record KdjResponse(
+internal record KdjResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -10130,7 +10194,7 @@ class FfiConverterTypeKdjResponse : FfiConverterRustBuffer<KdjResponse>
 /// <summary>
 /// Listing applicant entry
 /// </summary>
-public record ListingApplicant(
+internal record ListingApplicant(
     string @symbol,
     string? @name,
     string? @applicationDate,
@@ -10181,7 +10245,7 @@ class FfiConverterTypeListingApplicant : FfiConverterRustBuffer<ListingApplicant
 /// <summary>
 /// Listing applicants response
 /// </summary>
-public record ListingApplicantsResponse(
+internal record ListingApplicantsResponse(
     string @dataType,
     string @exchange,
     string @market,
@@ -10224,7 +10288,7 @@ class FfiConverterTypeListingApplicantsResponse : FfiConverterRustBuffer<Listing
 /// <summary>
 /// MACD data point
 /// </summary>
-public record MacdDataPoint(
+internal record MacdDataPoint(
     string @date,
     double @macd,
     double @signalValue,
@@ -10266,7 +10330,7 @@ class FfiConverterTypeMacdDataPoint : FfiConverterRustBuffer<MacdDataPoint>
 /// <summary>
 /// MACD response
 /// </summary>
-public record MacdResponse(
+internal record MacdResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -10328,7 +10392,7 @@ class FfiConverterTypeMacdResponse : FfiConverterRustBuffer<MacdResponse>
 /// <summary>
 /// Single mover entry
 /// </summary>
-public record Mover(
+internal record Mover(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -10402,7 +10466,7 @@ class FfiConverterTypeMover : FfiConverterRustBuffer<Mover>
 /// <summary>
 /// Movers response
 /// </summary>
-public record MoversResponse(string @date, string @time, string @market, List<Mover> @data) { }
+internal record MoversResponse(string @date, string @time, string @market, List<Mover> @data) { }
 
 class FfiConverterTypeMoversResponse : FfiConverterRustBuffer<MoversResponse>
 {
@@ -10439,7 +10503,7 @@ class FfiConverterTypeMoversResponse : FfiConverterRustBuffer<MoversResponse>
 /// <summary>
 /// Bid/Ask price level for order book
 /// </summary>
-public record PriceLevel(double @price, long @size) { }
+internal record PriceLevel(double @price, long @size) { }
 
 class FfiConverterTypePriceLevel : FfiConverterRustBuffer<PriceLevel>
 {
@@ -10470,7 +10534,7 @@ class FfiConverterTypePriceLevel : FfiConverterRustBuffer<PriceLevel>
 /// <summary>
 /// FutOpt product
 /// </summary>
-public record Product(
+internal record Product(
     string? @productType,
     string? @exchange,
     string @symbol,
@@ -10560,7 +10624,7 @@ class FfiConverterTypeProduct : FfiConverterRustBuffer<Product>
 /// <summary>
 /// FutOpt products response
 /// </summary>
-public record ProductsResponse(
+internal record ProductsResponse(
     string? @date,
     string? @productType,
     string? @session,
@@ -10611,7 +10675,7 @@ class FfiConverterTypeProductsResponse : FfiConverterRustBuffer<ProductsResponse
 /// <summary>
 /// Real-time stock quote
 /// </summary>
-public record Quote(
+internal record Quote(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -10812,7 +10876,7 @@ class FfiConverterTypeQuote : FfiConverterRustBuffer<Quote>
 /// <param name="max_delay_ms">
 /// Maximum reconnection delay in milliseconds (default: 60000)
 /// </param>
-public record ReconnectConfigRecord(
+internal record ReconnectConfigRecord(
     /// <summary>
     /// Maximum reconnection attempts (default: 5, min: 1)
     /// </summary>
@@ -10860,7 +10924,7 @@ class FfiConverterTypeReconnectConfigRecord : FfiConverterRustBuffer<ReconnectCo
 /// <summary>
 /// RSI data point
 /// </summary>
-public record RsiDataPoint(string @date, double @rsi) { }
+internal record RsiDataPoint(string @date, double @rsi) { }
 
 class FfiConverterTypeRsiDataPoint : FfiConverterRustBuffer<RsiDataPoint>
 {
@@ -10891,7 +10955,7 @@ class FfiConverterTypeRsiDataPoint : FfiConverterRustBuffer<RsiDataPoint>
 /// <summary>
 /// RSI response
 /// </summary>
-public record RsiResponse(
+internal record RsiResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -10945,7 +11009,7 @@ class FfiConverterTypeRsiResponse : FfiConverterRustBuffer<RsiResponse>
 /// <summary>
 /// SMA data point
 /// </summary>
-public record SmaDataPoint(string @date, double @sma) { }
+internal record SmaDataPoint(string @date, double @sma) { }
 
 class FfiConverterTypeSmaDataPoint : FfiConverterRustBuffer<SmaDataPoint>
 {
@@ -10976,7 +11040,7 @@ class FfiConverterTypeSmaDataPoint : FfiConverterRustBuffer<SmaDataPoint>
 /// <summary>
 /// SMA response
 /// </summary>
-public record SmaResponse(
+internal record SmaResponse(
     string @symbol,
     string @dataType,
     string @exchange,
@@ -11030,7 +11094,7 @@ class FfiConverterTypeSmaResponse : FfiConverterRustBuffer<SmaResponse>
 /// <summary>
 /// Single snapshot quote
 /// </summary>
-public record SnapshotQuote(
+internal record SnapshotQuote(
     string? @dataType,
     string @symbol,
     string? @name,
@@ -11104,7 +11168,7 @@ class FfiConverterTypeSnapshotQuote : FfiConverterRustBuffer<SnapshotQuote>
 /// <summary>
 /// Snapshot quotes response
 /// </summary>
-public record SnapshotQuotesResponse(
+internal record SnapshotQuotesResponse(
     string @date,
     string @time,
     string @market,
@@ -11147,7 +11211,7 @@ class FfiConverterTypeSnapshotQuotesResponse : FfiConverterRustBuffer<SnapshotQu
 /// <summary>
 /// Historical stats response
 /// </summary>
-public record StatsResponse(
+internal record StatsResponse(
     string @date,
     string @dataType,
     string @exchange,
@@ -11241,7 +11305,7 @@ class FfiConverterTypeStatsResponse : FfiConverterRustBuffer<StatsResponse>
 /// <summary>
 /// Streaming message (simplified for FFI)
 /// </summary>
-public record StreamMessage(
+internal record StreamMessage(
     string @event,
     string? @channel,
     string? @symbol,
@@ -11295,7 +11359,7 @@ class FfiConverterTypeStreamMessage : FfiConverterRustBuffer<StreamMessage>
 /// <summary>
 /// Stock ticker info
 /// </summary>
-public record Ticker(
+internal record Ticker(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11463,9 +11527,68 @@ class FfiConverterTypeTicker : FfiConverterRustBuffer<Ticker>
 }
 
 /// <summary>
+/// Optional TLS customization exposed to foreign languages.
+///
+/// When all fields are default the SDK uses the OS trust store
+/// (loaded by `rustls-native-certs`). Provide `root_cert_pem` to pin
+/// an additional CA, or set `accept_invalid_certs` to disable all
+/// verification (dev/testing only — exposes MITM risk).
+/// </summary>
+/// <param name="root_cert_pem">
+/// PEM-encoded additional root CA bytes. Appended to the OS trust
+/// store; chains signed by either this CA or any OS-trusted root
+/// are accepted.
+/// </param>
+/// <param name="accept_invalid_certs">
+/// Disable ALL TLS verification (chain + hostname + expiry).
+/// Equivalent to `curl -k` / `wscat --no-check`. Do not use in
+/// production.
+/// </param>
+internal record TlsConfigRecord(
+    /// <summary>
+    /// PEM-encoded additional root CA bytes. Appended to the OS trust
+    /// store; chains signed by either this CA or any OS-trusted root
+    /// are accepted.
+    /// </summary>
+    byte[]? @rootCertPem,
+    /// <summary>
+    /// Disable ALL TLS verification (chain + hostname + expiry).
+    /// Equivalent to `curl -k` / `wscat --no-check`. Do not use in
+    /// production.
+    /// </summary>
+    bool @acceptInvalidCerts
+) { }
+
+class FfiConverterTypeTlsConfigRecord : FfiConverterRustBuffer<TlsConfigRecord>
+{
+    public static FfiConverterTypeTlsConfigRecord INSTANCE = new FfiConverterTypeTlsConfigRecord();
+
+    public override TlsConfigRecord Read(BigEndianStream stream)
+    {
+        return new TlsConfigRecord(
+            @rootCertPem: FfiConverterOptionalByteArray.INSTANCE.Read(stream),
+            @acceptInvalidCerts: FfiConverterBoolean.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(TlsConfigRecord value)
+    {
+        return 0
+            + FfiConverterOptionalByteArray.INSTANCE.AllocationSize(value.@rootCertPem)
+            + FfiConverterBoolean.INSTANCE.AllocationSize(value.@acceptInvalidCerts);
+    }
+
+    public override void Write(TlsConfigRecord value, BigEndianStream stream)
+    {
+        FfiConverterOptionalByteArray.INSTANCE.Write(value.@rootCertPem, stream);
+        FfiConverterBoolean.INSTANCE.Write(value.@acceptInvalidCerts, stream);
+    }
+}
+
+/// <summary>
 /// Total trading statistics
 /// </summary>
-public record TotalStats(
+internal record TotalStats(
     double @tradeValue,
     long @tradeVolume,
     long? @tradeVolumeAtBid,
@@ -11515,7 +11638,7 @@ class FfiConverterTypeTotalStats : FfiConverterRustBuffer<TotalStats>
 /// <summary>
 /// Single trade execution
 /// </summary>
-public record Trade(double? @bid, double? @ask, double @price, long @size, long @time) { }
+internal record Trade(double? @bid, double? @ask, double @price, long @size, long @time) { }
 
 class FfiConverterTypeTrade : FfiConverterRustBuffer<Trade>
 {
@@ -11555,7 +11678,7 @@ class FfiConverterTypeTrade : FfiConverterRustBuffer<Trade>
 /// <summary>
 /// Trade execution info
 /// </summary>
-public record TradeInfo(double? @bid, double? @ask, double @price, long @size, long @time) { }
+internal record TradeInfo(double? @bid, double? @ask, double @price, long @size, long @time) { }
 
 class FfiConverterTypeTradeInfo : FfiConverterRustBuffer<TradeInfo>
 {
@@ -11595,7 +11718,7 @@ class FfiConverterTypeTradeInfo : FfiConverterRustBuffer<TradeInfo>
 /// <summary>
 /// Trades response
 /// </summary>
-public record TradesResponse(
+internal record TradesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11645,7 +11768,7 @@ class FfiConverterTypeTradesResponse : FfiConverterRustBuffer<TradesResponse>
 /// <summary>
 /// Trading halt status
 /// </summary>
-public record TradingHalt(bool @isHalted, long? @time) { }
+internal record TradingHalt(bool @isHalted, long? @time) { }
 
 class FfiConverterTypeTradingHalt : FfiConverterRustBuffer<TradingHalt>
 {
@@ -11676,7 +11799,7 @@ class FfiConverterTypeTradingHalt : FfiConverterRustBuffer<TradingHalt>
 /// <summary>
 /// Volume at a specific price level
 /// </summary>
-public record VolumeAtPrice(
+internal record VolumeAtPrice(
     double @price,
     long @volume,
     long? @volumeAtBid,
@@ -11718,7 +11841,7 @@ class FfiConverterTypeVolumeAtPrice : FfiConverterRustBuffer<VolumeAtPrice>
 /// <summary>
 /// Volumes response
 /// </summary>
-public record VolumesResponse(
+internal record VolumesResponse(
     string @date,
     string? @dataType,
     string? @exchange,
@@ -11773,7 +11896,7 @@ class FfiConverterTypeVolumesResponse : FfiConverterRustBuffer<VolumesResponse>
 ///
 /// Note: This is a FLAT enum per UniFFI constraints - no nested error types.
 /// </summary>
-public class MarketDataException : UniffiException
+internal class MarketDataException : UniffiException
 {
     MarketDataException()
         : base() { }
@@ -12089,7 +12212,7 @@ class FfiConverterTypeMarketDataError
 /// <summary>
 /// Endpoint type for WebSocket connection
 /// </summary>
-public enum WebSocketEndpoint : int
+internal enum WebSocketEndpoint : int
 {
     /// <summary>
     /// Stock market data endpoint
@@ -12409,6 +12532,45 @@ class FfiConverterOptionalString : FfiConverterRustBuffer<string?>
     }
 }
 
+class FfiConverterOptionalByteArray : FfiConverterRustBuffer<byte[]?>
+{
+    public static FfiConverterOptionalByteArray INSTANCE = new FfiConverterOptionalByteArray();
+
+    public override byte[]? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
+            return null;
+        }
+        return FfiConverterByteArray.INSTANCE.Read(stream);
+    }
+
+    public override int AllocationSize(byte[]? value)
+    {
+        if (value == null)
+        {
+            return 1;
+        }
+        else
+        {
+            return 1 + FfiConverterByteArray.INSTANCE.AllocationSize((byte[])value);
+        }
+    }
+
+    public override void Write(byte[]? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
+            stream.WriteByte(0);
+        }
+        else
+        {
+            stream.WriteByte(1);
+            FfiConverterByteArray.INSTANCE.Write((byte[])value, stream);
+        }
+    }
+}
+
 class FfiConverterOptionalTypeFutOptLastTrade : FfiConverterRustBuffer<FutOptLastTrade?>
 {
     public static FfiConverterOptionalTypeFutOptLastTrade INSTANCE =
@@ -12580,6 +12742,47 @@ class FfiConverterOptionalTypeReconnectConfigRecord : FfiConverterRustBuffer<Rec
                 (ReconnectConfigRecord)value,
                 stream
             );
+        }
+    }
+}
+
+class FfiConverterOptionalTypeTlsConfigRecord : FfiConverterRustBuffer<TlsConfigRecord?>
+{
+    public static FfiConverterOptionalTypeTlsConfigRecord INSTANCE =
+        new FfiConverterOptionalTypeTlsConfigRecord();
+
+    public override TlsConfigRecord? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
+            return null;
+        }
+        return FfiConverterTypeTlsConfigRecord.INSTANCE.Read(stream);
+    }
+
+    public override int AllocationSize(TlsConfigRecord? value)
+    {
+        if (value == null)
+        {
+            return 1;
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeTlsConfigRecord.INSTANCE.AllocationSize((TlsConfigRecord)value);
+        }
+    }
+
+    public override void Write(TlsConfigRecord? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
+            stream.WriteByte(0);
+        }
+        else
+        {
+            stream.WriteByte(1);
+            FfiConverterTypeTlsConfigRecord.INSTANCE.Write((TlsConfigRecord)value, stream);
         }
     }
 }
@@ -13860,7 +14063,7 @@ internal static class _UniFFIAsync
     }
 }
 #pragma warning restore 8625
-public static class MarketdataUniffiMethods
+internal static class MarketdataUniffiMethods
 {
     /// <summary>
     /// Create a REST client with API key authentication
@@ -13880,6 +14083,30 @@ public static class MarketdataUniffiMethods
                 (ref UniffiRustCallStatus _status) =>
                     _UniFFILib.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key(
                         FfiConverterString.INSTANCE.Lower(@apiKey),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
+    /// Create a REST client with API key authentication, custom base URL, and TLS config
+    /// </summary>
+    /// <exception cref="MarketDataException"></exception>
+    public static RestClient NewRestClientWithApiKeyAndTls(
+        string @apiKey,
+        string? @baseUrl,
+        TlsConfigRecord @tls
+    )
+    {
+        return FfiConverterTypeRestClient.INSTANCE.Lift(
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeMarketDataError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls(
+                        FfiConverterString.INSTANCE.Lower(@apiKey),
+                        FfiConverterOptionalString.INSTANCE.Lower(@baseUrl),
+                        FfiConverterTypeTlsConfigRecord.INSTANCE.Lower(@tls),
                         ref _status
                     )
             )
@@ -13911,6 +14138,30 @@ public static class MarketdataUniffiMethods
     }
 
     /// <summary>
+    /// Create a REST client with bearer token authentication, custom base URL, and TLS config
+    /// </summary>
+    /// <exception cref="MarketDataException"></exception>
+    public static RestClient NewRestClientWithBearerTokenAndTls(
+        string @bearerToken,
+        string? @baseUrl,
+        TlsConfigRecord @tls
+    )
+    {
+        return FfiConverterTypeRestClient.INSTANCE.Lift(
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeMarketDataError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls(
+                        FfiConverterString.INSTANCE.Lower(@bearerToken),
+                        FfiConverterOptionalString.INSTANCE.Lower(@baseUrl),
+                        FfiConverterTypeTlsConfigRecord.INSTANCE.Lower(@tls),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
     /// Create a REST client with SDK token authentication
     ///
     /// # Arguments
@@ -13928,6 +14179,30 @@ public static class MarketdataUniffiMethods
                 (ref UniffiRustCallStatus _status) =>
                     _UniFFILib.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token(
                         FfiConverterString.INSTANCE.Lower(@sdkToken),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
+    /// Create a REST client with SDK token authentication, custom base URL, and TLS config
+    /// </summary>
+    /// <exception cref="MarketDataException"></exception>
+    public static RestClient NewRestClientWithSdkTokenAndTls(
+        string @sdkToken,
+        string? @baseUrl,
+        TlsConfigRecord @tls
+    )
+    {
+        return FfiConverterTypeRestClient.INSTANCE.Lift(
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeMarketDataError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls(
+                        FfiConverterString.INSTANCE.Lower(@sdkToken),
+                        FfiConverterOptionalString.INSTANCE.Lower(@baseUrl),
+                        FfiConverterTypeTlsConfigRecord.INSTANCE.Lower(@tls),
                         ref _status
                     )
             )

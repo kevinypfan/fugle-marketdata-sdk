@@ -360,6 +360,15 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls()
+		})
+		if checksum != 17616 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token()
 		})
 		if checksum != 30582 {
@@ -369,11 +378,29 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls()
+		})
+		if checksum != 21309 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token()
 		})
 		if checksum != 14209 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls()
+		})
+		if checksum != 25673 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -992,7 +1019,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_connect()
 		})
-		if checksum != 52173 {
+		if checksum != 34522 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_connect: UniFFI API checksum mismatch")
 		}
@@ -1001,7 +1028,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_disconnect()
 		})
-		if checksum != 33142 {
+		if checksum != 57258 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_disconnect: UniFFI API checksum mismatch")
 		}
@@ -1028,7 +1055,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_ping()
 		})
-		if checksum != 13903 {
+		if checksum != 51664 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_ping: UniFFI API checksum mismatch")
 		}
@@ -1037,7 +1064,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions()
 		})
-		if checksum != 5989 {
+		if checksum != 20069 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_query_subscriptions: UniFFI API checksum mismatch")
 		}
@@ -1046,7 +1073,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_subscribe()
 		})
-		if checksum != 63126 {
+		if checksum != 39559 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_subscribe: UniFFI API checksum mismatch")
 		}
@@ -1055,7 +1082,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_marketdata_uniffi_checksum_method_websocketclient_unsubscribe()
 		})
-		if checksum != 9652 {
+		if checksum != 21735 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_method_websocketclient_unsubscribe: UniFFI API checksum mismatch")
 		}
@@ -1139,6 +1166,15 @@ func uniffiCheckChecksums() {
 		if checksum != 35702 {
 			// If this happens try cleaning and rebuilding your project
 			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config()
+		})
+		if checksum != 39727 {
+			// If this happens try cleaning and rebuilding your project
+			panic("marketdata_uniffi: uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -1352,6 +1388,50 @@ func (FfiConverterString) Write(writer io.Writer, value string) {
 type FfiDestroyerString struct{}
 
 func (FfiDestroyerString) Destroy(_ string) {}
+
+type FfiConverterBytes struct{}
+
+var FfiConverterBytesINSTANCE = FfiConverterBytes{}
+
+func (c FfiConverterBytes) Lower(value []byte) C.RustBuffer {
+	return LowerIntoRustBuffer[[]byte](c, value)
+}
+
+func (c FfiConverterBytes) Write(writer io.Writer, value []byte) {
+	if len(value) > math.MaxInt32 {
+		panic("[]byte is too large to fit into Int32")
+	}
+
+	writeInt32(writer, int32(len(value)))
+	write_length, err := writer.Write(value)
+	if err != nil {
+		panic(err)
+	}
+	if write_length != len(value) {
+		panic(fmt.Errorf("bad write length when writing []byte, expected %d, written %d", len(value), write_length))
+	}
+}
+
+func (c FfiConverterBytes) Lift(rb RustBufferI) []byte {
+	return LiftFromRustBuffer[[]byte](c, rb)
+}
+
+func (c FfiConverterBytes) Read(reader io.Reader) []byte {
+	length := readInt32(reader)
+	buffer := make([]byte, length)
+	read_length, err := reader.Read(buffer)
+	if err != nil {
+		panic(err)
+	}
+	if read_length != int(length) {
+		panic(fmt.Errorf("bad read length when reading []byte, expected %d, read %d", length, read_length))
+	}
+	return buffer
+}
+
+type FfiDestroyerBytes struct{}
+
+func (FfiDestroyerBytes) Destroy(_ []byte) {}
 
 // Below is an implementation of synchronization requirements outlined in the link.
 // https://github.com/mozilla/uniffi-rs/blob/0dc031132d9493ca812c3af6e7dd60ad2ea95bf0/uniffi_bindgen/src/bindings/kotlin/templates/ObjectRuntime.kt#L31
@@ -3737,49 +3817,15 @@ func (_ FfiDestroyerStockTechnicalClient) Destroy(value *StockTechnicalClient) {
 // Wraps the core WebSocketClient and forwards messages to the provided
 // WebSocketListener implementation via a background task.
 type WebSocketClientInterface interface {
-	// Connect to the WebSocket server
-	//
-	// Establishes connection, authenticates, and starts a background task
-	// to forward messages to the listener.
-	//
-	// # Errors
-	//
-	// Returns error if connection or authentication fails.
 	Connect() *MarketDataError
-	// Disconnect from the WebSocket server
-	//
-	// Gracefully closes the connection and stops the message forwarding task.
 	Disconnect()
 	// Check if the client has been shut down
 	IsClosed() bool
 	// Check if the client is currently connected
 	IsConnected() bool
-	// Send a ping message to the server
-	//
-	// # Arguments
-	// * `state` - Optional state string echoed back in the pong response
 	Ping(state *string) *MarketDataError
-	// Query the server for current subscriptions
 	QuerySubscriptions() *MarketDataError
-	// Subscribe to a channel for a symbol
-	//
-	// # Arguments
-	// * `channel` - Channel name (e.g., "trades", "candles", "books")
-	// * `symbol` - Symbol to subscribe (e.g., "2330")
-	//
-	// # Errors
-	//
-	// Returns error if not connected or subscription fails.
 	Subscribe(channel string, symbol string) *MarketDataError
-	// Unsubscribe from a channel for a symbol
-	//
-	// # Arguments
-	// * `channel` - Channel name
-	// * `symbol` - Symbol to unsubscribe
-	//
-	// # Errors
-	//
-	// Returns error if not connected.
 	Unsubscribe(channel string, symbol string) *MarketDataError
 }
 
@@ -3828,6 +3874,26 @@ func WebSocketClientNewWithEndpoint(apiKey string, listener WebSocketListener, e
 	}))
 }
 
+// Create a new WebSocket client with full configuration including TLS.
+//
+// All optional parameters can be None to use defaults. This is the
+// TLS-aware variant of `new_with_url` — use this when you need to
+// pin a custom CA or disable cert verification.
+//
+// # Arguments
+// * `api_key` - Fugle API key for authentication
+// * `listener` - Callback interface for receiving WebSocket events
+// * `endpoint` - The market data endpoint (Stock or FutOpt)
+// * `base_url` - Optional base URL override
+// * `reconnect_config` - Optional reconnection configuration
+// * `health_check_config` - Optional health check configuration
+// * `tls` - Optional TLS customization (custom CA or accept_invalid_certs)
+func WebSocketClientNewWithFullConfig(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint, baseUrl *string, reconnectConfig *ReconnectConfigRecord, healthCheckConfig *HealthCheckConfigRecord, tls *TlsConfigRecord) *WebSocketClient {
+	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterWebSocketListenerINSTANCE.Lower(listener), FfiConverterWebSocketEndpointINSTANCE.Lower(endpoint), FfiConverterOptionalStringINSTANCE.Lower(baseUrl), FfiConverterOptionalReconnectConfigRecordINSTANCE.Lower(reconnectConfig), FfiConverterOptionalHealthCheckConfigRecordINSTANCE.Lower(healthCheckConfig), FfiConverterOptionalTlsConfigRecordINSTANCE.Lower(tls), _uniffiStatus)
+	}))
+}
+
 // Create a new WebSocket client with full configuration including custom base URL
 func WebSocketClientNewWithUrl(apiKey string, listener WebSocketListener, endpoint WebSocketEndpoint, baseUrl string, reconnectConfig *ReconnectConfigRecord, healthCheckConfig *HealthCheckConfigRecord) *WebSocketClient {
 	return FfiConverterWebSocketClientINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
@@ -3835,14 +3901,6 @@ func WebSocketClientNewWithUrl(apiKey string, listener WebSocketListener, endpoi
 	}))
 }
 
-// Connect to the WebSocket server
-//
-// Establishes connection, authenticates, and starts a background task
-// to forward messages to the listener.
-//
-// # Errors
-//
-// Returns error if connection or authentication fails.
 func (_self *WebSocketClient) Connect() *MarketDataError {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -3870,9 +3928,6 @@ func (_self *WebSocketClient) Connect() *MarketDataError {
 	return err
 }
 
-// Disconnect from the WebSocket server
-//
-// Gracefully closes the connection and stops the message forwarding task.
 func (_self *WebSocketClient) Disconnect() {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -3919,10 +3974,6 @@ func (_self *WebSocketClient) IsConnected() bool {
 	}))
 }
 
-// Send a ping message to the server
-//
-// # Arguments
-// * `state` - Optional state string echoed back in the pong response
 func (_self *WebSocketClient) Ping(state *string) *MarketDataError {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -3950,7 +4001,6 @@ func (_self *WebSocketClient) Ping(state *string) *MarketDataError {
 	return err
 }
 
-// Query the server for current subscriptions
 func (_self *WebSocketClient) QuerySubscriptions() *MarketDataError {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -3978,15 +4028,6 @@ func (_self *WebSocketClient) QuerySubscriptions() *MarketDataError {
 	return err
 }
 
-// Subscribe to a channel for a symbol
-//
-// # Arguments
-// * `channel` - Channel name (e.g., "trades", "candles", "books")
-// * `symbol` - Symbol to subscribe (e.g., "2330")
-//
-// # Errors
-//
-// Returns error if not connected or subscription fails.
 func (_self *WebSocketClient) Subscribe(channel string, symbol string) *MarketDataError {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -4014,15 +4055,6 @@ func (_self *WebSocketClient) Subscribe(channel string, symbol string) *MarketDa
 	return err
 }
 
-// Unsubscribe from a channel for a symbol
-//
-// # Arguments
-// * `channel` - Channel name
-// * `symbol` - Symbol to unsubscribe
-//
-// # Errors
-//
-// Returns error if not connected.
 func (_self *WebSocketClient) Unsubscribe(channel string, symbol string) *MarketDataError {
 	_pointer := _self.ffiObject.incrementPointer("*WebSocketClient")
 	defer _self.ffiObject.decrementPointer()
@@ -5665,7 +5697,7 @@ type IntradayCandle struct {
 	Close   float64
 	Volume  int64
 	Average *float64
-	Time    int64
+	Date    string
 }
 
 func (r *IntradayCandle) Destroy() {
@@ -5675,7 +5707,7 @@ func (r *IntradayCandle) Destroy() {
 	FfiDestroyerFloat64{}.Destroy(r.Close)
 	FfiDestroyerInt64{}.Destroy(r.Volume)
 	FfiDestroyerOptionalFloat64{}.Destroy(r.Average)
-	FfiDestroyerInt64{}.Destroy(r.Time)
+	FfiDestroyerString{}.Destroy(r.Date)
 }
 
 type FfiConverterIntradayCandle struct{}
@@ -5694,7 +5726,7 @@ func (c FfiConverterIntradayCandle) Read(reader io.Reader) IntradayCandle {
 		FfiConverterFloat64INSTANCE.Read(reader),
 		FfiConverterInt64INSTANCE.Read(reader),
 		FfiConverterOptionalFloat64INSTANCE.Read(reader),
-		FfiConverterInt64INSTANCE.Read(reader),
+		FfiConverterStringINSTANCE.Read(reader),
 	}
 }
 
@@ -5709,7 +5741,7 @@ func (c FfiConverterIntradayCandle) Write(writer io.Writer, value IntradayCandle
 	FfiConverterFloat64INSTANCE.Write(writer, value.Close)
 	FfiConverterInt64INSTANCE.Write(writer, value.Volume)
 	FfiConverterOptionalFloat64INSTANCE.Write(writer, value.Average)
-	FfiConverterInt64INSTANCE.Write(writer, value.Time)
+	FfiConverterStringINSTANCE.Write(writer, value.Date)
 }
 
 type FfiDestroyerIntradayCandle struct{}
@@ -7358,6 +7390,58 @@ func (_ FfiDestroyerTicker) Destroy(value Ticker) {
 	value.Destroy()
 }
 
+// Optional TLS customization exposed to foreign languages.
+//
+// When all fields are default the SDK uses the OS trust store
+// (loaded by `rustls-native-certs`). Provide `root_cert_pem` to pin
+// an additional CA, or set `accept_invalid_certs` to disable all
+// verification (dev/testing only — exposes MITM risk).
+type TlsConfigRecord struct {
+	// PEM-encoded additional root CA bytes. Appended to the OS trust
+	// store; chains signed by either this CA or any OS-trusted root
+	// are accepted.
+	RootCertPem *[]byte
+	// Disable ALL TLS verification (chain + hostname + expiry).
+	// Equivalent to `curl -k` / `wscat --no-check`. Do not use in
+	// production.
+	AcceptInvalidCerts bool
+}
+
+func (r *TlsConfigRecord) Destroy() {
+	FfiDestroyerOptionalBytes{}.Destroy(r.RootCertPem)
+	FfiDestroyerBool{}.Destroy(r.AcceptInvalidCerts)
+}
+
+type FfiConverterTlsConfigRecord struct{}
+
+var FfiConverterTlsConfigRecordINSTANCE = FfiConverterTlsConfigRecord{}
+
+func (c FfiConverterTlsConfigRecord) Lift(rb RustBufferI) TlsConfigRecord {
+	return LiftFromRustBuffer[TlsConfigRecord](c, rb)
+}
+
+func (c FfiConverterTlsConfigRecord) Read(reader io.Reader) TlsConfigRecord {
+	return TlsConfigRecord{
+		FfiConverterOptionalBytesINSTANCE.Read(reader),
+		FfiConverterBoolINSTANCE.Read(reader),
+	}
+}
+
+func (c FfiConverterTlsConfigRecord) Lower(value TlsConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[TlsConfigRecord](c, value)
+}
+
+func (c FfiConverterTlsConfigRecord) Write(writer io.Writer, value TlsConfigRecord) {
+	FfiConverterOptionalBytesINSTANCE.Write(writer, value.RootCertPem)
+	FfiConverterBoolINSTANCE.Write(writer, value.AcceptInvalidCerts)
+}
+
+type FfiDestroyerTlsConfigRecord struct{}
+
+func (_ FfiDestroyerTlsConfigRecord) Destroy(value TlsConfigRecord) {
+	value.Destroy()
+}
+
 // Total trading statistics
 type TotalStats struct {
 	TradeValue       float64
@@ -8494,6 +8578,43 @@ func (_ FfiDestroyerOptionalString) Destroy(value *string) {
 	}
 }
 
+type FfiConverterOptionalBytes struct{}
+
+var FfiConverterOptionalBytesINSTANCE = FfiConverterOptionalBytes{}
+
+func (c FfiConverterOptionalBytes) Lift(rb RustBufferI) *[]byte {
+	return LiftFromRustBuffer[*[]byte](c, rb)
+}
+
+func (_ FfiConverterOptionalBytes) Read(reader io.Reader) *[]byte {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterBytesINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalBytes) Lower(value *[]byte) C.RustBuffer {
+	return LowerIntoRustBuffer[*[]byte](c, value)
+}
+
+func (_ FfiConverterOptionalBytes) Write(writer io.Writer, value *[]byte) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterBytesINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalBytes struct{}
+
+func (_ FfiDestroyerOptionalBytes) Destroy(value *[]byte) {
+	if value != nil {
+		FfiDestroyerBytes{}.Destroy(*value)
+	}
+}
+
 type FfiConverterOptionalFutOptLastTrade struct{}
 
 var FfiConverterOptionalFutOptLastTradeINSTANCE = FfiConverterOptionalFutOptLastTrade{}
@@ -8639,6 +8760,43 @@ type FfiDestroyerOptionalReconnectConfigRecord struct{}
 func (_ FfiDestroyerOptionalReconnectConfigRecord) Destroy(value *ReconnectConfigRecord) {
 	if value != nil {
 		FfiDestroyerReconnectConfigRecord{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalTlsConfigRecord struct{}
+
+var FfiConverterOptionalTlsConfigRecordINSTANCE = FfiConverterOptionalTlsConfigRecord{}
+
+func (c FfiConverterOptionalTlsConfigRecord) Lift(rb RustBufferI) *TlsConfigRecord {
+	return LiftFromRustBuffer[*TlsConfigRecord](c, rb)
+}
+
+func (_ FfiConverterOptionalTlsConfigRecord) Read(reader io.Reader) *TlsConfigRecord {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterTlsConfigRecordINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalTlsConfigRecord) Lower(value *TlsConfigRecord) C.RustBuffer {
+	return LowerIntoRustBuffer[*TlsConfigRecord](c, value)
+}
+
+func (_ FfiConverterOptionalTlsConfigRecord) Write(writer io.Writer, value *TlsConfigRecord) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterTlsConfigRecordINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalTlsConfigRecord struct{}
+
+func (_ FfiDestroyerOptionalTlsConfigRecord) Destroy(value *TlsConfigRecord) {
+	if value != nil {
+		FfiDestroyerTlsConfigRecord{}.Destroy(*value)
 	}
 }
 
@@ -9781,6 +9939,19 @@ func NewRestClientWithApiKey(apiKey string) (*RestClient, *MarketDataError) {
 	}
 }
 
+// Create a REST client with API key authentication, custom base URL, and TLS config
+func NewRestClientWithApiKeyAndTls(apiKey string, baseUrl *string, tls TlsConfigRecord) (*RestClient, *MarketDataError) {
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls(FfiConverterStringINSTANCE.Lower(apiKey), FfiConverterOptionalStringINSTANCE.Lower(baseUrl), FfiConverterTlsConfigRecordINSTANCE.Lower(tls), _uniffiStatus)
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue *RestClient
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterRestClientINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
 // Create a REST client with bearer token authentication
 //
 // # Arguments
@@ -9800,6 +9971,19 @@ func NewRestClientWithBearerToken(bearerToken string) (*RestClient, *MarketDataE
 	}
 }
 
+// Create a REST client with bearer token authentication, custom base URL, and TLS config
+func NewRestClientWithBearerTokenAndTls(bearerToken string, baseUrl *string, tls TlsConfigRecord) (*RestClient, *MarketDataError) {
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls(FfiConverterStringINSTANCE.Lower(bearerToken), FfiConverterOptionalStringINSTANCE.Lower(baseUrl), FfiConverterTlsConfigRecordINSTANCE.Lower(tls), _uniffiStatus)
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue *RestClient
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterRestClientINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
 // Create a REST client with SDK token authentication
 //
 // # Arguments
@@ -9810,6 +9994,19 @@ func NewRestClientWithBearerToken(bearerToken string) (*RestClient, *MarketDataE
 func NewRestClientWithSdkToken(sdkToken string) (*RestClient, *MarketDataError) {
 	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
 		return C.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token(FfiConverterStringINSTANCE.Lower(sdkToken), _uniffiStatus)
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue *RestClient
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterRestClientINSTANCE.Lift(_uniffiRV), _uniffiErr
+	}
+}
+
+// Create a REST client with SDK token authentication, custom base URL, and TLS config
+func NewRestClientWithSdkTokenAndTls(sdkToken string, baseUrl *string, tls TlsConfigRecord) (*RestClient, *MarketDataError) {
+	_uniffiRV, _uniffiErr := rustCallWithError[MarketDataError](FfiConverterMarketDataError{}, func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls(FfiConverterStringINSTANCE.Lower(sdkToken), FfiConverterOptionalStringINSTANCE.Lower(baseUrl), FfiConverterTlsConfigRecordINSTANCE.Lower(tls), _uniffiStatus)
 	})
 	if _uniffiErr != nil {
 		var _uniffiDefaultValue *RestClient

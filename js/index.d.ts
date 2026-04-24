@@ -1774,6 +1774,16 @@ export interface RestClientOptions {
   sdkToken?: string
   /** Override base URL (optional) */
   baseUrl?: string
+  /**
+   * Additional root CA (PEM bytes). Appended to the OS trust store;
+   * chains signed by either this CA or an OS-trusted root are accepted.
+   */
+  tlsRootCertPem?: Uint8Array
+  /**
+   * Disable ALL TLS verification (chain + hostname + expiry).
+   * Dev/testing only — exposes MITM risk. Defaults to false.
+   */
+  tlsAcceptInvalidCerts?: boolean
 }
 
 /** Stock intraday quote params (object form) */
@@ -1806,4 +1816,11 @@ export interface WebSocketClientOptions {
   reconnect?: ReconnectOptions
   /** Health check configuration (optional) */
   healthCheck?: HealthCheckOptions
+  /** Additional root CA (PEM bytes). Appended to the OS trust store. */
+  tlsRootCertPem?: Uint8Array
+  /**
+   * Disable ALL TLS verification (chain + hostname + expiry).
+   * Dev/testing only — exposes MITM risk. Defaults to false.
+   */
+  tlsAcceptInvalidCerts?: boolean
 }

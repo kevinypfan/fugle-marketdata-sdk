@@ -103,6 +103,7 @@ interface UniffiLib extends Library {
     Pointer uniffi_marketdata_uniffi_fn_constructor_websocketclient_new(RustBuffer.ByValue apiKey, Pointer listener, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_config(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, RustBuffer.ByValue reconnectConfig, RustBuffer.ByValue healthCheckConfig, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_endpoint(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, UniffiRustCallStatus uniffi_out_errmk);
+    Pointer uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_full_config(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, RustBuffer.ByValue baseUrl, RustBuffer.ByValue reconnectConfig, RustBuffer.ByValue healthCheckConfig, RustBuffer.ByValue tls, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_constructor_websocketclient_new_with_url(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, RustBuffer.ByValue baseUrl, RustBuffer.ByValue reconnectConfig, RustBuffer.ByValue healthCheckConfig, UniffiRustCallStatus uniffi_out_errmk);
     Long uniffi_marketdata_uniffi_fn_method_websocketclient_connect(Pointer ptr);
     Long uniffi_marketdata_uniffi_fn_method_websocketclient_disconnect(Pointer ptr);
@@ -122,8 +123,11 @@ interface UniffiLib extends Library {
     void uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnecting(Pointer ptr, Integer attempt, UniffiRustCallStatus uniffi_out_errmk);
     void uniffi_marketdata_uniffi_fn_method_websocketlistener_on_reconnect_failed(Pointer ptr, Integer attempts, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key(RustBuffer.ByValue apiKey, UniffiRustCallStatus uniffi_out_errmk);
+    Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls(RustBuffer.ByValue apiKey, RustBuffer.ByValue baseUrl, RustBuffer.ByValue tls, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token(RustBuffer.ByValue bearerToken, UniffiRustCallStatus uniffi_out_errmk);
+    Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls(RustBuffer.ByValue bearerToken, RustBuffer.ByValue baseUrl, RustBuffer.ByValue tls, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token(RustBuffer.ByValue sdkToken, UniffiRustCallStatus uniffi_out_errmk);
+    Pointer uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls(RustBuffer.ByValue sdkToken, RustBuffer.ByValue baseUrl, RustBuffer.ByValue tls, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_websocket_client(RustBuffer.ByValue apiKey, Pointer listener, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_websocket_client_with_config(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, RustBuffer.ByValue reconnectConfig, RustBuffer.ByValue healthCheckConfig, UniffiRustCallStatus uniffi_out_errmk);
     Pointer uniffi_marketdata_uniffi_fn_func_new_websocket_client_with_endpoint(RustBuffer.ByValue apiKey, Pointer listener, RustBuffer.ByValue endpoint, UniffiRustCallStatus uniffi_out_errmk);
@@ -184,8 +188,11 @@ interface UniffiLib extends Library {
     void ffi_marketdata_uniffi_rust_future_free_void(Long handle);
     void ffi_marketdata_uniffi_rust_future_complete_void(Long handle, UniffiRustCallStatus uniffi_out_errmk);
     Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key();
+    Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_api_key_and_tls();
     Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token();
+    Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_bearer_token_and_tls();
     Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token();
+    Short uniffi_marketdata_uniffi_checksum_func_new_rest_client_with_sdk_token_and_tls();
     Short uniffi_marketdata_uniffi_checksum_func_new_websocket_client();
     Short uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_config();
     Short uniffi_marketdata_uniffi_checksum_func_new_websocket_client_with_endpoint();
@@ -271,6 +278,7 @@ interface UniffiLib extends Library {
     Short uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new();
     Short uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_config();
     Short uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_endpoint();
+    Short uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_full_config();
     Short uniffi_marketdata_uniffi_checksum_constructor_websocketclient_new_with_url();
     Integer ffi_marketdata_uniffi_uniffi_contract_version();
     

@@ -15,7 +15,7 @@ public enum FfiConverterTypeIntradayCandle implements FfiConverterRustBuffer<Int
       FfiConverterDouble.INSTANCE.read(buf),
       FfiConverterLong.INSTANCE.read(buf),
       FfiConverterOptionalDouble.INSTANCE.read(buf),
-      FfiConverterLong.INSTANCE.read(buf)
+      FfiConverterString.INSTANCE.read(buf)
     );
   }
 
@@ -28,7 +28,7 @@ public enum FfiConverterTypeIntradayCandle implements FfiConverterRustBuffer<Int
             FfiConverterDouble.INSTANCE.allocationSize(value.close()) +
             FfiConverterLong.INSTANCE.allocationSize(value.volume()) +
             FfiConverterOptionalDouble.INSTANCE.allocationSize(value.average()) +
-            FfiConverterLong.INSTANCE.allocationSize(value.time())
+            FfiConverterString.INSTANCE.allocationSize(value.date())
       );
   }
 
@@ -40,7 +40,7 @@ public enum FfiConverterTypeIntradayCandle implements FfiConverterRustBuffer<Int
       FfiConverterDouble.INSTANCE.write(value.close(), buf);
       FfiConverterLong.INSTANCE.write(value.volume(), buf);
       FfiConverterOptionalDouble.INSTANCE.write(value.average(), buf);
-      FfiConverterLong.INSTANCE.write(value.time(), buf);
+      FfiConverterString.INSTANCE.write(value.date(), buf);
   }
 }
 

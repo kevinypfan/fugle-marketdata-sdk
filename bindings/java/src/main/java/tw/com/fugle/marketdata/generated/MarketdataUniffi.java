@@ -38,6 +38,31 @@ public class MarketdataUniffi {
 
   
     /**
+     * Create a REST client with API key authentication, custom base URL, and TLS config
+     */public static RestClient newRestClientWithApiKeyAndTls(String apiKey, String baseUrl, TlsConfigRecord tls) throws MarketDataException {
+            try {
+                return FfiConverterTypeRestClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_api_key_and_tls(
+            FfiConverterString.INSTANCE.lower(apiKey), FfiConverterOptionalString.INSTANCE.lower(baseUrl), FfiConverterTypeTlsConfigRecord.INSTANCE.lower(tls), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                if (MarketDataException.class.isInstance(_e.getCause())) {
+                    throw (MarketDataException)_e.getCause();
+                }
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Create a REST client with bearer token authentication
      *
      * # Arguments
@@ -69,6 +94,31 @@ public class MarketdataUniffi {
 
   
     /**
+     * Create a REST client with bearer token authentication, custom base URL, and TLS config
+     */public static RestClient newRestClientWithBearerTokenAndTls(String bearerToken, String baseUrl, TlsConfigRecord tls) throws MarketDataException {
+            try {
+                return FfiConverterTypeRestClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_bearer_token_and_tls(
+            FfiConverterString.INSTANCE.lower(bearerToken), FfiConverterOptionalString.INSTANCE.lower(baseUrl), FfiConverterTypeTlsConfigRecord.INSTANCE.lower(tls), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                if (MarketDataException.class.isInstance(_e.getCause())) {
+                    throw (MarketDataException)_e.getCause();
+                }
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
      * Create a REST client with SDK token authentication
      *
      * # Arguments
@@ -82,6 +132,31 @@ public class MarketdataUniffi {
     UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
         return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token(
             FfiConverterString.INSTANCE.lower(sdkToken), _status);
+    })
+    );
+            } catch (RuntimeException _e) {
+                
+                if (MarketDataException.class.isInstance(_e.getCause())) {
+                    throw (MarketDataException)_e.getCause();
+                }
+                
+                if (InternalException.class.isInstance(_e.getCause())) {
+                    throw (InternalException)_e.getCause();
+                }
+                throw _e;
+            }
+    }
+    
+
+  
+    /**
+     * Create a REST client with SDK token authentication, custom base URL, and TLS config
+     */public static RestClient newRestClientWithSdkTokenAndTls(String sdkToken, String baseUrl, TlsConfigRecord tls) throws MarketDataException {
+            try {
+                return FfiConverterTypeRestClient.INSTANCE.lift(
+    UniffiHelpers.uniffiRustCallWithError(new MarketDataExceptionErrorHandler(), _status -> {
+        return UniffiLib.INSTANCE.uniffi_marketdata_uniffi_fn_func_new_rest_client_with_sdk_token_and_tls(
+            FfiConverterString.INSTANCE.lower(sdkToken), FfiConverterOptionalString.INSTANCE.lower(baseUrl), FfiConverterTypeTlsConfigRecord.INSTANCE.lower(tls), _status);
     })
     );
             } catch (RuntimeException _e) {
