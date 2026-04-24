@@ -94,6 +94,9 @@ class RestClient:
         bearer_token: str | None = None,
         sdk_token: str | None = None,
         base_url: str | None = None,
+        tls_ca_file: str | None = None,
+        tls_root_cert_pem: bytes | None = None,
+        tls_accept_invalid_certs: bool = False,
     ) -> None:
         """Create a new REST client with authentication.
 
@@ -102,23 +105,36 @@ class RestClient:
             bearer_token: Bearer token for authentication (exactly one auth method required)
             sdk_token: SDK token for authentication (exactly one auth method required)
             base_url: Optional custom base URL
+            tls_ca_file: Path to a PEM-encoded root CA to trust (in addition to
+                the system trust store). Mutually exclusive with tls_root_cert_pem.
+            tls_root_cert_pem: Raw PEM bytes of a root CA to trust. Mutually
+                exclusive with tls_ca_file.
+            tls_accept_invalid_certs: DANGER — disable ALL TLS verification
+                (chain + hostname). Equivalent to ``curl -k``. Prefer
+                tls_ca_file for production. Emits UserWarning when set.
 
         Raises:
-            ValueError: If zero or multiple auth methods provided
+            TypeError: zero/multiple auth methods, or both TLS cert options set
+            OSError: tls_ca_file path not readable
+            ValueError: tls_root_cert_pem contents not a valid PEM certificate
 
         Example:
             ```python
             # API key auth
             client = RestClient(api_key="your-key")
 
-            # Bearer token auth
-            client = RestClient(bearer_token="your-token")
-
-            # SDK token auth
-            client = RestClient(sdk_token="your-sdk-token")
-
-            # With custom base URL
+            # Custom base URL
             client = RestClient(api_key="key", base_url="https://custom.api")
+
+            # Self-signed deployment — pin the CA
+            client = RestClient(api_key="key",
+                                base_url="https://custom.api",
+                                tls_ca_file="/path/to/ca.pem")
+
+            # Local testing only — skip all TLS verification
+            client = RestClient(api_key="key",
+                                base_url="https://192.168.1.1/v1",
+                                tls_accept_invalid_certs=True)
             ```
         """
         ...
@@ -1287,6 +1303,9 @@ class WebSocketClient:
         base_url: str | None = None,
         reconnect: ReconnectConfig | None = None,
         health_check: HealthCheckConfig | None = None,
+        tls_ca_file: str | None = None,
+        tls_root_cert_pem: bytes | None = None,
+        tls_accept_invalid_certs: bool = False,
     ) -> None:
         """Create a new WebSocket client with authentication and configuration.
 
@@ -1297,23 +1316,28 @@ class WebSocketClient:
             base_url: Optional custom base URL
             reconnect: Optional reconnect configuration (default: enabled with 5 attempts)
             health_check: Optional health check configuration (default: disabled)
+            tls_ca_file: Path to a PEM-encoded root CA to trust (in addition to
+                the system trust store). Mutually exclusive with tls_root_cert_pem.
+            tls_root_cert_pem: Raw PEM bytes of a root CA to trust. Mutually
+                exclusive with tls_ca_file.
+            tls_accept_invalid_certs: DANGER — disable ALL TLS verification
+                (chain + hostname). Equivalent to ``wscat --no-check``. Prefer
+                tls_ca_file for production. Emits UserWarning when set.
 
         Raises:
-            ValueError: If zero or multiple auth methods provided
+            TypeError: zero/multiple auth methods, or both TLS cert options set
+            OSError: tls_ca_file path not readable
+            ValueError: tls_root_cert_pem contents not a valid PEM certificate
 
         Example:
             ```python
             # API key auth
             ws = WebSocketClient(api_key="your-key")
 
-            # With custom configs
-            rc = ReconnectConfig(max_attempts=10)
-            hc = HealthCheckConfig(enabled=True)
-            ws = WebSocketClient(
-                bearer_token="token",
-                reconnect=rc,
-                health_check=hc
-            )
+            # Self-signed deployment — pin the CA
+            ws = WebSocketClient(api_key="key",
+                                 base_url="wss://192.168.1.1/v1",
+                                 tls_ca_file="/path/to/ca.pem")
             ```
         """
         ...

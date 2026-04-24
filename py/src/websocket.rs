@@ -438,6 +438,7 @@ pub struct WebSocketClient {
     base_url: Option<String>,
     reconnect_config: ReconnectConfig,
     health_check_config: HealthCheckConfig,
+    tls: marketdata_core::TlsConfig,
 }
 
 #[pymethods]
@@ -474,14 +475,18 @@ impl WebSocketClient {
     ///     ws = WebSocketClient(api_key="key", health_check=hc)
     ///     ```
     #[new]
-    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None, reconnect=None, health_check=None))]
+    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None, reconnect=None, health_check=None, tls_ca_file=None, tls_root_cert_pem=None, tls_accept_invalid_certs=false))]
     pub fn new(
+        py: Python<'_>,
         api_key: Option<String>,
         bearer_token: Option<String>,
         sdk_token: Option<String>,
         base_url: Option<String>,
         reconnect: Option<&Bound<'_, ReconnectConfig>>,
         health_check: Option<&Bound<'_, HealthCheckConfig>>,
+        tls_ca_file: Option<String>,
+        tls_root_cert_pem: Option<Vec<u8>>,
+        tls_accept_invalid_certs: bool,
     ) -> PyResult<Self> {
         // Validate exactly one auth method (fail fast)
         let auth_count = [&api_key, &bearer_token, &sdk_token]
@@ -511,11 +516,19 @@ impl WebSocketClient {
             HealthCheckConfig::default()
         };
 
+        let tls = crate::tls_kwargs::parse_tls_kwargs(
+            py,
+            tls_ca_file,
+            tls_root_cert_pem,
+            tls_accept_invalid_certs,
+        )?;
+
         Ok(Self {
             api_key: auth_key,
             base_url,
             reconnect_config,
             health_check_config,
+            tls,
         })
     }
 
@@ -530,6 +543,7 @@ impl WebSocketClient {
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            self.tls.clone(),
         )
     }
 
@@ -544,6 +558,7 @@ impl WebSocketClient {
             self.base_url.clone(),
             self.reconnect_config.clone(),
             self.health_check_config.clone(),
+            self.tls.clone(),
         )
     }
 }
@@ -570,6 +585,7 @@ pub struct StockWebSocketClient {
     base_url: Option<String>,
     reconnect_config: ReconnectConfig,
     health_check_config: HealthCheckConfig,
+    tls: marketdata_core::TlsConfig,
     callbacks: Arc<CallbackRegistry>,
     // State is wrapped in Mutex<Option<>> for thread-safety
     state: Arc<Mutex<Option<WebSocketState>>>,
@@ -585,12 +601,14 @@ impl StockWebSocketClient {
         base_url: Option<String>,
         reconnect_config: ReconnectConfig,
         health_check_config: HealthCheckConfig,
+        tls: marketdata_core::TlsConfig,
     ) -> Self {
         Self {
             api_key,
             base_url,
             reconnect_config,
             health_check_config,
+            tls,
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
@@ -601,7 +619,7 @@ impl StockWebSocketClient {
 
     fn build_config(&self) -> marketdata_core::ConnectionConfig {
         let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
-        match &self.base_url {
+        let mut config = match &self.base_url {
             // Legacy SDK semantic: base_url is the host + marketdata version
             // prefix (e.g. "wss://api.fugle.tw/marketdata/v1.0"), the SDK
             // appends "/stock/streaming". Trailing slashes tolerated.
@@ -610,7 +628,9 @@ impl StockWebSocketClient {
                 marketdata_core::ConnectionConfig::new(url, auth)
             }
             None => marketdata_core::ConnectionConfig::fugle_stock(auth),
-        }
+        };
+        config.tls = self.tls.clone();
+        config
     }
 
     /// Get or create the tokio runtime
@@ -1436,6 +1456,7 @@ pub struct FutOptWebSocketClient {
     base_url: Option<String>,
     reconnect_config: ReconnectConfig,
     health_check_config: HealthCheckConfig,
+    tls: marketdata_core::TlsConfig,
     callbacks: Arc<CallbackRegistry>,
     state: Arc<Mutex<Option<WebSocketState>>>,
     runtime: Arc<Mutex<Option<tokio::runtime::Runtime>>>,
@@ -1449,12 +1470,14 @@ impl FutOptWebSocketClient {
         base_url: Option<String>,
         reconnect_config: ReconnectConfig,
         health_check_config: HealthCheckConfig,
+        tls: marketdata_core::TlsConfig,
     ) -> Self {
         Self {
             api_key,
             base_url,
             reconnect_config,
             health_check_config,
+            tls,
             callbacks: Arc::new(CallbackRegistry::new()),
             state: Arc::new(Mutex::new(None)),
             runtime: Arc::new(Mutex::new(None)),
@@ -1513,13 +1536,15 @@ impl FutOptWebSocketClient {
 
     fn build_config(&self) -> marketdata_core::ConnectionConfig {
         let auth = marketdata_core::AuthRequest::with_api_key(&self.api_key);
-        match &self.base_url {
+        let mut config = match &self.base_url {
             Some(base) => {
                 let url = format!("{}/futopt/streaming", base.trim_end_matches('/'));
                 marketdata_core::ConnectionConfig::new(url, auth)
             }
             None => marketdata_core::ConnectionConfig::fugle_futopt(auth),
-        }
+        };
+        config.tls = self.tls.clone();
+        config
     }
 
     /// Get or create the tokio runtime

@@ -91,6 +91,7 @@ mod callback;
 mod client;
 mod errors;
 pub mod iterator;
+mod tls_kwargs;
 mod types;
 mod websocket;
 

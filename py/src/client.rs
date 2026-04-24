@@ -61,12 +61,16 @@ impl RestClient {
     ///     client = RestClient(api_key="key", base_url="https://custom.api")
     ///     ```
     #[new]
-    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None))]
+    #[pyo3(signature = (*, api_key=None, bearer_token=None, sdk_token=None, base_url=None, tls_ca_file=None, tls_root_cert_pem=None, tls_accept_invalid_certs=false))]
     pub fn new(
+        py: Python<'_>,
         api_key: Option<String>,
         bearer_token: Option<String>,
         sdk_token: Option<String>,
         base_url: Option<String>,
+        tls_ca_file: Option<String>,
+        tls_root_cert_pem: Option<Vec<u8>>,
+        tls_accept_invalid_certs: bool,
     ) -> PyResult<Self> {
         // Validate exactly one auth method (fail fast)
         let auth_count = [&api_key, &bearer_token, &sdk_token]
@@ -89,8 +93,19 @@ impl RestClient {
             marketdata_core::Auth::SdkToken(sdk_token.unwrap())
         };
 
-        // Create client with optional base_url
-        let mut inner = marketdata_core::RestClient::new(auth);
+        // Parse TLS kwargs; emits UserWarning if verification is disabled.
+        let tls = crate::tls_kwargs::parse_tls_kwargs(
+            py,
+            tls_ca_file,
+            tls_root_cert_pem,
+            tls_accept_invalid_certs,
+        )?;
+
+        // Create client. with_tls returns Err only on malformed PEM —
+        // surface that as a Python ValueError.
+        let mut inner = marketdata_core::RestClient::with_tls(auth, tls).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("{e}"))
+        })?;
         if let Some(url) = base_url {
             inner = inner.base_url(&url);
         }
