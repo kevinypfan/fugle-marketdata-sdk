@@ -2512,13 +2512,18 @@ mod tests {
 
     #[test]
     fn test_rest_client_creation_with_api_key() {
-        let _client = RestClient::new(
-            Some("test-key".to_string()),
-            None,
-            None,
-            None,
-        ).unwrap();
-        // Client should be created without error
+        Python::attach(|py| {
+            let _client = RestClient::new(
+                py,
+                Some("test-key".to_string()),
+                None,  // bearer_token
+                None,  // sdk_token
+                None,  // base_url
+                None,  // tls_ca_file
+                None,  // tls_root_cert_pem
+                false, // tls_accept_invalid_certs
+            ).unwrap();
+        });
     }
 
     #[test]
@@ -2535,18 +2540,26 @@ mod tests {
 
     #[test]
     fn test_rest_client_no_auth_fails() {
-        let result = RestClient::new(None, None, None, None);
-        assert!(result.is_err());
+        Python::attach(|py| {
+            let result = RestClient::new(py, None, None, None, None, None, None, false);
+            assert!(result.is_err());
+        });
     }
 
     #[test]
     fn test_rest_client_multiple_auth_fails() {
-        let result = RestClient::new(
-            Some("key".to_string()),
-            Some("token".to_string()),
-            None,
-            None,
-        );
-        assert!(result.is_err());
+        Python::attach(|py| {
+            let result = RestClient::new(
+                py,
+                Some("key".to_string()),
+                Some("token".to_string()),
+                None,  // sdk_token
+                None,  // base_url
+                None,  // tls_ca_file
+                None,  // tls_root_cert_pem
+                false, // tls_accept_invalid_certs
+            );
+            assert!(result.is_err());
+        });
     }
 }

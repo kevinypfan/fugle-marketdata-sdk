@@ -2109,6 +2109,7 @@ mod tests {
             None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
+            marketdata_core::TlsConfig::default(),
         );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
@@ -2121,6 +2122,7 @@ mod tests {
             None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
+            marketdata_core::TlsConfig::default(),
         );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
@@ -2133,6 +2135,7 @@ mod tests {
             None,
             ReconnectConfig::default(),
             HealthCheckConfig::default(),
+            marketdata_core::TlsConfig::default(),
         );
         let state = client.state.lock().unwrap();
         assert!(state.is_none());
