@@ -64,7 +64,7 @@ gen-cpp:
 # Uses `sed -i.bak ... && rm *.bak` for BSD/GNU compatibility (macOS + Linux CI).
 gen-csharp:
 	cargo build -p marketdata-uniffi --release
-	uniffi-bindgen-cs --library $(UNIFFI_LIB) -o bindings/csharp/MarketdataUniffi/
+	uniffi-bindgen-cs --library $(UNIFFI_LIB) --config uniffi/uniffi.toml -o bindings/csharp/MarketdataUniffi/
 	@echo "Post-processing: making generated types public..."
 	sed -i.bak 's/^internal record /public record /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
 	sed -i.bak 's/^internal interface /public interface /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
