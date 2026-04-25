@@ -10288,12 +10288,7 @@ class FfiConverterTypeListingApplicantsResponse : FfiConverterRustBuffer<Listing
 /// <summary>
 /// MACD data point
 /// </summary>
-public record MacdDataPoint(
-    string @date,
-    double @macd,
-    double @signalValue,
-    double @histogram
-) { }
+public record MacdDataPoint(string @date, double @macd, double @signalValue, double @histogram) { }
 
 class FfiConverterTypeMacdDataPoint : FfiConverterRustBuffer<MacdDataPoint>
 {
@@ -11799,12 +11794,7 @@ class FfiConverterTypeTradingHalt : FfiConverterRustBuffer<TradingHalt>
 /// <summary>
 /// Volume at a specific price level
 /// </summary>
-public record VolumeAtPrice(
-    double @price,
-    long @volume,
-    long? @volumeAtBid,
-    long? @volumeAtAsk
-) { }
+public record VolumeAtPrice(double @price, long @volume, long? @volumeAtBid, long? @volumeAtAsk) { }
 
 class FfiConverterTypeVolumeAtPrice : FfiConverterRustBuffer<VolumeAtPrice>
 {
