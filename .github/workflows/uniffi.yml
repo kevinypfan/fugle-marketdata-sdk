@@ -158,8 +158,12 @@ jobs:
         run: cargo install uniffi-bindgen-go --git https://github.com/NordSecurity/uniffi-bindgen-go --tag v0.2.2+v0.28.3
 
       - name: Generate C# bindings
+        # --config matches Makefile gen-csharp; without it the bindgen falls
+        # back to access_modifier="internal" default and would silently produce
+        # broken bindings if the uniffi.toml [bindings.csharp] section ever
+        # drifts away (this is what caused the rc.9 nupkg pack failure).
         run: |
-          uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.so -o generated/csharp/
+          uniffi-bindgen-cs --library target/release/libmarketdata_uniffi.so --config uniffi/uniffi.toml -o generated/csharp/
           echo "C# bindings generated:"
           ls -la generated/csharp/
 
