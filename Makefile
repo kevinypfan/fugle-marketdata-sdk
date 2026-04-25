@@ -59,19 +59,13 @@ gen-cpp:
 	uniffi-bindgen-cpp --library $(UNIFFI_LIB) -o bindings/cpp/
 	@echo "C++ bindings generated successfully (sync-only API)"
 
-# Generate C# bindings from UniFFI (library mode - proc-macro approach)
-# Post-processes generated file to make types public for consumer access.
-# Uses `sed -i.bak ... && rm *.bak` for BSD/GNU compatibility (macOS + Linux CI).
+# Generate C# bindings from UniFFI (library mode - proc-macro approach).
+# `access_modifier = "public"` in uniffi/uniffi.toml ensures generated types
+# (records, interfaces, enums, classes, MarketdataUniffiMethods static class)
+# are consumer-visible. See CONFIGURATION.md in NordSecurity/uniffi-bindgen-cs.
 gen-csharp:
 	cargo build -p marketdata-uniffi --release
 	uniffi-bindgen-cs --library $(UNIFFI_LIB) --config uniffi/uniffi.toml -o bindings/csharp/MarketdataUniffi/
-	@echo "Post-processing: making generated types public..."
-	sed -i.bak 's/^internal record /public record /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i.bak 's/^internal interface /public interface /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i.bak 's/^internal class /public class /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i.bak 's/^internal enum /public enum /g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	sed -i.bak 's/^internal static class MarketdataUniffiMethods/public static class MarketdataUniffiMethods/g' bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs
-	rm -f bindings/csharp/MarketdataUniffi/marketdata_uniffi.cs.bak
 	@echo "C# bindings generated successfully"
 
 # ============================================================
