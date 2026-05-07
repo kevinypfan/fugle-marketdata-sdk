@@ -19,7 +19,7 @@ pub mod subscription;
 pub use channels::StockSubscription;
 pub use config::ConnectionConfig;
 pub use connection::{ConnectionEvent, ConnectionState, WebSocketClient};
-pub use health_check::{HealthCheck, HealthCheckConfig};
+pub use health_check::HealthCheckConfig;
 pub use message::MessageReceiver;
 pub use reconnection::{ReconnectionConfig, ReconnectionManager};
 pub use subscription::SubscriptionManager;

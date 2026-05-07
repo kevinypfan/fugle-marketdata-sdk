@@ -2,7 +2,7 @@
 
 use crate::models::{SubscribeRequest, WebSocketMessage, WebSocketRequest};
 use crate::websocket::{
-    ConnectionConfig, HealthCheck, HealthCheckConfig, MessageReceiver, ReconnectionConfig,
+    ConnectionConfig, HealthCheckConfig, MessageReceiver, ReconnectionConfig,
     ReconnectionManager, SubscriptionManager,
 };
 use crate::MarketDataError;
