@@ -184,27 +184,41 @@ let reconnect = ReconnectionConfig::new(
 
 ### HealthCheckConfig
 
-Control WebSocket health check (ping-pong) behavior to detect stale connections:
+Control connection liveness detection. The SDK declares the connection dead and
+triggers reconnect when no inbound frame arrives within `heartbeat_timeout`.
+
+The SDK uses **passive activity detection at the WebSocket read site** — no
+background task, no atomic timestamps, no protocol-level pings. The dispatch
+loop wraps each `ws_read.next()` in `tokio::time::timeout(heartbeat_timeout, ...)`
+and emits `ConnectionEvent::HeartbeatTimeout` when the timer fires.
 
 ```rust
 use marketdata_core::websocket::HealthCheckConfig;
 use std::time::Duration;
 
-let health = HealthCheckConfig::new(
-    true,                            // enabled (default: false)
-    Duration::from_millis(15_000),   // interval (min: 5000ms)
-    3,                               // max_missed_pongs (min: 1)
-)?;
+// Recommended: with_timeout validates against the 5s sanity floor.
+let health = HealthCheckConfig::with_timeout(Duration::from_secs(35))?;
+
+// Default: enabled=true, heartbeat_timeout=35s (Fugle server's 30s heartbeat
+// + 5s buffer).
+let health = HealthCheckConfig::default();
+
+// Opt out (discouraged — stalled connections won't surface until OS times
+// out the underlying TCP, typically hours later).
+let health = HealthCheckConfig::disabled();
 ```
 
 **Parameters:**
-- `enabled` (bool): Whether health check is enabled (default: false, aligned with official SDKs)
-- `interval` (Duration): Ping interval (default: 30000ms, min: 5000ms)
-- `max_missed_pongs` (u64): Maximum missed pongs before considering connection stale (default: 2, min: 1)
+- `enabled` (bool): Whether liveness detection is active. Default `true` in 3.0
+  (was `false` in 2.x).
+- `heartbeat_timeout` (Duration): Maximum allowed gap between inbound frames.
+  Default 35s. Floor 5s — but values below the live server's 30s heartbeat
+  period will cause repeated false disconnects.
 
-**Validation:**
-- `interval` must be >= 5000ms (prevents excessive overhead)
-- `max_missed_pongs` must be >= 1
+**Migration from 2.x:** `interval × max_missed_pongs` collapsed into a single
+`heartbeat_timeout` field. If you used `HealthCheckConfig::new(enabled, interval,
+max_missed_pongs)`, the equivalent is `HealthCheckConfig::with_timeout(interval *
+max_missed_pongs)?`.
 
 ### Config Constants
 
@@ -212,16 +226,15 @@ All configuration constants are exported from `lib.rs` for use in binding layers
 
 ```rust
 // Reconnection defaults
-pub const DEFAULT_MAX_RECONNECT_ATTEMPTS: usize = 5;
-pub const DEFAULT_INITIAL_RECONNECT_DELAY_MS: u64 = 1000;
-pub const DEFAULT_MAX_RECONNECT_DELAY_MS: u64 = 60000;
+pub const DEFAULT_MAX_ATTEMPTS: u32 = 5;
+pub const DEFAULT_INITIAL_DELAY_MS: u64 = 1000;
+pub const DEFAULT_MAX_DELAY_MS: u64 = 60000;
 pub const MIN_INITIAL_DELAY_MS: u64 = 100;
 
-// Health check defaults
-pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = false;
-pub const DEFAULT_HEALTH_CHECK_INTERVAL_MS: u64 = 30000;
-pub const DEFAULT_MAX_MISSED_PONGS: usize = 2;
-pub const MIN_HEALTH_CHECK_INTERVAL_MS: u64 = 5000;
+// Health check defaults (3.0)
+pub const DEFAULT_HEALTH_CHECK_ENABLED: bool = true;
+pub const DEFAULT_HEARTBEAT_TIMEOUT_MS: u64 = 35000;
+pub const MIN_HEARTBEAT_TIMEOUT_MS: u64 = 5000;
 ```
 
 ## Error Handling

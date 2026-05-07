@@ -129,16 +129,27 @@ let reconnect = ReconnectionConfig::new(
 
 ### Health Check
 
+The SDK uses passive activity detection at the WebSocket read site — no
+background task, no protocol-level pings. The dispatch loop wraps each
+`ws_read.next()` in `tokio::time::timeout(heartbeat_timeout, ...)` and emits
+`ConnectionEvent::HeartbeatTimeout` when the timer fires, which then triggers
+the auto-reconnect path.
+
 ```rust,no_run
 use fugle_marketdata::websocket::HealthCheckConfig;
 use std::time::Duration;
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let health = HealthCheckConfig::new(
-    true,                            // enabled
-    Duration::from_millis(15_000),   // interval (min 5000ms)
-    3,                               // max_missed_pongs
-)?;
+// Default: enabled=true, heartbeat_timeout=35s (server's 30s + 5s buffer)
+let health = HealthCheckConfig::default();
+
+// Custom timeout (the floor is 5s, but values below the live server's 30s
+// heartbeat period will cause repeated false disconnects)
+let health = HealthCheckConfig::with_timeout(Duration::from_secs(45))?;
+
+// Opt out (discouraged — stalled connections won't surface until the OS
+// times out the underlying TCP, typically hours later)
+let health = HealthCheckConfig::disabled();
 # drop(health);
 # Ok(())
 # }

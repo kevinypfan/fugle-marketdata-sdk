@@ -11,6 +11,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Major release — SDK graduates to 3.x. All language bindings bump together.
 
+### WebSocket connection liveness — read-site timeout (BREAKING)
+
+The background activity-timer task is replaced with a `tokio::time::timeout`
+wrapped at the WebSocket read site inside `dispatch_messages`. No more polling
+task, no atomic timestamps, no `pause`/`resume` choreography during reconnect.
+Detection latency improves from up to 90s (3 × 30s heartbeats missed) to the
+configured `heartbeat_timeout` (default 35s).
+
+#### Breaking
+- `HealthCheckConfig` collapsed `interval` + `max_missed_pongs` into a single
+  `heartbeat_timeout: Duration` field. Use
+  `HealthCheckConfig::with_timeout(Duration::from_secs(35))?` to construct,
+  or `HealthCheckConfig::default()` for the new 35s default.
+- `HealthCheckConfig::enabled` default changed from `false` to `true`. Restore
+  previous opt-out behaviour with `HealthCheckConfig::disabled()`.
+- Removed the `HealthCheck` runtime struct (was `pub` but only used internally).
+  All `touch` / `pause` / `resume` / `stop` / `spawn_check_task` / `ping`
+  methods are gone — the read-site timeout doesn't need them.
+- Removed constants `DEFAULT_HEALTH_CHECK_INTERVAL_MS`,
+  `DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS`, `MIN_HEALTH_CHECK_INTERVAL_MS`.
+  Replaced by `DEFAULT_HEARTBEAT_TIMEOUT_MS = 35_000` and
+  `MIN_HEARTBEAT_TIMEOUT_MS = 5_000`.
+- Binding-layer field renames (PyO3 / napi / UniFFI):
+  - PyO3: `HealthCheckConfig.ping_interval` + `max_missed_pongs` →
+    `heartbeat_timeout_ms`
+  - napi: `HealthCheckOptions.ping_interval` + `max_missed_pongs` →
+    `heartbeat_timeout_ms`
+  - UniFFI: `HealthCheckConfigRecord.interval_ms` + `max_missed_pongs` →
+    `heartbeat_timeout_ms`
+
+#### Added
+- `MarketDataError::HeartbeatTimeout { elapsed: Duration }` — first-class
+  error variant for liveness timeout (error code 3003). PyO3 binding routes
+  to the existing `TimeoutError` Python exception; UniFFI binding routes to
+  the existing UniFFI `TimeoutError` variant.
+- `ConnectionEvent::HeartbeatTimeout { elapsed: Duration }` — distinguishes
+  "we stopped hearing from the server" from a server-initiated `Disconnected`
+  close frame. Bindings reuse the existing disconnect callback path with a
+  synthesized reason string for now; a dedicated `on_heartbeat_timeout`
+  callback can be added in a follow-up if user code needs to discriminate.
+- `AuthRequest.heartbeat_interval_ms` — wire-only optional field
+  (`heartbeatIntervalMs` in JSON) for future client-requested heartbeat
+  interval negotiation. Not exposed via builder method until server-side
+  honoring lands; see `WEBSOCKET-SERVER-RECOMMENDATIONS.md`.
+
+#### Changed
+- WebSocket dispatch loop now uses `tokio::time::timeout(heartbeat_timeout,
+  ws_read.next())` at the read site, replacing the background polling task.
+- `WebSocketClient` storage shifts from `Arc<HealthCheck>` to
+  `HealthCheckConfig` (plain owned value).
+
 ### Python (fugle-marketdata on PyPI)
 
 Drop-in successor to the pure-Python `fugle-marketdata` 2.4.1 maintained at
