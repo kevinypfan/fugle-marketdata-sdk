@@ -132,6 +132,7 @@ fugle-marketdata-python/
 
 # Ad-hoc developer scratch files (not part of the test suite)
 js/test_dummy.js
-py/test_1.py
+py/test_*.py
 py/ws_stream.py
+py/ca.crt
 
