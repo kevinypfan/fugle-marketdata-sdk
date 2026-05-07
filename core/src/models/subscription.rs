@@ -228,6 +228,18 @@ pub struct AuthRequest {
     /// SDK token (if using SDK token auth)
     #[serde(rename = "sdkToken", skip_serializing_if = "Option::is_none")]
     pub sdk_token: Option<String>,
+
+    /// Optional client-requested heartbeat interval in milliseconds.
+    /// Server may honor or clamp; absent value means "use server default".
+    ///
+    /// **Wire-only field** in 3.x — there is no public builder method
+    /// yet because the server side does not honor this preference. Once
+    /// server support lands (Phase 2.3 in the SDK roadmap), a
+    /// `with_heartbeat_interval` builder will be exposed.
+    /// Pre-shipping the wire field here means deployed v3.x clients
+    /// can negotiate without needing a fresh release.
+    #[serde(rename = "heartbeatIntervalMs", skip_serializing_if = "Option::is_none")]
+    pub heartbeat_interval_ms: Option<u64>,
 }
 
 impl AuthRequest {
@@ -237,6 +249,7 @@ impl AuthRequest {
             apikey: Some(api_key.into()),
             token: None,
             sdk_token: None,
+            heartbeat_interval_ms: None,
         }
     }
 
@@ -246,6 +259,7 @@ impl AuthRequest {
             apikey: None,
             token: Some(token.into()),
             sdk_token: None,
+            heartbeat_interval_ms: None,
         }
     }
 
@@ -255,6 +269,7 @@ impl AuthRequest {
             apikey: None,
             token: None,
             sdk_token: Some(sdk_token.into()),
+            heartbeat_interval_ms: None,
         }
     }
 }
@@ -439,6 +454,26 @@ mod tests {
         let req = AuthRequest::with_sdk_token("my-sdk-token");
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"sdkToken\":\"my-sdk-token\""));
+    }
+
+    #[test]
+    fn test_auth_request_heartbeat_interval_omitted_by_default() {
+        // None must be skipped, preserving the existing wire format.
+        let req = AuthRequest::with_api_key("k");
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("heartbeatIntervalMs"));
+    }
+
+    #[test]
+    fn test_auth_request_heartbeat_interval_serialized_when_set() {
+        let mut req = AuthRequest::with_api_key("k");
+        req.heartbeat_interval_ms = Some(30_000);
+        let json: serde_json::Value = serde_json::from_str(
+            &serde_json::to_string(&req).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(json["heartbeatIntervalMs"], 30_000);
+        assert_eq!(json["apikey"], "k");
     }
 
     #[test]
