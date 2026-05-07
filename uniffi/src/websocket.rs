@@ -471,6 +471,13 @@ impl WebSocketClient {
                                         message
                                     ));
                                 }
+                                // Heartbeat timeout: route to on_disconnected for now.
+                                // A dedicated on_heartbeat_timeout listener method can be
+                                // added in a follow-up if user code needs to discriminate.
+                                ConnectionEvent::HeartbeatTimeout { .. } => {
+                                    event_listener.on_disconnected();
+                                    event_connected.store(false, Ordering::SeqCst);
+                                }
                                 _ => {}
                             }
                         }

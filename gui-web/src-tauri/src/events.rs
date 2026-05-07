@@ -234,6 +234,12 @@ impl From<ConnectionEvent> for ConnectionStateDto {
             },
             ConnectionEvent::Unauthenticated { message } => Self::Failed { message },
             ConnectionEvent::Error { message, .. } => Self::Failed { message },
+            // Surface as Disconnected with a clear reason. UI can update its
+            // state machine the same way as a server-driven disconnect; the
+            // reconnection manager will then drive the Reconnecting events.
+            ConnectionEvent::HeartbeatTimeout { elapsed } => Self::Disconnected {
+                reason: format!("Heartbeat timeout after {:?}", elapsed),
+            },
         }
     }
 }

@@ -66,6 +66,11 @@ pub enum ConnectionEvent {
     Reconnecting { attempt: u32 },
     /// Reconnection failed after max attempts
     ReconnectFailed { attempts: u32 },
+    /// Heartbeat timeout: no inbound frame received within the configured
+    /// `heartbeat_timeout` window. Emitted by the dispatch loop when the
+    /// read-site `tokio::time::timeout` fires; the dispatch loop returns
+    /// immediately afterwards, which lets the reconnect path take over.
+    HeartbeatTimeout { elapsed: Duration },
     /// Error occurred
     Error { message: String, code: i32 },
 }

@@ -842,6 +842,17 @@ impl StockWebSocketClient {
                                             ConnectionEvent::Unauthenticated { message } => {
                                                 callbacks_for_events.invoke_unauthenticated(py, &message);
                                             }
+                                            ConnectionEvent::HeartbeatTimeout { elapsed } => {
+                                                // Reuse on_disconnect with a synthesized reason; a
+                                                // dedicated on_heartbeat_timeout callback can be
+                                                // added in a follow-up if user code needs to
+                                                // discriminate beyond the reason string.
+                                                callbacks_for_events.invoke_disconnect(
+                                                    py,
+                                                    None,
+                                                    &format!("Heartbeat timeout after {:?}", elapsed),
+                                                );
+                                            }
                                             _ => {} // Connecting, Connected handled elsewhere
                                         }
                                     });
@@ -1684,6 +1695,17 @@ impl FutOptWebSocketClient {
                                             }
                                             ConnectionEvent::Unauthenticated { message } => {
                                                 callbacks_for_events.invoke_unauthenticated(py, &message);
+                                            }
+                                            ConnectionEvent::HeartbeatTimeout { elapsed } => {
+                                                // Reuse on_disconnect with a synthesized reason; a
+                                                // dedicated on_heartbeat_timeout callback can be
+                                                // added in a follow-up if user code needs to
+                                                // discriminate beyond the reason string.
+                                                callbacks_for_events.invoke_disconnect(
+                                                    py,
+                                                    None,
+                                                    &format!("Heartbeat timeout after {:?}", elapsed),
+                                                );
                                             }
                                             _ => {} // Connecting, Connected handled elsewhere
                                         }

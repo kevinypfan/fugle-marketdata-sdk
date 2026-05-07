@@ -588,6 +588,11 @@ impl StockWebSocketClient {
                                     ConnectionEvent::Unauthenticated { message } => {
                                         fire_callback(&callbacks_for_events, "unauthenticated", message);
                                     }
+                                    ConnectionEvent::HeartbeatTimeout { elapsed } => {
+                                        // Reuse "disconnect" callback with synthesized reason
+                                        fire_callback(&callbacks_for_events, "disconnect",
+                                            format!("{{\"code\":null,\"reason\":\"Heartbeat timeout after {:?}\"}}", elapsed));
+                                    }
                                     _ => {}
                                 }
                             }
@@ -1075,6 +1080,11 @@ impl FutOptWebSocketClient {
                                     }
                                     ConnectionEvent::Unauthenticated { message } => {
                                         fire_callback(&callbacks_for_events, "unauthenticated", message);
+                                    }
+                                    ConnectionEvent::HeartbeatTimeout { elapsed } => {
+                                        // Reuse "disconnect" callback with synthesized reason
+                                        fire_callback(&callbacks_for_events, "disconnect",
+                                            format!("{{\"code\":null,\"reason\":\"Heartbeat timeout after {:?}\"}}", elapsed));
                                     }
                                     _ => {}
                                 }
