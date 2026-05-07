@@ -75,7 +75,9 @@ pub fn to_py_err(err: marketdata_core::MarketDataError) -> PyErr {
                 ApiError::new_err((message.clone(), error_code))
             }
         }
-        CoreError::TimeoutError { .. } => TimeoutError::new_err((message.clone(), error_code)),
+        CoreError::TimeoutError { .. } | CoreError::HeartbeatTimeout { .. } => {
+            TimeoutError::new_err((message.clone(), error_code))
+        }
         CoreError::ConnectionError { .. }
         | CoreError::WebSocketError { .. }
         | CoreError::ClientClosed => WebSocketError::new_err((message.clone(), error_code)),

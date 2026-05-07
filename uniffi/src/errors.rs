@@ -75,6 +75,9 @@ impl From<CoreError> for MarketDataError {
             CoreError::TimeoutError { operation } => {
                 MarketDataError::TimeoutError { msg: operation }
             }
+            CoreError::HeartbeatTimeout { elapsed } => MarketDataError::TimeoutError {
+                msg: format!("Heartbeat timeout: no inbound frames for {:?}", elapsed),
+            },
             CoreError::WebSocketError { msg } => MarketDataError::WebSocketError { msg },
             CoreError::ClientClosed => MarketDataError::ClientClosed,
             CoreError::InvalidParameter { name, reason } => MarketDataError::ApiError {

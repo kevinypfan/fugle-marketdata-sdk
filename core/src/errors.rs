@@ -6,6 +6,7 @@
 //! - 3000-3999: Network errors (timeout, WebSocket)
 //! - 9000-9999: Internal errors (unexpected failures)
 
+use std::time::Duration;
 use thiserror::Error;
 
 /// Main error type for marketdata-core operations
@@ -53,6 +54,11 @@ pub enum MarketDataError {
     /// WebSocket error
     #[error("WebSocket error: {msg}")]
     WebSocketError { msg: String },
+
+    /// Inbound activity timed out: no frame received within the
+    /// configured `heartbeat_timeout` window.
+    #[error("Heartbeat timeout: no inbound frames for {elapsed:?}")]
+    HeartbeatTimeout { elapsed: Duration },
 
     /// Client has been closed and cannot be reused
     #[error("Client already closed")]
@@ -118,6 +124,7 @@ impl MarketDataError {
             Self::ApiError { .. } => 2003,
             Self::TimeoutError { .. } => 3001,
             Self::WebSocketError { .. } => 3002,
+            Self::HeartbeatTimeout { .. } => 3003,
             Self::ClientClosed => 2010,
             Self::Other(_) => 9999,
         }
@@ -127,7 +134,10 @@ impl MarketDataError {
     pub fn is_retryable(&self) -> bool {
         match self {
             // Network errors are always retryable
-            Self::ConnectionError { .. } | Self::TimeoutError { .. } | Self::WebSocketError { .. } => true,
+            Self::ConnectionError { .. }
+            | Self::TimeoutError { .. }
+            | Self::WebSocketError { .. }
+            | Self::HeartbeatTimeout { .. } => true,
             // API errors with 429 or 5xx status codes are retryable
             Self::ApiError { status, .. } => *status == 429 || (500..=599).contains(status),
             // Parameter errors are never retryable (user must fix input)
@@ -208,6 +218,11 @@ mod tests {
         };
         assert_eq!(err.to_error_code(), 3002);
 
+        let err = MarketDataError::HeartbeatTimeout {
+            elapsed: Duration::from_secs(35),
+        };
+        assert_eq!(err.to_error_code(), 3003);
+
         let err = MarketDataError::ClientClosed;
         assert_eq!(err.to_error_code(), 2010);
 
@@ -230,6 +245,11 @@ mod tests {
 
         let err = MarketDataError::WebSocketError {
             msg: "test".to_string(),
+        };
+        assert!(err.is_retryable());
+
+        let err = MarketDataError::HeartbeatTimeout {
+            elapsed: Duration::from_secs(35),
         };
         assert!(err.is_retryable());
 
@@ -277,6 +297,15 @@ mod tests {
 
         let err = MarketDataError::Other(anyhow::anyhow!("test"));
         assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_heartbeat_timeout_display() {
+        let err = MarketDataError::HeartbeatTimeout {
+            elapsed: Duration::from_secs(35),
+        };
+        assert!(err.to_string().contains("35s"));
+        assert!(err.to_string().starts_with("Heartbeat timeout"));
     }
 
     #[test]
