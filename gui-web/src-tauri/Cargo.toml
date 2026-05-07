@@ -3,9 +3,10 @@ name = "marketdata-gui-tauri"
 version = "0.1.1"
 description = "Fugle Marketdata desktop GUI"
 authors = ["Fugle Team"]
-license = "MIT"
+license.workspace = true
 edition = "2021"
 rust-version = "1.77.2"
+publish = false
 
 [lib]
 name = "marketdata_gui_tauri_lib"

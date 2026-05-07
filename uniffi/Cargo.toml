@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "UniFFI bindings for Fugle marketdata-core (EXPERIMENTAL)"
+publish = false
 
 # Metadata to indicate experimental status
 [package.metadata]

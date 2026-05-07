@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "NAPI-RS bindings for marketdata-core - Node.js FFI"
+publish = false
 
 [lib]
 crate-type = ["cdylib"]

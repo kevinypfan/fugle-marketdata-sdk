@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Python bindings for marketdata-core"
+publish = false
 
 [lib]
 name = "fugle_marketdata"
