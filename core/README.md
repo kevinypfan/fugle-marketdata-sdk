@@ -101,12 +101,17 @@ async fn main() -> Result<(), marketdata_core::MarketDataError> {
     // Process messages in a separate task
     let msg_handle = tokio::spawn(async move {
         for _ in 0..10 {
-            match messages.recv_timeout(std::time::Duration::from_secs(5)) {
-                Ok(msg) => {
+            // receive_timeout returns Result<Option<msg>, _>:
+            //   Ok(Some(msg)) — message received
+            //   Ok(None)      — timeout elapsed
+            //   Err(_)        — channel closed
+            match messages.receive_timeout(std::time::Duration::from_secs(5)) {
+                Ok(Some(msg)) => {
                     if msg.is_data() {
                         println!("Data: {:?} - {:?}", msg.channel, msg.symbol);
                     }
                 }
+                Ok(None) => continue,
                 Err(_) => break,
             }
         }
@@ -158,18 +163,19 @@ Control WebSocket automatic reconnection behavior with exponential backoff:
 
 ```rust
 use marketdata_core::websocket::ReconnectionConfig;
+use std::time::Duration;
 
 let reconnect = ReconnectionConfig::new(
-    10,      // max_attempts (min: 1)
-    2000,    // initial_delay_ms (min: 100ms)
-    120000   // max_delay_ms
+    10,                              // max_attempts (min: 1)
+    Duration::from_millis(2_000),    // initial_delay (min: 100ms)
+    Duration::from_millis(120_000),  // max_delay
 )?;
 ```
 
 **Parameters:**
-- `max_attempts` (usize): Maximum reconnection attempts (default: 5, range: 1+)
-- `initial_delay` (u64): Initial delay for exponential backoff in milliseconds (default: 1000ms, min: 100ms)
-- `max_delay` (u64): Maximum delay cap in milliseconds (default: 60000ms)
+- `max_attempts` (u32): Maximum reconnection attempts (default: 5, range: 1+)
+- `initial_delay` (Duration): Initial delay for exponential backoff (default: 1000ms, min: 100ms)
+- `max_delay` (Duration): Maximum delay cap (default: 60000ms)
 
 **Validation:**
 - `max_attempts` must be >= 1
@@ -182,18 +188,19 @@ Control WebSocket health check (ping-pong) behavior to detect stale connections:
 
 ```rust
 use marketdata_core::websocket::HealthCheckConfig;
+use std::time::Duration;
 
 let health = HealthCheckConfig::new(
-    true,    // enabled (default: false)
-    15000,   // interval_ms (min: 5000ms)
-    3        // max_missed_pongs (min: 1)
+    true,                            // enabled (default: false)
+    Duration::from_millis(15_000),   // interval (min: 5000ms)
+    3,                               // max_missed_pongs (min: 1)
 )?;
 ```
 
 **Parameters:**
 - `enabled` (bool): Whether health check is enabled (default: false, aligned with official SDKs)
-- `interval` (u64): Ping interval in milliseconds (default: 30000ms, min: 5000ms)
-- `max_missed_pongs` (usize): Maximum missed pongs before considering connection stale (default: 2, min: 1)
+- `interval` (Duration): Ping interval (default: 30000ms, min: 5000ms)
+- `max_missed_pongs` (u64): Maximum missed pongs before considering connection stale (default: 2, min: 1)
 
 **Validation:**
 - `interval` must be >= 5000ms (prevents excessive overhead)
