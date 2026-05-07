@@ -28,8 +28,8 @@
 //! This is expected behavior - the streaming API only sends data during active trading.
 
 use marketdata_core::{
-    AuthRequest, Channel, ConnectionConfig, ConnectionState, WebSocketClient,
-    SubscribeRequest,
+    AuthRequest, Channel, ConnectionConfig, ConnectionEvent, ConnectionState,
+    HealthCheckConfig, SubscribeRequest, WebSocketClient,
 };
 use marketdata_core::websocket::StockSubscription;
 use std::env;
@@ -483,5 +483,91 @@ fn test_subscribe_multiple_symbols() {
         }
 
         client.disconnect().await.ok();
+    });
+}
+
+// =============================================================================
+// Heartbeat / Liveness Detection
+// =============================================================================
+
+/// End-to-end check that the read-site `tokio::time::timeout` in
+/// dispatch_messages emits `ConnectionEvent::HeartbeatTimeout` when the
+/// configured window elapses without any inbound frame.
+///
+/// We force the timeout to fire on purpose by configuring an
+/// artificially-short heartbeat_timeout (5s) against the live server,
+/// which sends a heartbeat every 30s. The test asserts:
+/// 1. We receive a `HeartbeatTimeout` event within reasonable bounds.
+/// 2. The reconnect path subsequently fires a `Reconnecting` event.
+///
+/// This deliberately produces false-disconnects against the production
+/// server (5s < 30s), so it must be `#[ignore]`'d — run manually before
+/// each major release.
+#[test]
+#[ignore]
+fn test_heartbeat_timeout_triggers_reconnect_in_real_env() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(async {
+        let config = stock_config();
+        let client = WebSocketClient::with_health_check_config(
+            config,
+            // 5 s timeout against a 30 s server heartbeat == guaranteed
+            // false disconnect after 5s of silence.
+            HealthCheckConfig::with_timeout(Duration::from_secs(5))
+                .expect("5s is exactly at the floor and must validate"),
+        );
+
+        client.connect().await.expect("Failed to connect");
+        assert_eq!(client.state_async().await, ConnectionState::Connected);
+
+        // Drain events for up to 30s; expect HeartbeatTimeout, then
+        // Reconnecting.
+        let events = client.events();
+        let mut saw_heartbeat_timeout = false;
+        let mut saw_reconnecting = false;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+        loop {
+            if tokio::time::Instant::now() >= deadline {
+                break;
+            }
+            // Poll with a small budget so we don't hang past the deadline.
+            let event = tokio::task::spawn_blocking({
+                let events = events.clone();
+                move || {
+                    let rx = events.blocking_lock();
+                    rx.recv_timeout(Duration::from_secs(1))
+                }
+            })
+            .await
+            .ok();
+
+            match event {
+                Some(Ok(ConnectionEvent::HeartbeatTimeout { elapsed })) => {
+                    println!("Got HeartbeatTimeout after {:?}", elapsed);
+                    saw_heartbeat_timeout = true;
+                }
+                Some(Ok(ConnectionEvent::Reconnecting { attempt })) => {
+                    println!("Got Reconnecting (attempt {})", attempt);
+                    saw_reconnecting = true;
+                    if saw_heartbeat_timeout {
+                        break;
+                    }
+                }
+                _ => continue,
+            }
+        }
+
+        client.force_close().await.ok();
+
+        assert!(
+            saw_heartbeat_timeout,
+            "Expected HeartbeatTimeout within 30s with 5s heartbeat_timeout against a 30s heartbeat server",
+        );
+        assert!(
+            saw_reconnecting,
+            "Expected Reconnecting event after HeartbeatTimeout (auto-reconnect should kick in)",
+        );
     });
 }
