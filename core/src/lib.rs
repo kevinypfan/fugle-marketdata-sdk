@@ -51,10 +51,12 @@ pub use websocket::{
     ReconnectionConfig, WebSocketClient,
 };
 
-// Re-export WebSocket config constants for binding layers (CON-01)
+// Re-export WebSocket config constants for binding layers (CON-01).
+// 3.0 collapsed `interval × max_missed_pongs` into a single timeout
+// window — bindings that previously exposed both fields now expose
+// just `heartbeat_timeout_ms`.
 pub use websocket::health_check::{
-    DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEALTH_CHECK_INTERVAL_MS,
-    DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS, MIN_HEALTH_CHECK_INTERVAL_MS,
+    DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEARTBEAT_TIMEOUT_MS, MIN_HEARTBEAT_TIMEOUT_MS,
 };
 pub use websocket::reconnection::{
     DEFAULT_INITIAL_DELAY_MS, DEFAULT_MAX_ATTEMPTS, DEFAULT_MAX_DELAY_MS, MIN_INITIAL_DELAY_MS,

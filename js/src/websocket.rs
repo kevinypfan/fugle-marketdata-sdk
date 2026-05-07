@@ -57,16 +57,16 @@ pub struct ReconnectOptions {
 /// - pingInterval: 30000
 /// - maxMissedPongs: 2
 ///
-/// Note: `pingInterval` is named to match the official `@fugle/marketdata` SDK.
+/// Defaults: enabled=true, heartbeatTimeoutMs=35000.
 #[napi(object)]
 #[derive(Debug, Clone, Default)]
 pub struct HealthCheckOptions {
-    /// Whether health check is enabled (default: false)
+    /// Whether liveness detection is active (default: true in 3.0)
     pub enabled: Option<bool>,
-    /// Interval between ping messages in milliseconds (default: 30000, min: 5000)
-    pub ping_interval: Option<f64>,
-    /// Maximum missed pongs before disconnect (default: 2, min: 1)
-    pub max_missed_pongs: Option<f64>,
+    /// Maximum allowed gap between inbound frames before declaring the
+    /// connection dead, in milliseconds. Default 35000 (Fugle server's
+    /// 30s heartbeat + 5s buffer); floor 5000.
+    pub heartbeat_timeout_ms: Option<f64>,
 }
 
 /// REST client options
@@ -223,8 +223,7 @@ impl WebSocketClient {
     pub fn new(options: WebSocketClientOptions) -> napi::Result<Self> {
         use marketdata_core::{
             DEFAULT_MAX_ATTEMPTS, DEFAULT_INITIAL_DELAY_MS, DEFAULT_MAX_DELAY_MS,
-            DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEALTH_CHECK_INTERVAL_MS,
-            DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS,
+            DEFAULT_HEALTH_CHECK_ENABLED, DEFAULT_HEARTBEAT_TIMEOUT_MS,
         };
         use std::time::Duration;
 
@@ -274,14 +273,13 @@ impl WebSocketClient {
         // Build health check config with validation via core
         let health_check_cfg = if let Some(hc) = &options.health_check {
             let enabled = hc.enabled.unwrap_or(DEFAULT_HEALTH_CHECK_ENABLED);
-            let interval = Duration::from_millis(
-                hc.ping_interval.map(|v| v as u64).unwrap_or(DEFAULT_HEALTH_CHECK_INTERVAL_MS)
+            let timeout = Duration::from_millis(
+                hc.heartbeat_timeout_ms.map(|v| v as u64).unwrap_or(DEFAULT_HEARTBEAT_TIMEOUT_MS)
             );
-            let max_missed = hc.max_missed_pongs
-                .map(|v| v as u64)
-                .unwrap_or(DEFAULT_HEALTH_CHECK_MAX_MISSED_PONGS);
-            marketdata_core::HealthCheckConfig::new(enabled, interval, max_missed)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?
+            let mut cfg = marketdata_core::HealthCheckConfig::with_timeout(timeout)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            cfg.enabled = enabled;
+            cfg
         } else {
             marketdata_core::HealthCheckConfig::default()
         };

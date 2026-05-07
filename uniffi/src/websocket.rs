@@ -113,23 +113,21 @@ impl ReconnectConfigRecord {
 /// All fields are optional — zero/false values mean "use default".
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct HealthCheckConfigRecord {
-    /// Whether health check is enabled (default: false)
+    /// Whether liveness detection is active (default: true in 3.0)
     pub enabled: bool,
-    /// Interval between ping messages in milliseconds (default: 30000, min: 5000)
-    pub interval_ms: u64,
-    /// Maximum missed pongs before disconnect (default: 2, min: 1)
-    pub max_missed_pongs: u64,
+    /// Maximum allowed gap between inbound frames before declaring the
+    /// connection dead, in milliseconds. Default 35000; floor 5000.
+    /// Pass 0 to use the default.
+    pub heartbeat_timeout_ms: u64,
 }
 
 impl HealthCheckConfigRecord {
     fn to_core(&self) -> marketdata_core::HealthCheckConfig {
         let mut cfg = marketdata_core::HealthCheckConfig::default();
         cfg.enabled = self.enabled;
-        if self.interval_ms > 0 {
-            cfg.interval = std::time::Duration::from_millis(self.interval_ms);
-        }
-        if self.max_missed_pongs > 0 {
-            cfg.max_missed_pongs = self.max_missed_pongs;
+        if self.heartbeat_timeout_ms > 0 {
+            cfg.heartbeat_timeout =
+                std::time::Duration::from_millis(self.heartbeat_timeout_ms);
         }
         cfg
     }

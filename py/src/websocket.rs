@@ -343,49 +343,53 @@ impl Default for ReconnectConfig {
 #[pyclass]
 #[derive(Clone)]
 pub struct HealthCheckConfig {
-    /// Whether health check is enabled
+    /// Whether liveness detection is active (default: True in 3.0)
     #[pyo3(get)]
     pub enabled: bool,
-    /// Interval between ping messages in milliseconds (named to match the old `fugle-marketdata` SDK)
+    /// Maximum allowed gap between inbound frames before declaring the
+    /// connection dead, in milliseconds. Default 35 000.
     #[pyo3(get)]
-    pub ping_interval: u64,
-    /// Maximum missed pongs before disconnect
-    #[pyo3(get)]
-    pub max_missed_pongs: u64,
+    pub heartbeat_timeout_ms: u64,
 }
 
 #[pymethods]
 impl HealthCheckConfig {
-    /// Create a new health check configuration
+    /// Create a new health check configuration.
     ///
     /// Args:
-    ///     enabled: Whether health check is enabled (default: False)
-    ///     ping_interval: Interval between pings in milliseconds (default: 30000, min: 5000)
-    ///     max_missed_pongs: Max missed pongs before disconnect (default: 2, min: 1)
+    ///     enabled: Whether liveness detection is active (default: True).
+    ///     heartbeat_timeout_ms: Max gap between inbound frames before
+    ///         the connection is declared dead. Default 35 000 ms (Fugle
+    ///         server's 30 s heartbeat + 5 s buffer). Floor is 5 000 ms;
+    ///         values below the live server's heartbeat period (30 s)
+    ///         will cause repeated false disconnects.
     ///
     /// Raises:
-    ///     ValueError: If validation fails (interval < 5000ms or max_missed_pongs == 0)
+    ///     ValueError: If `heartbeat_timeout_ms` < 5 000.
     ///
     /// Example:
     ///     ```python
-    ///     # Default config (disabled)
+    ///     # Default (enabled, 35s timeout)
     ///     config = HealthCheckConfig()
     ///
-    ///     # Enabled with custom settings
-    ///     config = HealthCheckConfig(enabled=True, ping_interval=15000, max_missed_pongs=3)
+    ///     # Tighter detection (only safe once server side supports
+    ///     # negotiated heartbeat interval)
+    ///     config = HealthCheckConfig(heartbeat_timeout_ms=10000)
+    ///
+    ///     # Opt out of liveness detection
+    ///     config = HealthCheckConfig(enabled=False)
     ///     ```
     #[new]
-    #[pyo3(signature = (*, enabled=false, ping_interval=30000, max_missed_pongs=2))]
-    pub fn new(enabled: bool, ping_interval: u64, max_missed_pongs: u64) -> PyResult<Self> {
-        // Validate using core's validation logic (fail fast)
-        let duration = Duration::from_millis(ping_interval);
-        let _ = marketdata_core::HealthCheckConfig::new(enabled, duration, max_missed_pongs)
+    #[pyo3(signature = (*, enabled=true, heartbeat_timeout_ms=35_000))]
+    pub fn new(enabled: bool, heartbeat_timeout_ms: u64) -> PyResult<Self> {
+        // Validate via core even when disabled, for early feedback on bad input.
+        let duration = Duration::from_millis(heartbeat_timeout_ms);
+        let _ = marketdata_core::HealthCheckConfig::with_timeout(duration)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(Self {
             enabled,
-            ping_interval,
-            max_missed_pongs,
+            heartbeat_timeout_ms,
         })
     }
 }
@@ -395,21 +399,20 @@ impl HealthCheckConfig {
     ///
     /// This should not fail since validation already happened in __new__
     pub fn to_core(&self) -> marketdata_core::HealthCheckConfig {
-        marketdata_core::HealthCheckConfig::new(
-            self.enabled,
-            Duration::from_millis(self.ping_interval),
-            self.max_missed_pongs,
+        let mut cfg = marketdata_core::HealthCheckConfig::with_timeout(
+            Duration::from_millis(self.heartbeat_timeout_ms),
         )
-        .expect("Config already validated in constructor")
+        .expect("Config already validated in constructor");
+        cfg.enabled = self.enabled;
+        cfg
     }
 }
 
 impl Default for HealthCheckConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
-            ping_interval: 30000,
-            max_missed_pongs: 2,
+            enabled: true,
+            heartbeat_timeout_ms: 35_000,
         }
     }
 }
