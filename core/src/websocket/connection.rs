@@ -92,12 +92,15 @@ pub struct WebSocketClient {
     write_tx: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
     reconnection: Arc<Mutex<ReconnectionManager>>,
     subscriptions: Arc<SubscriptionManager>,
-    health_check: Arc<HealthCheck>,
+    /// Health check / liveness configuration. The dispatch loop reads
+    /// `heartbeat_timeout` from this and wraps `ws_read.next()` in
+    /// `tokio::time::timeout`; no separate runtime struct or background
+    /// polling task is needed.
+    health_check_config: HealthCheckConfig,
     message_tx: mpsc::Sender<WebSocketMessage>,
     message_receiver: Arc<MessageReceiver>,
     // Internal handles
     dispatch_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    health_check_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
@@ -162,11 +165,10 @@ impl WebSocketClient {
             write_tx: Arc::new(Mutex::new(None)),
             reconnection: Arc::new(Mutex::new(ReconnectionManager::new(reconnection_config))),
             subscriptions: Arc::new(SubscriptionManager::new()),
-            health_check: Arc::new(HealthCheck::new(health_check_config)),
+            health_check_config,
             message_tx,
             message_receiver: Arc::new(MessageReceiver::new(message_rx)),
             dispatch_handle: Arc::new(Mutex::new(None)),
-            health_check_handle: Arc::new(Mutex::new(None)),
             writer_handle: Arc::new(Mutex::new(None)),
         }
     }
@@ -441,11 +443,10 @@ impl WebSocketClient {
                 }
                 let _ = self.event_tx.send(ConnectionEvent::Authenticated);
 
-                // Spawn dispatch task to handle incoming messages (uses read half)
+                // Spawn dispatch task to handle incoming messages (uses read half).
+                // Liveness detection is wrapped inside dispatch_messages itself
+                // (read-site `tokio::time::timeout`); no separate task needed.
                 self.spawn_dispatch_task(ws_read).await;
-
-                // Start health check task if enabled
-                self.start_health_check().await;
 
                 Ok(())
             }
@@ -502,10 +503,10 @@ impl WebSocketClient {
     /// Returns error if sending close frame fails. The client is still
     /// marked as closed even if the close handshake fails.
     pub async fn disconnect(&self) -> Result<(), MarketDataError> {
-        // 1. Stop health check first (prevents false triggers)
-        self.health_check.stop();
-
-        // 2. Cancel dispatch task
+        // 1. Cancel dispatch task. The read-site timeout (configured via
+        //    `health_check_config`) lives inside this task, so aborting
+        //    it also tears down liveness detection — no separate stop
+        //    flag or background-task abort is needed.
         {
             let mut handle = self.dispatch_handle.lock().await;
             if let Some(h) = handle.take() {
@@ -514,16 +515,7 @@ impl WebSocketClient {
             }
         }
 
-        // 3. Cancel health check task
-        {
-            let mut handle = self.health_check_handle.lock().await;
-            if let Some(h) = handle.take() {
-                h.abort();
-                let _ = h.await;
-            }
-        }
-
-        // 4. Drop the write_tx slot and abort the writer task
+        // 2. Drop the write_tx slot and abort the writer task
         {
             let mut tx_guard = self.write_tx.lock().await;
             *tx_guard = None;
@@ -585,20 +577,10 @@ impl WebSocketClient {
     ///
     /// Use when graceful close is not possible or times out.
     pub async fn force_close(&self) -> Result<(), MarketDataError> {
-        // Stop health check
-        self.health_check.stop();
-
-        // Abort dispatch task without waiting
+        // Abort dispatch task without waiting (read-site liveness timeout
+        // tears down with it; no separate health-check task to abort).
         {
             let mut handle = self.dispatch_handle.lock().await;
-            if let Some(h) = handle.take() {
-                h.abort();
-            }
-        }
-
-        // Abort health check task
-        {
-            let mut handle = self.health_check_handle.lock().await;
             if let Some(h) = handle.take() {
                 h.abort();
             }
@@ -986,7 +968,13 @@ impl WebSocketClient {
 
         let message_tx = self.message_tx.clone();
         let event_tx = self.event_tx.clone();
-        let health_check = Arc::clone(&self.health_check);
+
+        // Resolve heartbeat_timeout once: None means liveness disabled.
+        let heartbeat_timeout = if self.health_check_config.enabled {
+            Some(self.health_check_config.heartbeat_timeout)
+        } else {
+            None
+        };
 
         // Clone Arcs needed for auto-reconnect inside spawned task
         let reconnection = Arc::clone(&self.reconnection);
@@ -996,7 +984,6 @@ impl WebSocketClient {
         let write_tx_slot = Arc::clone(&self.write_tx);
         let writer_handle = Arc::clone(&self.writer_handle);
         let subscriptions = Arc::clone(&self.subscriptions);
-        let health_check_handle = Arc::clone(&self.health_check_handle);
 
         let handle = tokio::spawn(async move {
             // Dispatch → reconnect → dispatch loop (avoids recursive async which breaks Send)
@@ -1006,7 +993,7 @@ impl WebSocketClient {
                     current_ws_read,
                     message_tx.clone(),
                     event_tx.clone(),
-                    Arc::clone(&health_check),
+                    heartbeat_timeout,
                     Arc::clone(&subscriptions),
                 )
                 .await;
@@ -1022,8 +1009,6 @@ impl WebSocketClient {
                     Arc::clone(&write_tx_slot),
                     Arc::clone(&writer_handle),
                     Arc::clone(&subscriptions),
-                    Arc::clone(&health_check),
-                    Arc::clone(&health_check_handle),
                     message_tx.clone(),
                 )
                 .await
@@ -1083,29 +1068,6 @@ impl WebSocketClient {
         }
     }
 
-    /// Internal: Start health check monitoring
-    async fn start_health_check(&self) {
-        if !self.health_check.config().enabled {
-            return;
-        }
-
-        // CRITICAL: reset activity timer to "now" before spawning the task.
-        // HealthCheck::new() ran at client construction, possibly long before
-        // connect() was called. Without this touch the first tick would see a
-        // stale age and could false-disconnect immediately.
-        self.health_check.touch();
-
-        let event_tx = self.event_tx.clone();
-        let handle = self.health_check.spawn_check_task(event_tx);
-
-        {
-            let mut guard = self.health_check_handle.lock().await;
-            *guard = Some(handle);
-        }
-
-        self.health_check.resume();
-    }
-
     /// Internal: Automatic reconnection flow (&self version)
     ///
     /// Implements exponential backoff retry logic with subscription restoration.
@@ -1139,10 +1101,10 @@ impl WebSocketClient {
             });
         }
 
-        // Pause health check during reconnection
-        self.health_check.pause();
-
-        // Attempt reconnection with exponential backoff
+        // Attempt reconnection with exponential backoff. Liveness
+        // detection is per-dispatch-task, so reconnecting transparently
+        // restarts it via the new dispatch task — no separate
+        // pause/resume needed.
         loop {
             let delay = {
                 let mut reconnection = self.reconnection.lock().await;
@@ -1174,9 +1136,6 @@ impl WebSocketClient {
                                 let mut reconnection = self.reconnection.lock().await;
                                 reconnection.reset();
                             }
-
-                            // Resume health check after successful reconnection
-                            self.health_check.resume();
 
                             // Resubscribe all
                             let _ = self.resubscribe_all().await;
@@ -1258,8 +1217,6 @@ async fn try_reconnect(
     write_tx_slot: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
     writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     subscriptions: Arc<SubscriptionManager>,
-    health_check: Arc<HealthCheck>,
-    health_check_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     message_tx: mpsc::Sender<WebSocketMessage>,
 ) -> Option<WsStream> {
     // Check if we should attempt reconnection
@@ -1287,10 +1244,10 @@ async fn try_reconnect(
         return None;
     }
 
-    // Pause health check during reconnection
-    health_check.pause();
-
-    // Attempt reconnection with exponential backoff
+    // Attempt reconnection with exponential backoff. Liveness detection
+    // is owned by each dispatch-task instance via the read-site timeout;
+    // a successful reconnect spawns a fresh dispatch task that picks up
+    // a fresh timeout window. No separate pause/resume needed.
     loop {
         let delay = {
             let mut reconnection = reconnection.lock().await;
@@ -1364,20 +1321,11 @@ async fn try_reconnect(
                             }
                         }
 
-                        // Restart health check for the new connection if enabled
-                        if let Some(prev) = health_check_handle.lock().await.take() {
-                            prev.abort();
-                        }
-                        if health_check.config().enabled {
-                            // Reset activity timer before restarting the task.
-                            health_check.touch();
-                            health_check.resume();
-                            let hc_handle =
-                                health_check.spawn_check_task(event_tx.clone());
-                            let mut hch = health_check_handle.lock().await;
-                            *hch = Some(hc_handle);
-                        }
-
+                        // Liveness detection auto-restarts: the caller of
+                        // try_reconnect re-enters the dispatch loop with this
+                        // new ws_read, and dispatch_messages's read-site
+                        // timeout is a fresh `tokio::time::timeout` per loop
+                        // iteration.
                         return Some(ws_read);
                     }
                     Err(_) => {

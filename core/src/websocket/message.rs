@@ -4,7 +4,7 @@
 //! Uses std::sync::mpsc (not tokio channels) for compatibility with non-async FFI consumers.
 
 use crate::models::WebSocketMessage;
-use crate::websocket::{ConnectionEvent, HealthCheck, SubscriptionManager};
+use crate::websocket::{ConnectionEvent, SubscriptionManager};
 use crate::MarketDataError;
 use futures_util::stream::SplitStream;
 use futures_util::StreamExt;
@@ -103,25 +103,59 @@ impl MessageReceiver {
 /// * `ws_read` - The read half of the WebSocket stream
 /// * `message_tx` - Channel to send parsed messages to consumers
 /// * `event_tx` - Channel to send connection events
-/// * `health_check` - Health check manager for pong tracking
+/// * `heartbeat_timeout` - If `Some(d)`, wrap each `ws_read.next()` in
+///   `tokio::time::timeout(d, ...)` and emit
+///   [`ConnectionEvent::HeartbeatTimeout`] when the timer fires. If
+///   `None`, liveness detection is disabled and reads block indefinitely.
+/// * `subscriptions` - Subscription manager for `subscribed` event handling
 ///
 /// # Returns
 ///
-/// Close code from the WebSocket close frame, or None if connection
-/// was dropped without a proper close or due to an error.
+/// Close code from the WebSocket close frame, or None if the connection
+/// was dropped without a proper close, due to an error, or due to
+/// `heartbeat_timeout` firing. The dispatch-task caller treats `None` as
+/// reconnectable per `should_reconnect`'s default arm.
 pub(crate) async fn dispatch_messages(
     mut ws_read: WsStream,
     message_tx: mpsc::Sender<WebSocketMessage>,
     event_tx: mpsc::Sender<ConnectionEvent>,
-    health_check: Arc<HealthCheck>,
+    heartbeat_timeout: Option<Duration>,
     subscriptions: Arc<SubscriptionManager>,
 ) -> Option<u16> {
-    while let Some(msg_result) = ws_read.next().await {
+    loop {
+        // Read-site liveness: if `heartbeat_timeout` is set, the next
+        // frame must arrive within that window or we declare the
+        // connection dead. When None, fall back to a plain blocking
+        // read (no liveness detection).
+        let frame_result = match heartbeat_timeout {
+            Some(timeout) => match tokio::time::timeout(timeout, ws_read.next()).await {
+                Ok(opt) => opt,
+                Err(_elapsed) => {
+                    let _ = event_tx.send(ConnectionEvent::HeartbeatTimeout {
+                        elapsed: timeout,
+                    });
+                    return None;
+                }
+            },
+            None => ws_read.next().await,
+        };
+
+        let msg_result = match frame_result {
+            Some(r) => r,
+            None => {
+                // Stream ended cleanly without close frame.
+                let _ = event_tx.send(ConnectionEvent::Disconnected {
+                    code: None,
+                    reason: "Connection closed".to_string(),
+                });
+                return None;
+            }
+        };
+
         match msg_result {
             Ok(Message::Text(text)) => {
                 match serde_json::from_str::<WebSocketMessage>(&text) {
                     Ok(ws_msg) => {
-                        health_check.touch();
                         // Mutex is only taken when event == "subscribed" (cheap
                         // string compare for every other message).
                         handle_subscribed_event(&subscriptions, &ws_msg);
@@ -140,7 +174,6 @@ pub(crate) async fn dispatch_messages(
             Ok(Message::Binary(data)) => {
                 match serde_json::from_slice::<WebSocketMessage>(&data) {
                     Ok(ws_msg) => {
-                        health_check.touch();
                         handle_subscribed_event(&subscriptions, &ws_msg);
                         if message_tx.send(ws_msg).is_err() {
                             return None;
@@ -155,9 +188,9 @@ pub(crate) async fn dispatch_messages(
                 }
             }
             Ok(Message::Pong(_)) => {
-                // RFC 6455 control-frame pong: count as activity. Fugle
-                // sends pong via JSON message; this branch is defensive.
-                health_check.touch();
+                // RFC 6455 control-frame pong: counted as activity by
+                // virtue of resetting the read-site timeout. Fugle sends
+                // pong via JSON message; this branch is defensive.
             }
             Ok(Message::Close(close_frame)) => {
                 // Server initiated close - RFC 6455 compliant handling
@@ -192,13 +225,6 @@ pub(crate) async fn dispatch_messages(
             }
         }
     }
-
-    // Stream ended without close frame (connection dropped)
-    let _ = event_tx.send(ConnectionEvent::Disconnected {
-        code: None,
-        reason: "Connection closed".to_string(),
-    });
-    None
 }
 
 /// Build the subscription key used by `SubscriptionManager`, mirroring the
