@@ -180,6 +180,34 @@ impl SubscribeRequest {
         req
     }
 
+    /// Expand a batch request into N single-symbol requests.
+    ///
+    /// For wire transmission a batch `SubscribeRequest` is sent as a single
+    /// frame with `symbols: [...]`, but for internal bookkeeping (and
+    /// reconnect replay) each symbol must occupy its own row in
+    /// `SubscriptionManager` so that the server's per-symbol ACK can be
+    /// recorded against a stable local key. This helper materializes the
+    /// expansion; single-symbol requests pass through unchanged.
+    ///
+    /// Modifier flags (`after_hours`, `intraday_odd_lot`) are duplicated to
+    /// every expanded entry — batches always share their modifier flags
+    /// across the symbols they enumerate.
+    pub fn expand(self) -> Vec<SubscribeRequest> {
+        match self.symbols {
+            Some(symbols) => symbols
+                .into_iter()
+                .map(|s| SubscribeRequest {
+                    channel: self.channel.clone(),
+                    symbol: Some(s),
+                    symbols: None,
+                    after_hours: self.after_hours,
+                    intraday_odd_lot: self.intraday_odd_lot,
+                })
+                .collect(),
+            None => vec![self],
+        }
+    }
+
     /// Create a trades channel subscription
     pub fn trades(symbol: impl Into<String>) -> Self {
         Self::new(Channel::Trades, symbol)
@@ -517,6 +545,37 @@ mod tests {
         let json = serde_json::to_value(&req).unwrap();
         assert_eq!(json["symbol"], "2330");
         assert!(json.get("symbols").is_none());
+    }
+
+    #[test]
+    fn expand_batch_into_per_symbol_requests() {
+        let batch = SubscribeRequest::with_symbols(Channel::Aggregates, vec!["A", "B", "C"]);
+        let expanded = batch.expand();
+        assert_eq!(expanded.len(), 3);
+        for (i, sym) in ["A", "B", "C"].iter().enumerate() {
+            assert_eq!(expanded[i].channel, "aggregates");
+            assert_eq!(expanded[i].symbol.as_deref(), Some(*sym));
+            assert!(expanded[i].symbols.is_none());
+        }
+    }
+
+    #[test]
+    fn expand_preserves_modifier_flags_per_entry() {
+        let mut batch = SubscribeRequest::with_symbols(Channel::Trades, ["2330", "2454"]);
+        batch.intraday_odd_lot = Some(true);
+        let expanded = batch.expand();
+        for entry in &expanded {
+            assert_eq!(entry.intraday_odd_lot, Some(true));
+            assert_eq!(entry.key().contains("oddlot"), true);
+        }
+    }
+
+    #[test]
+    fn expand_single_symbol_passes_through() {
+        let single = SubscribeRequest::new(Channel::Trades, "2330");
+        let expanded = single.expand();
+        assert_eq!(expanded.len(), 1);
+        assert_eq!(expanded[0].symbol.as_deref(), Some("2330"));
     }
 
     #[test]
