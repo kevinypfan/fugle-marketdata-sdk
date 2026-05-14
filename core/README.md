@@ -89,11 +89,17 @@ async fn main() -> Result<(), marketdata_core::MarketDataError> {
     client.connect().await?;
     println!("Connected to WebSocket");
 
-    // Subscribe to channels
-    use marketdata_core::websocket::StockSubscription;
-    client.subscribe_channel(StockSubscription::new(Channel::Trades, "2330")).await?;
-    client.subscribe_channel(StockSubscription::new(Channel::Books, "2330")).await?;
-    println!("Subscribed to 2330 trades and books");
+    // Subscribe to channels — single symbol
+    use marketdata_core::websocket::channels::StockSubscription;
+    client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+    client.subscribe(StockSubscription::new(Channel::Books, "2330")).await?;
+
+    // Batch subscribe — one frame, N symbols
+    client.subscribe(StockSubscription::new(
+        Channel::Aggregates,
+        vec!["2330", "0050", "2603"],
+    )).await?;
+    println!("Subscribed to 2330 trades + books and 3-symbol aggregates batch");
 
     // Get message receiver
     let messages = client.messages();

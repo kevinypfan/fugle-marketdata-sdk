@@ -7,7 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [Rust 0.1.0] - TBD
+## [Rust 0.2.0] - TBD
+
+Second Rust crate release — clean-slate subscribe/unsubscribe API and
+async-friendly channel surface.
+
+### Breaking — `WebSocketClient` subscribe/unsubscribe API
+
+Seven older methods are removed without a deprecation cycle (0.1.0 was
+published 2026-05-15 with zero downstream usage):
+
+- `subscribe(req: SubscribeRequest)`
+- `subscribe_channel(sub: StockSubscription)`
+- `subscribe_symbols(channel, &[&str], odd_lot)`
+- `subscribe_futopt_channel(sub: FutOptSubscription)`
+- `unsubscribe(key: &str)`
+- `unsubscribe_channel(sub: &StockSubscription)`
+- `unsubscribe_futopt_channel(sub: &FutOptSubscription)`
+- `unsubscribe_by_id(id: &str)`
+
+Replaced by three methods:
+
+- `subscribe(StockSubscription)` — stock channels
+- `subscribe_futopt(FutOptSubscription)` — FutOpt channels
+- `unsubscribe(impl IntoIterator<Item = impl Into<String>>)` — single id or batch
+
+`StockSubscription` / `FutOptSubscription` schema changes from `symbol: String`
+to `symbols: SymbolSpec`. `StockSubscription::new(channel, symbols)` accepts
+`&str`, `String`, `Vec<String>`, array literals (`["A", "B"]`), and slices via
+`impl Into<SymbolSpec>`.
+
+`SubscribeRequest` is no longer re-exported from `marketdata_core` — it's an
+internal wire type. User code should not construct it directly.
+
+### Added — true batch subscribe / unsubscribe
+
+`StockSubscription::new(Channel::Trades, vec!["A", "B", "C"])` sends one frame
+with `{"symbols": ["A","B","C"]}`, gets one ACK array back, and registers N
+internal rows in `SubscriptionManager` (one local key per symbol). Previously
+each symbol was a separate frame — the Fugle server gateway natively handles
+both wire shapes (`stock.gateway.ts:13` and `futopt.gateway.ts:58`) so the
+batch path is a real 1-frame-in / 1-ACK-out round-trip, not an N-frame loop.
+
+### Added — async-friendly receive APIs
+
+- `WebSocketClient::message_stream() -> tokio::sync::mpsc::Receiver<WebSocketMessage>`
+  for pure-async Rust consumers. Avoids the std-mpsc bridge hop that `messages()`
+  incurs.
+
+Internal `message_tx` switches to `tokio::sync::mpsc::channel(1024)`. The
+existing `messages()` API stays backward-compatible — first call lazily spawns
+a bridge task that drains the tokio channel into a std mpsc for FFI bindings.
+
+`messages()` and `message_stream()` are **mutually exclusive** — each takes
+the receiver; calling the other afterwards panics.
+
+### Changed — event channel bounded with drop semantics
+
+`event_tx` switches from `std::sync::mpsc::channel()` (unbounded) to
+`std::sync::mpsc::sync_channel(1024)`. All event emission goes through the new
+internal `emit_event` helper which uses `try_send` and logs a stderr warning
+on saturation. Saturation drops the **new** event (drop-newest) — drop-oldest
+would require receiver-side access from the sender, which the
+`Arc<Mutex<Receiver>>` public API does not expose without breaking callers.
+
+### Binding changes
+
+- **py / js**: external API unchanged (`subscribe({symbol|symbols})` and
+  `unsubscribe({id|ids})` dicts still accepted). Internally the per-symbol
+  loop is replaced by a single batch call to core, so the wire now sends
+  one frame per `subscribe([...])` call instead of N.
+- **UniFFI** (Java / Go / C#): unchanged in this release — UDL cannot express
+  the generic `IntoIterator` signature. A dedicated batch surface
+  (`subscribe_single` / `subscribe_many`) is planned for 0.3.0.
+
+## [Rust 0.1.0] - 2026-05-15
 
 Initial public release of the Rust SDK on crates.io. Two crates ship together:
 

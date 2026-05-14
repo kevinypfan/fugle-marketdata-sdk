@@ -71,8 +71,20 @@ let config = ConnectionConfig::fugle_stock(
 let client = WebSocketClient::new(config);
 
 client.connect().await?;
-client.subscribe_channel(StockSubscription::new(Channel::Trades, "2330")).await?;
-client.subscribe_channel(StockSubscription::new(Channel::Books, "2330")).await?;
+
+// Single symbol
+client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+
+// Batch — one frame subscribes N symbols
+client.subscribe(StockSubscription::new(
+    Channel::Aggregates,
+    vec!["2330", "0050", "2603"],
+)).await?;
+
+// Odd-lot session: builder modifier applies to every symbol
+client.subscribe(
+    StockSubscription::new(Channel::Trades, "2330").with_odd_lot(true)
+).await?;
 
 let messages = client.messages();
 for _ in 0..10 {
@@ -87,10 +99,34 @@ for _ in 0..10 {
     }
 }
 
+// Unsubscribe by server id(s) — accepts a single id or a batch.
+client.unsubscribe(["server-id-1", "server-id-2"]).await?;
+
 client.disconnect().await?;
 # Ok(())
 # }
 ```
+
+#### Pure-async consumers
+
+Prefer `message_stream()` over `messages()` to skip the std-mpsc bridge hop:
+
+```rust,no_run
+# use fugle_marketdata::{WebSocketClient, websocket::ConnectionConfig, AuthRequest};
+# async fn run(client: WebSocketClient) -> Result<(), fugle_marketdata::MarketDataError> {
+let mut stream = client.message_stream();
+while let Some(msg) = stream.recv().await {
+    if msg.is_data() {
+        println!("Data: {:?} - {:?}", msg.channel, msg.symbol);
+    }
+}
+# Ok(())
+# }
+```
+
+`messages()` and `message_stream()` are mutually exclusive — each takes
+ownership of the underlying tokio receiver; calling the other afterwards
+will panic. Pick one based on consumer style.
 
 ## Authentication
 
@@ -151,6 +187,33 @@ let health = HealthCheckConfig::with_timeout(Duration::from_secs(45))?;
 // times out the underlying TCP, typically hours later)
 let health = HealthCheckConfig::disabled();
 # drop(health);
+# Ok(())
+# }
+```
+
+### Full Configuration
+
+For complete control over connection, reconnection, and health-check
+parameters, use `WebSocketClient::with_full_config`:
+
+```rust,no_run
+use fugle_marketdata::{
+    AuthRequest, WebSocketClient,
+    websocket::{ConnectionConfig, HealthCheckConfig, ReconnectionConfig},
+};
+use std::time::Duration;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let auth = AuthRequest::with_api_key("your-api-key");
+let connection = ConnectionConfig::fugle_stock(auth);
+let reconnect = ReconnectionConfig::new(
+    10,
+    Duration::from_secs(2),
+    Duration::from_secs(120),
+)?;
+let health = HealthCheckConfig::with_timeout(Duration::from_secs(45))?;
+let client = WebSocketClient::with_full_config(connection, reconnect, health);
+# drop(client);
 # Ok(())
 # }
 ```
