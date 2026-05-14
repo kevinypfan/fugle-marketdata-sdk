@@ -32,6 +32,29 @@ type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
 /// Type alias for WebSocket read half
 type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
+/// Emit a [`ConnectionEvent`] on the bounded event channel.
+///
+/// The channel is `std::sync::mpsc::sync_channel(1024)`. We use `try_send`
+/// here so that a stuck consumer can never block the connection task. On
+/// saturation we drop the new event and surface a `stderr` warning so an
+/// operator can detect the wedge.
+///
+/// We accept *drop-newest* over the theoretically nicer drop-oldest because
+/// `std::sync::mpsc` does not expose receiver-side access to the sender, and
+/// switching to a primitive that does (e.g. `tokio::sync::broadcast`) would
+/// break the public `events()` / `state_events()` API shape that the binding
+/// crates depend on. The cap of 1024 is large enough that saturation is
+/// itself the bug signal — a healthy consumer never approaches it.
+pub(crate) fn emit_event(tx: &mpsc::SyncSender<ConnectionEvent>, event: ConnectionEvent) {
+    if let Err(mpsc::TrySendError::Full(dropped)) = tx.try_send(event) {
+        eprintln!(
+            "[fugle-marketdata-core] event channel saturated (cap=1024); \
+             dropped {:?}. Consumer is likely stuck.",
+            dropped
+        );
+    }
+}
+
 /// WebSocket connection state machine
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConnectionState {
@@ -79,7 +102,7 @@ pub enum ConnectionEvent {
 pub struct WebSocketClient {
     config: ConnectionConfig,
     state: Arc<RwLock<ConnectionState>>,
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    event_tx: mpsc::SyncSender<ConnectionEvent>,
     event_rx: Arc<Mutex<mpsc::Receiver<ConnectionEvent>>>,
     /// Write half of the WebSocket stream (held by the writer task during
     /// normal operation; close/force_close paths may also touch it).
@@ -160,7 +183,7 @@ impl WebSocketClient {
         reconnection_config: ReconnectionConfig,
         health_check_config: HealthCheckConfig,
     ) -> Self {
-        let (event_tx, event_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::sync_channel(1024);
         let (message_tx, message_rx) = tokio_mpsc::channel(1024);
 
         Self {
@@ -390,7 +413,7 @@ impl WebSocketClient {
             let mut state = self.state.write().await;
             *state = ConnectionState::Connecting;
         }
-        let _ = self.event_tx.send(ConnectionEvent::Connecting);
+        emit_event(&self.event_tx, ConnectionEvent::Connecting);
 
         // Connect to WebSocket (with optional TLS customization).
         let tls_connector = tls_connector_for(&self.config)?;
@@ -408,7 +431,7 @@ impl WebSocketClient {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Disconnected;
                 }
-                let _ = self.event_tx.send(ConnectionEvent::Error {
+                emit_event(&self.event_tx, ConnectionEvent::Error {
                     message: err.to_string(),
                     code: err.to_error_code(),
                 });
@@ -422,7 +445,7 @@ impl WebSocketClient {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Disconnected;
                 }
-                let _ = self.event_tx.send(ConnectionEvent::Error {
+                emit_event(&self.event_tx, ConnectionEvent::Error {
                     message: err.to_string(),
                     code: err.to_error_code(),
                 });
@@ -433,7 +456,7 @@ impl WebSocketClient {
         // Split the stream into read/write halves
         let (mut ws_sink, mut ws_read) = ws_stream.split();
 
-        let _ = self.event_tx.send(ConnectionEvent::Connected);
+        emit_event(&self.event_tx, ConnectionEvent::Connected);
 
         // Update state to Authenticating
         {
@@ -505,7 +528,7 @@ impl WebSocketClient {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Connected;
                 }
-                let _ = self.event_tx.send(ConnectionEvent::Authenticated);
+                emit_event(&self.event_tx, ConnectionEvent::Authenticated);
 
                 // Spawn dispatch task to handle incoming messages (uses read half).
                 // Liveness detection is wrapped inside dispatch_messages itself
@@ -523,11 +546,11 @@ impl WebSocketClient {
                 // listeners on `unauthenticated` keep working. Other failures
                 // (network, parse, etc.) still go through the generic Error event.
                 if let MarketDataError::AuthError { msg } = &e {
-                    let _ = self.event_tx.send(ConnectionEvent::Unauthenticated {
+                    emit_event(&self.event_tx, ConnectionEvent::Unauthenticated {
                         message: msg.clone(),
                     });
                 } else {
-                    let _ = self.event_tx.send(ConnectionEvent::Error {
+                    emit_event(&self.event_tx, ConnectionEvent::Error {
                         message: e.to_string(),
                         code: e.to_error_code(),
                     });
@@ -542,7 +565,7 @@ impl WebSocketClient {
                     let mut state = self.state.write().await;
                     *state = ConnectionState::Disconnected;
                 }
-                let _ = self.event_tx.send(ConnectionEvent::Error {
+                emit_event(&self.event_tx, ConnectionEvent::Error {
                     message: err.to_string(),
                     code: err.to_error_code(),
                 });
@@ -605,7 +628,7 @@ impl WebSocketClient {
         }
 
         // 7. Send Disconnected event
-        let _ = self.event_tx.send(ConnectionEvent::Disconnected {
+        emit_event(&self.event_tx, ConnectionEvent::Disconnected {
             code: Some(1000),
             reason: "Normal closure".to_string(),
         });
@@ -677,7 +700,7 @@ impl WebSocketClient {
             };
         }
 
-        let _ = self.event_tx.send(ConnectionEvent::Disconnected {
+        emit_event(&self.event_tx, ConnectionEvent::Disconnected {
             code: Some(1006),
             reason: "Force closed".to_string(),
         });
@@ -1159,7 +1182,7 @@ impl WebSocketClient {
                 reconnection.current_attempt()
             };
 
-            let _ = self.event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+            emit_event(&self.event_tx, ConnectionEvent::ReconnectFailed { attempts });
             return Err(MarketDataError::ConnectionError {
                 msg: format!("Non-retriable close code: {:?}", close_code),
             });
@@ -1187,7 +1210,7 @@ impl WebSocketClient {
                         let mut state = self.state.write().await;
                         *state = ConnectionState::Reconnecting { attempt };
                     }
-                    let _ = self.event_tx.send(ConnectionEvent::Reconnecting { attempt });
+                    emit_event(&self.event_tx, ConnectionEvent::Reconnecting { attempt });
 
                     // Wait before reconnecting
                     sleep(d).await;
@@ -1227,7 +1250,7 @@ impl WebSocketClient {
                         reconnection.current_attempt()
                     };
 
-                    let _ = self.event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+                    emit_event(&self.event_tx, ConnectionEvent::ReconnectFailed { attempts });
 
                     return Err(MarketDataError::ConnectionError {
                         msg: "Max reconnection attempts reached".to_string(),
@@ -1244,7 +1267,7 @@ impl WebSocketClient {
 async fn run_writer_task(
     mut rx: tokio_mpsc::Receiver<String>,
     ws_sink: Arc<Mutex<Option<WsSink>>>,
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    event_tx: mpsc::SyncSender<ConnectionEvent>,
 ) {
     while let Some(text) = rx.recv().await {
         let mut sink_guard = ws_sink.lock().await;
@@ -1254,7 +1277,7 @@ async fn run_writer_task(
         };
         if let Err(e) = sink.send(Message::Text(text.into())).await {
             let err: MarketDataError = e.into();
-            let _ = event_tx.send(ConnectionEvent::Error {
+            emit_event(&event_tx, ConnectionEvent::Error {
                 message: format!("Writer error: {}", err),
                 code: err.to_error_code(),
             });
@@ -1276,7 +1299,7 @@ async fn try_reconnect(
     reconnection: Arc<Mutex<ReconnectionManager>>,
     config: ConnectionConfig,
     state: Arc<RwLock<ConnectionState>>,
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    event_tx: mpsc::SyncSender<ConnectionEvent>,
     ws_sink: Arc<Mutex<Option<WsSink>>>,
     write_tx_slot: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
     writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
@@ -1304,7 +1327,7 @@ async fn try_reconnect(
             reconnection.current_attempt()
         };
 
-        let _ = event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+        emit_event(&event_tx, ConnectionEvent::ReconnectFailed { attempts });
         return None;
     }
 
@@ -1330,7 +1353,7 @@ async fn try_reconnect(
                     let mut st = state.write().await;
                     *st = ConnectionState::Reconnecting { attempt };
                 }
-                let _ = event_tx.send(ConnectionEvent::Reconnecting { attempt });
+                emit_event(&event_tx, ConnectionEvent::Reconnecting { attempt });
 
                 // Wait before reconnecting
                 sleep(d).await;
@@ -1413,7 +1436,7 @@ async fn try_reconnect(
                     reconnection.current_attempt()
                 };
 
-                let _ = event_tx.send(ConnectionEvent::ReconnectFailed { attempts });
+                emit_event(&event_tx, ConnectionEvent::ReconnectFailed { attempts });
 
                 return None;
             }
@@ -1428,7 +1451,7 @@ async fn try_reconnect(
 async fn try_connect(
     config: ConnectionConfig,
     state: Arc<RwLock<ConnectionState>>,
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    event_tx: mpsc::SyncSender<ConnectionEvent>,
     message_tx: tokio_mpsc::Sender<WebSocketMessage>,
 ) -> Result<(WsSink, WsStream), MarketDataError> {
     // Update state to Connecting
@@ -1436,7 +1459,7 @@ async fn try_connect(
         let mut st = state.write().await;
         *st = ConnectionState::Connecting;
     }
-    let _ = event_tx.send(ConnectionEvent::Connecting);
+    emit_event(&event_tx, ConnectionEvent::Connecting);
 
     // Connect to WebSocket
     let tls_connector = tls_connector_for(&config)?;
@@ -1470,7 +1493,7 @@ async fn try_connect(
     // Split the stream
     let (mut new_ws_sink, mut ws_read) = ws_stream.split();
 
-    let _ = event_tx.send(ConnectionEvent::Connected);
+    emit_event(&event_tx, ConnectionEvent::Connected);
 
     // Authenticate
     {
@@ -1524,7 +1547,7 @@ async fn try_connect(
                 let mut st = state.write().await;
                 *st = ConnectionState::Connected;
             }
-            let _ = event_tx.send(ConnectionEvent::Authenticated);
+            emit_event(&event_tx, ConnectionEvent::Authenticated);
             Ok((new_ws_sink, ws_read))
         }
         Ok(Err(e)) => {
@@ -1534,7 +1557,7 @@ async fn try_connect(
             }
             // Same auth-vs-other split as the primary connect() flow
             if let MarketDataError::AuthError { msg } = &e {
-                let _ = event_tx.send(ConnectionEvent::Unauthenticated {
+                emit_event(&event_tx, ConnectionEvent::Unauthenticated {
                     message: msg.clone(),
                 });
             }
@@ -1981,6 +2004,23 @@ mod tests {
 
         // Without a runtime, is_closed_sync should return false
         assert!(!client.is_closed_sync());
+    }
+
+    #[test]
+    fn emit_event_drops_when_channel_full() {
+        // Saturate a tiny bounded channel and verify emit_event drops the
+        // overflow silently instead of panicking or blocking.
+        let (tx, rx) = mpsc::sync_channel::<ConnectionEvent>(2);
+        emit_event(&tx, ConnectionEvent::Connecting);
+        emit_event(&tx, ConnectionEvent::Connected);
+
+        // 3rd send would block on plain `send`; emit_event must drop instead.
+        emit_event(&tx, ConnectionEvent::Authenticated);
+
+        // First two queued; third dropped at the sender.
+        assert!(matches!(rx.recv(), Ok(ConnectionEvent::Connecting)));
+        assert!(matches!(rx.recv(), Ok(ConnectionEvent::Connected)));
+        assert!(rx.try_recv().is_err(), "third event must have been dropped");
     }
 
     #[tokio::test]

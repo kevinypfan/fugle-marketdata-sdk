@@ -4,6 +4,7 @@
 //! Uses std::sync::mpsc (not tokio channels) for compatibility with non-async FFI consumers.
 
 use crate::models::WebSocketMessage;
+use crate::websocket::connection::emit_event;
 use crate::websocket::{ConnectionEvent, SubscriptionManager};
 use crate::MarketDataError;
 use futures_util::stream::SplitStream;
@@ -119,7 +120,7 @@ impl MessageReceiver {
 pub(crate) async fn dispatch_messages(
     mut ws_read: WsStream,
     message_tx: tokio_mpsc::Sender<WebSocketMessage>,
-    event_tx: mpsc::Sender<ConnectionEvent>,
+    event_tx: mpsc::SyncSender<ConnectionEvent>,
     heartbeat_timeout: Option<Duration>,
     subscriptions: Arc<SubscriptionManager>,
 ) -> Option<u16> {
@@ -132,7 +133,7 @@ pub(crate) async fn dispatch_messages(
             Some(timeout) => match tokio::time::timeout(timeout, ws_read.next()).await {
                 Ok(opt) => opt,
                 Err(_elapsed) => {
-                    let _ = event_tx.send(ConnectionEvent::HeartbeatTimeout {
+                    emit_event(&event_tx, ConnectionEvent::HeartbeatTimeout {
                         elapsed: timeout,
                     });
                     return None;
@@ -145,7 +146,7 @@ pub(crate) async fn dispatch_messages(
             Some(r) => r,
             None => {
                 // Stream ended cleanly without close frame.
-                let _ = event_tx.send(ConnectionEvent::Disconnected {
+                emit_event(&event_tx, ConnectionEvent::Disconnected {
                     code: None,
                     reason: "Connection closed".to_string(),
                 });
@@ -165,7 +166,7 @@ pub(crate) async fn dispatch_messages(
                         }
                     }
                     Err(e) => {
-                        let _ = event_tx.send(ConnectionEvent::Error {
+                        emit_event(&event_tx, ConnectionEvent::Error {
                             message: format!("Failed to deserialize message: {}", e),
                             code: 2003,
                         });
@@ -181,7 +182,7 @@ pub(crate) async fn dispatch_messages(
                         }
                     }
                     Err(e) => {
-                        let _ = event_tx.send(ConnectionEvent::Error {
+                        emit_event(&event_tx, ConnectionEvent::Error {
                             message: format!("Failed to deserialize binary message: {}", e),
                             code: 2003,
                         });
@@ -202,7 +203,7 @@ pub(crate) async fn dispatch_messages(
                     .unwrap_or_else(|| "Server initiated close".to_string());
 
                 // Send disconnected event with close details
-                let _ = event_tx.send(ConnectionEvent::Disconnected {
+                emit_event(&event_tx, ConnectionEvent::Disconnected {
                     code,
                     reason,
                 });
@@ -215,7 +216,7 @@ pub(crate) async fn dispatch_messages(
             }
             Err(e) => {
                 // WebSocket error - connection likely broken
-                let _ = event_tx.send(ConnectionEvent::Error {
+                emit_event(&event_tx, ConnectionEvent::Error {
                     message: format!("WebSocket error: {}", e),
                     code: 2001,
                 });
