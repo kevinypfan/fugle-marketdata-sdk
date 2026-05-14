@@ -76,7 +76,6 @@ pub enum ConnectionEvent {
 }
 
 /// WebSocket client for real-time market data
-#[allow(clippy::arc_with_non_send_sync)] // MessageReceiver uses std::sync::mpsc for FFI compatibility
 pub struct WebSocketClient {
     config: ConnectionConfig,
     state: Arc<RwLock<ConnectionState>>,
@@ -97,8 +96,17 @@ pub struct WebSocketClient {
     /// `tokio::time::timeout`; no separate runtime struct or background
     /// polling task is needed.
     health_check_config: HealthCheckConfig,
-    message_tx: mpsc::Sender<WebSocketMessage>,
-    message_receiver: Arc<MessageReceiver>,
+    /// Inbound message channel (tokio mpsc). Producer side handed to
+    /// `dispatch_messages` and auth handshake; consumer side is taken
+    /// either by `messages()` (lazily spawns bridge to std mpsc for FFI)
+    /// or by `message_stream()` (returns the tokio receiver directly).
+    /// The two consumers are mutually exclusive — see method docs.
+    message_tx: tokio_mpsc::Sender<WebSocketMessage>,
+    message_rx: Arc<std::sync::Mutex<Option<tokio_mpsc::Receiver<WebSocketMessage>>>>,
+    /// Cached `MessageReceiver` for FFI consumers. Initialized lazily on
+    /// first `messages()` call, when we spawn the bridge task that drains
+    /// the tokio receiver into a `std::sync::mpsc::Sender`.
+    message_receiver: Arc<std::sync::Mutex<Option<Arc<MessageReceiver>>>>,
     // Internal handles
     dispatch_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
@@ -147,14 +155,13 @@ impl WebSocketClient {
     }
 
     /// Create a new WebSocket client with full custom config
-    #[allow(clippy::arc_with_non_send_sync)] // MessageReceiver uses std::sync::mpsc for FFI compatibility
     pub fn with_full_config(
         config: ConnectionConfig,
         reconnection_config: ReconnectionConfig,
         health_check_config: HealthCheckConfig,
     ) -> Self {
         let (event_tx, event_rx) = mpsc::channel();
-        let (message_tx, message_rx) = mpsc::channel();
+        let (message_tx, message_rx) = tokio_mpsc::channel(1024);
 
         Self {
             config,
@@ -167,7 +174,8 @@ impl WebSocketClient {
             subscriptions: Arc::new(SubscriptionManager::new()),
             health_check_config,
             message_tx,
-            message_receiver: Arc::new(MessageReceiver::new(message_rx)),
+            message_rx: Arc::new(std::sync::Mutex::new(Some(message_rx))),
+            message_receiver: Arc::new(std::sync::Mutex::new(None)),
             dispatch_handle: Arc::new(Mutex::new(None)),
             writer_handle: Arc::new(Mutex::new(None)),
         }
@@ -300,10 +308,66 @@ impl WebSocketClient {
 
     /// Get reference to message receiver for FFI consumers
     ///
-    /// Returns MessageReceiver with blocking API suitable for FFI bindings
-    #[allow(clippy::arc_with_non_send_sync)] // MessageReceiver uses std::sync::mpsc for FFI compatibility
+    /// Returns a blocking-API receiver suitable for FFI bindings (PyO3, napi,
+    /// UniFFI). Internally the SDK uses a tokio mpsc channel; the first call
+    /// to this method spawns a lightweight bridge task that drains the tokio
+    /// receiver into a `std::sync::mpsc::Sender`. Subsequent calls return the
+    /// same cached `Arc<MessageReceiver>`.
+    ///
+    /// **Mutually exclusive with [`message_stream`]**: only one of the two
+    /// methods may take ownership of the underlying tokio receiver. Calling
+    /// `messages()` after `message_stream()` (or vice versa) will panic with
+    /// a descriptive message.
+    ///
+    /// Pure-async Rust callers should prefer [`message_stream`] to avoid the
+    /// std-mpsc bridge hop.
+    ///
+    /// [`message_stream`]: Self::message_stream
     pub fn messages(&self) -> Arc<MessageReceiver> {
-        Arc::clone(&self.message_receiver)
+        let mut slot = self.message_receiver.lock().expect("message_receiver poisoned");
+        if let Some(rx) = slot.as_ref() {
+            return Arc::clone(rx);
+        }
+        let tokio_rx = self
+            .message_rx
+            .lock()
+            .expect("message_rx poisoned")
+            .take()
+            .expect("message_stream() already consumed the message receiver");
+        let (std_tx, std_rx) = mpsc::channel();
+        tokio::spawn(async move {
+            let mut rx = tokio_rx;
+            while let Some(msg) = rx.recv().await {
+                if std_tx.send(msg).is_err() {
+                    break;
+                }
+            }
+        });
+        let receiver = Arc::new(MessageReceiver::new(std_rx));
+        *slot = Some(Arc::clone(&receiver));
+        receiver
+    }
+
+    /// Get the async message stream for pure-Rust async consumers.
+    ///
+    /// Returns the underlying tokio mpsc receiver, allowing direct `.recv().await`
+    /// or use with `tokio_stream::wrappers::ReceiverStream` for `Stream`-based
+    /// processing. Avoids the std-mpsc bridge hop that [`messages`] incurs.
+    ///
+    /// **Mutually exclusive with [`messages`]**: takes ownership of the
+    /// receiver; can only be called once per client and panics if [`messages`]
+    /// has already been called (or this method called twice).
+    ///
+    /// [`messages`]: Self::messages
+    pub fn message_stream(&self) -> tokio_mpsc::Receiver<WebSocketMessage> {
+        self.message_rx
+            .lock()
+            .expect("message_rx poisoned")
+            .take()
+            .expect(
+                "message receiver already taken — `messages()` or `message_stream()` may only be \
+                 called once between them",
+            )
     }
 
     /// Connect to WebSocket server and authenticate
@@ -399,7 +463,7 @@ impl WebSocketClient {
                             serde_json::from_str::<WebSocketMessage>(&text)
                         {
                             // Forward ALL messages to channel (including auth)
-                            let _ = message_tx.send(ws_msg.clone());
+                            let _ = message_tx.send(ws_msg.clone()).await;
 
                             if ws_msg.is_authenticated() {
                                 return Ok(());
@@ -1217,7 +1281,7 @@ async fn try_reconnect(
     write_tx_slot: Arc<Mutex<Option<tokio_mpsc::Sender<String>>>>,
     writer_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
     subscriptions: Arc<SubscriptionManager>,
-    message_tx: mpsc::Sender<WebSocketMessage>,
+    message_tx: tokio_mpsc::Sender<WebSocketMessage>,
 ) -> Option<WsStream> {
     // Check if we should attempt reconnection
     let should_reconnect = {
@@ -1365,7 +1429,7 @@ async fn try_connect(
     config: ConnectionConfig,
     state: Arc<RwLock<ConnectionState>>,
     event_tx: mpsc::Sender<ConnectionEvent>,
-    message_tx: mpsc::Sender<WebSocketMessage>,
+    message_tx: tokio_mpsc::Sender<WebSocketMessage>,
 ) -> Result<(WsSink, WsStream), MarketDataError> {
     // Update state to Connecting
     {
@@ -1431,7 +1495,7 @@ async fn try_connect(
             match msg_result {
                 Ok(Message::Text(text)) => {
                     if let Ok(ws_msg) = serde_json::from_str::<WebSocketMessage>(&text) {
-                        let _ = msg_tx.send(ws_msg.clone());
+                        let _ = msg_tx.send(ws_msg.clone()).await;
                         if ws_msg.is_authenticated() {
                             return Ok(());
                         }
@@ -1917,6 +1981,40 @@ mod tests {
 
         // Without a runtime, is_closed_sync should return false
         assert!(!client.is_closed_sync());
+    }
+
+    #[tokio::test]
+    async fn messages_is_idempotent_and_blocks_message_stream() {
+        let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("k"));
+        let client = WebSocketClient::new(config);
+
+        let r1 = client.messages();
+        let r2 = client.messages();
+        assert!(Arc::ptr_eq(&r1, &r2), "messages() must return the cached Arc");
+
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            client.message_stream()
+        }));
+        assert!(
+            panicked.is_err(),
+            "message_stream() must panic after messages() has taken ownership"
+        );
+    }
+
+    #[tokio::test]
+    async fn message_stream_blocks_messages() {
+        let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("k"));
+        let client = WebSocketClient::new(config);
+
+        let _stream = client.message_stream();
+
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            client.messages()
+        }));
+        assert!(
+            panicked.is_err(),
+            "messages() must panic after message_stream() has taken ownership"
+        );
     }
 }
 

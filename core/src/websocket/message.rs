@@ -12,6 +12,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -117,7 +118,7 @@ impl MessageReceiver {
 /// reconnectable per `should_reconnect`'s default arm.
 pub(crate) async fn dispatch_messages(
     mut ws_read: WsStream,
-    message_tx: mpsc::Sender<WebSocketMessage>,
+    message_tx: tokio_mpsc::Sender<WebSocketMessage>,
     event_tx: mpsc::Sender<ConnectionEvent>,
     heartbeat_timeout: Option<Duration>,
     subscriptions: Arc<SubscriptionManager>,
@@ -159,7 +160,7 @@ pub(crate) async fn dispatch_messages(
                         // Mutex is only taken when event == "subscribed" (cheap
                         // string compare for every other message).
                         handle_subscribed_event(&subscriptions, &ws_msg);
-                        if message_tx.send(ws_msg).is_err() {
+                        if message_tx.send(ws_msg).await.is_err() {
                             return None;
                         }
                     }
@@ -175,7 +176,7 @@ pub(crate) async fn dispatch_messages(
                 match serde_json::from_slice::<WebSocketMessage>(&data) {
                     Ok(ws_msg) => {
                         handle_subscribed_event(&subscriptions, &ws_msg);
-                        if message_tx.send(ws_msg).is_err() {
+                        if message_tx.send(ws_msg).await.is_err() {
                             return None;
                         }
                     }
