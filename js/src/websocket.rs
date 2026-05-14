@@ -121,8 +121,8 @@ pub struct WebSocketClientOptions {
 /// Command sent to WebSocket worker thread
 #[derive(Debug)]
 enum WsCommand {
-    Subscribe { channel: String, symbol: String, extra: Option<bool> },
-    Unsubscribe { id: String },
+    Subscribe { channel: String, symbols: Vec<String>, extra: Option<bool> },
+    Unsubscribe { ids: Vec<String> },
     /// Send a `ping` frame (mirrors old fugle-marketdata SDK's `ping()`)
     Ping { state: Option<String> },
     /// Ask the server for its current subscription list (response arrives via `message`)
@@ -606,7 +606,7 @@ impl StockWebSocketClient {
                 loop {
                     // Check for commands (non-blocking)
                     match cmd_rx.try_recv() {
-                        Ok(WsCommand::Subscribe { channel, symbol, extra }) => {
+                        Ok(WsCommand::Subscribe { channel, symbols, extra }) => {
                             let channel_enum = match channel.to_lowercase().as_str() {
                                 "trades" => Channel::Trades,
                                 "candles" => Channel::Candles,
@@ -616,11 +616,11 @@ impl StockWebSocketClient {
                                 _ => continue,
                             };
                             let odd_lot = extra.unwrap_or(false);
-                            let sub = StockSubscription::new(channel_enum, &symbol).with_odd_lot(odd_lot);
-                            let _ = rt.block_on(client.subscribe_channel(sub));
+                            let sub = StockSubscription::new(channel_enum, symbols).with_odd_lot(odd_lot);
+                            let _ = rt.block_on(client.subscribe(sub));
                         }
-                        Ok(WsCommand::Unsubscribe { id }) => {
-                            let _ = rt.block_on(client.unsubscribe_by_id(&id));
+                        Ok(WsCommand::Unsubscribe { ids }) => {
+                            let _ = rt.block_on(client.unsubscribe(ids));
                         }
                         Ok(WsCommand::Ping { state }) => {
                             let request = marketdata_core::WebSocketRequest::ping(state);
@@ -733,14 +733,12 @@ impl StockWebSocketClient {
             napi::Error::from_reason("Not connected. Call connect() first.")
         })?;
 
-        for sym in target_symbols {
-            tx.send(WsCommand::Subscribe {
-                channel: channel_str.to_string(),
-                symbol: sym,
-                extra: odd_lot,
-            })
-            .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
-        }
+        tx.send(WsCommand::Subscribe {
+            channel: channel_str.to_string(),
+            symbols: target_symbols,
+            extra: odd_lot,
+        })
+        .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
 
         Ok(())
     }
@@ -795,10 +793,8 @@ impl StockWebSocketClient {
             napi::Error::from_reason("Not connected. Call connect() first.")
         })?;
 
-        for id in target_ids {
-            tx.send(WsCommand::Unsubscribe { id })
-                .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
-        }
+        tx.send(WsCommand::Unsubscribe { ids: target_ids })
+            .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
 
         Ok(())
     }
@@ -1099,7 +1095,7 @@ impl FutOptWebSocketClient {
                 loop {
                     // Check for commands (non-blocking)
                     match cmd_rx.try_recv() {
-                        Ok(WsCommand::Subscribe { channel, symbol, extra }) => {
+                        Ok(WsCommand::Subscribe { channel, symbols, extra }) => {
                             let channel_enum = match channel.to_lowercase().as_str() {
                                 "trades" => FutOptChannel::Trades,
                                 "candles" => FutOptChannel::Candles,
@@ -1108,18 +1104,11 @@ impl FutOptWebSocketClient {
                                 _ => continue,
                             };
                             let after_hours = extra.unwrap_or(false);
-                            let sub = FutOptSubscription::new(channel_enum, &symbol).with_after_hours(after_hours);
-
-                            // Build subscribe request and send
-                            let request = sub.to_subscribe_request();
-                            if let Ok(request_str) = serde_json::to_string(&request) {
-                                if let Ok(ws_req) = serde_json::from_str::<marketdata_core::models::WebSocketRequest>(&request_str) {
-                                    let _ = rt.block_on(client.send(ws_req));
-                                }
-                            }
+                            let sub = FutOptSubscription::new(channel_enum, symbols).with_after_hours(after_hours);
+                            let _ = rt.block_on(client.subscribe_futopt(sub));
                         }
-                        Ok(WsCommand::Unsubscribe { id }) => {
-                            let _ = rt.block_on(client.unsubscribe_by_id(&id));
+                        Ok(WsCommand::Unsubscribe { ids }) => {
+                            let _ = rt.block_on(client.unsubscribe(ids));
                         }
                         Ok(WsCommand::Ping { state }) => {
                             let request = marketdata_core::WebSocketRequest::ping(state);
@@ -1229,14 +1218,12 @@ impl FutOptWebSocketClient {
             napi::Error::from_reason("Not connected. Call connect() first.")
         })?;
 
-        for sym in target_symbols {
-            tx.send(WsCommand::Subscribe {
-                channel: channel_str.to_string(),
-                symbol: sym,
-                extra: after_hours,
-            })
-            .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
-        }
+        tx.send(WsCommand::Subscribe {
+            channel: channel_str.to_string(),
+            symbols: target_symbols,
+            extra: after_hours,
+        })
+        .map_err(|_| napi::Error::from_reason("Failed to send subscribe command"))?;
 
         Ok(())
     }
@@ -1288,10 +1275,8 @@ impl FutOptWebSocketClient {
             napi::Error::from_reason("Not connected. Call connect() first.")
         })?;
 
-        for id in target_ids {
-            tx.send(WsCommand::Unsubscribe { id })
-                .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
-        }
+        tx.send(WsCommand::Unsubscribe { ids: target_ids })
+            .map_err(|_| napi::Error::from_reason("Failed to send unsubscribe command"))?;
 
         Ok(())
     }

@@ -714,73 +714,154 @@ impl WebSocketClient {
         matches!(*state, ConnectionState::Connected)
     }
 
-    /// Subscribe to a channel
+    /// Subscribe to a stock streaming channel.
     ///
-    /// Adds subscription to state immediately. If connected, sends subscribe
-    /// message to server. If disconnected, stores for reconnection.
+    /// Accepts a [`StockSubscription`] carrying single or batch symbols and
+    /// optional `intraday_odd_lot` modifier. On the wire the request is sent
+    /// as one frame (`{channel, symbol, ...}` for single,
+    /// `{channel, symbols: [...], ...}` for batch). Internally, batch
+    /// subscriptions are expanded to N per-symbol rows so each symbol owns a
+    /// stable local key for ACK recording and unsubscribe lookup.
     ///
     /// # Errors
     ///
     /// Returns `ClientClosed` if the client has been closed.
-    ///
-    /// From CONTEXT.md: "重連期間新訂閱請求：立即加入訂閱狀態，重連後一併訂閱"
-    pub async fn subscribe(&self, req: SubscribeRequest) -> Result<(), MarketDataError> {
-        // Check if client is closed
+    pub async fn subscribe(
+        &self,
+        sub: crate::websocket::channels::StockSubscription,
+    ) -> Result<(), MarketDataError> {
+        use crate::models::{SubscribeRequest, SymbolSpec};
+
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
 
-        // Add to subscription state immediately
-        self.subscriptions.subscribe(req.clone());
-
-        // If connected, enqueue subscribe message
-        if self.is_connected().await {
-            let sub_msg = WebSocketRequest::subscribe(req);
-            let sub_json = serde_json::to_string(&sub_msg)
-                .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-            self.enqueue_write(sub_json).await?;
+        let mut wire_req = SubscribeRequest {
+            channel: sub.channel.as_str().to_string(),
+            ..Default::default()
+        };
+        match &sub.symbols {
+            SymbolSpec::Single(s) => wire_req.symbol = Some(s.clone()),
+            SymbolSpec::Many(v) => wire_req.symbols = Some(v.clone()),
+        }
+        if sub.intraday_odd_lot {
+            wire_req.intraday_odd_lot = Some(true);
         }
 
+        // Internal bookkeeping: store N per-symbol rows (1 for single,
+        // len() for batch). Each row has its own local key for ACK
+        // recording. On reconnect each row sends its own frame — refolding
+        // back into batches is a future optimization.
+        for entry in wire_req.clone().expand() {
+            self.subscriptions.subscribe(entry);
+        }
+
+        let sub_msg = WebSocketRequest::subscribe(wire_req);
+        let sub_json = serde_json::to_string(&sub_msg)
+            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+
+        if self.is_connected().await {
+            self.enqueue_write(sub_json).await?;
+        }
         Ok(())
     }
 
-    /// Unsubscribe from a channel
+    /// Subscribe to a FutOpt streaming channel.
     ///
-    /// Removes subscription from state immediately. If connected, sends
-    /// unsubscribe message to server.
-    ///
-    /// # Errors
-    ///
-    /// Returns `ClientClosed` if the client has been closed.
-    ///
-    /// From CONTEXT.md: "unsubscribe() 在斷線期間立即從狀態移除"
-    pub async fn unsubscribe(&self, key: &str) -> Result<(), MarketDataError> {
-        // Check if client is closed
+    /// Mirror of [`subscribe`](Self::subscribe) for the FutOpt domain. Same
+    /// single/batch semantics; the modifier is `after_hours` instead of
+    /// `intraday_odd_lot`.
+    pub async fn subscribe_futopt(
+        &self,
+        sub: crate::websocket::channels::FutOptSubscription,
+    ) -> Result<(), MarketDataError> {
+        use crate::models::{SubscribeRequest, SymbolSpec};
+
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
 
-        // Consume the server-assigned id BEFORE dropping local state, since
-        // unsubscribe() clears the id map as part of its bookkeeping.
-        let server_id = self.subscriptions.take_server_id(key);
-
-        // Remove from subscription state immediately
-        self.subscriptions.unsubscribe(key);
-
-        // If connected, enqueue unsubscribe message. Fugle's protocol requires
-        // the server-assigned id from the `subscribed` ack, wrapped in an
-        // `ids` array. Fallback to the local key keeps the wire format valid
-        // when the ack hasn't arrived yet (race on fast sub/unsub).
-        if self.is_connected().await {
-            let id = server_id.unwrap_or_else(|| key.to_string());
-            let unsub_msg = WebSocketRequest::unsubscribe(
-                crate::models::UnsubscribeRequest::by_ids(vec![id]),
-            );
-            let unsub_json = serde_json::to_string(&unsub_msg)
-                .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-            self.enqueue_write(unsub_json).await?;
+        let mut wire_req = SubscribeRequest {
+            channel: sub.channel.as_str().to_string(),
+            ..Default::default()
+        };
+        match &sub.symbols {
+            SymbolSpec::Single(s) => wire_req.symbol = Some(s.clone()),
+            SymbolSpec::Many(v) => wire_req.symbols = Some(v.clone()),
+        }
+        if sub.after_hours {
+            wire_req.after_hours = Some(true);
         }
 
+        for entry in wire_req.clone().expand() {
+            self.subscriptions.subscribe(entry);
+        }
+
+        let sub_msg = WebSocketRequest::subscribe(wire_req);
+        let sub_json = serde_json::to_string(&sub_msg)
+            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+
+        if self.is_connected().await {
+            self.enqueue_write(sub_json).await?;
+        }
+        Ok(())
+    }
+
+    /// Unsubscribe by server id(s) — accepts single or batch via
+    /// `impl IntoIterator<Item = impl Into<String>>`.
+    ///
+    /// Each id is preferentially the server-assigned id returned in a
+    /// `subscribed` ACK. The internal `SubscriptionManager` falls back to
+    /// the local key (`"{channel}:{symbol}[:modifier]"`) when an ACK
+    /// hasn't been recorded yet (rare race on fast subscribe→unsubscribe).
+    ///
+    /// Sends a single `{event:"unsubscribe", data:{ids:[...]}}` frame on
+    /// the wire when there is more than one id, or `{data:{id:"..."}}`
+    /// for a single id — both shapes are accepted by the Fugle server.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClientClosed` if the client has been closed.
+    pub async fn unsubscribe(
+        &self,
+        ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Result<(), MarketDataError> {
+        use crate::models::UnsubscribeRequest;
+
+        if self.is_closed().await {
+            return Err(MarketDataError::ClientClosed);
+        }
+
+        let keys: Vec<String> = ids.into_iter().map(Into::into).collect();
+        if keys.is_empty() {
+            return Ok(());
+        }
+
+        // Translate keys to server ids where possible; fall back to the
+        // caller-supplied string (works for both server ids and local keys).
+        let mut wire_ids = Vec::with_capacity(keys.len());
+        for key in &keys {
+            let id = self
+                .subscriptions
+                .take_server_id(key)
+                .unwrap_or_else(|| key.clone());
+            self.subscriptions.unsubscribe(key);
+            wire_ids.push(id);
+        }
+
+        if !self.is_connected().await {
+            return Ok(());
+        }
+
+        let unsub_req = if wire_ids.len() == 1 {
+            UnsubscribeRequest::by_id(wire_ids.into_iter().next().unwrap())
+        } else {
+            UnsubscribeRequest::by_ids(wire_ids)
+        };
+        let unsub_msg = WebSocketRequest::unsubscribe(unsub_req);
+        let unsub_json = serde_json::to_string(&unsub_msg)
+            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+        self.enqueue_write(unsub_json).await?;
         Ok(())
     }
 
@@ -862,182 +943,6 @@ impl WebSocketClient {
     /// Used internally for sending subscription requests
     pub(crate) async fn send_text(&self, text: &str) -> Result<(), MarketDataError> {
         self.enqueue_write(text.to_string()).await
-    }
-
-    // ========================================================================
-    // Stock Streaming Channel API (Phase 4)
-    // ========================================================================
-
-    /// Subscribe to a stock streaming channel
-    ///
-    /// # Errors
-    ///
-    /// Returns `ClientClosed` if the client has been closed.
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// use marketdata_core::websocket::{WebSocketClient, ConnectionConfig};
-    /// use marketdata_core::websocket::channels::StockSubscription;
-    /// use marketdata_core::models::Channel;
-    /// use marketdata_core::AuthRequest;
-    ///
-    /// # async fn example() -> Result<(), marketdata_core::MarketDataError> {
-    /// let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("key"));
-    /// let client = WebSocketClient::new(config);
-    ///
-    /// // Subscribe to trades
-    /// let sub = StockSubscription::new(Channel::Trades, "2330");
-    /// client.subscribe_channel(sub).await?;
-    ///
-    /// // Subscribe to odd lot trades
-    /// let odd_lot_sub = StockSubscription::new(Channel::Trades, "2330")
-    ///     .with_odd_lot(true);
-    /// client.subscribe_channel(odd_lot_sub).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn subscribe_channel(
-        &self,
-        sub: crate::websocket::channels::StockSubscription,
-    ) -> Result<(), MarketDataError> {
-        // Check if client is closed
-        if self.is_closed().await {
-            return Err(MarketDataError::ClientClosed);
-        }
-
-        // Build subscribe request JSON
-        let request = sub.to_subscribe_request();
-        let request_str = serde_json::to_string(&request)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-
-        // Store full SubscribeRequest so reconnect's resubscribe_all replays
-        // the same modifier (oddlot) instead of silently downgrading.
-        let stored = crate::models::SubscribeRequest {
-            channel: sub.channel.as_str().to_string(),
-            symbol: Some(sub.symbol.clone()),
-            intraday_odd_lot: if sub.intraday_odd_lot { Some(true) } else { None },
-            ..Default::default()
-        };
-        self.subscriptions.subscribe(stored);
-
-        // Send if connected (ignore error if not connected - will be sent on reconnect)
-        let _ = self.send_text(&request_str).await;
-        Ok(())
-    }
-
-    /// Subscribe to multiple symbols on the same channel
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// # use marketdata_core::websocket::{WebSocketClient, ConnectionConfig};
-    /// # use marketdata_core::models::Channel;
-    /// # use marketdata_core::AuthRequest;
-    /// # async fn example() -> Result<(), marketdata_core::MarketDataError> {
-    /// # let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("key"));
-    /// # let client = WebSocketClient::new(config);
-    /// client.subscribe_symbols(Channel::Trades, &["2330", "2317", "2454"], false).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn subscribe_symbols(
-        &self,
-        channel: crate::models::Channel,
-        symbols: &[&str],
-        intraday_odd_lot: bool,
-    ) -> Result<(), MarketDataError> {
-        use crate::websocket::channels::StockSubscription;
-
-        for symbol in symbols {
-            let sub = StockSubscription::new(channel, *symbol).with_odd_lot(intraday_odd_lot);
-            self.subscribe_channel(sub).await?;
-        }
-        Ok(())
-    }
-
-    /// Unsubscribe from a stock streaming channel by subscription
-    ///
-    /// Note: This removes from local state. To unsubscribe from server,
-    /// you need the subscription ID returned from the subscribed event.
-    pub async fn unsubscribe_channel(
-        &self,
-        sub: &crate::websocket::channels::StockSubscription,
-    ) -> Result<(), MarketDataError> {
-        // Remove from local subscription state
-        self.subscriptions.unsubscribe(&sub.key());
-        Ok(())
-    }
-
-    /// Subscribe to a FutOpt streaming channel.
-    ///
-    /// Mirrors [`subscribe_channel`](Self::subscribe_channel) but accepts a
-    /// `FutOptSubscription`, whose `to_subscribe_request` encodes the
-    /// `afterHours` flag when the regular/after-hours session is requested.
-    /// The subscription key (`"{channel}:{symbol}[:afterhours]"`) is what the
-    /// subscription manager uses to track state for reconnect and unsubscribe.
-    pub async fn subscribe_futopt_channel(
-        &self,
-        sub: crate::websocket::channels::FutOptSubscription,
-    ) -> Result<(), MarketDataError> {
-        if self.is_closed().await {
-            return Err(MarketDataError::ClientClosed);
-        }
-        let request = sub.to_subscribe_request();
-        let request_str = serde_json::to_string(&request)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-        // Store full SubscribeRequest so reconnect's resubscribe_all replays
-        // the afterHours flag — previous subscribe_key path dropped it.
-        let stored = crate::models::SubscribeRequest {
-            channel: sub.channel.as_str().to_string(),
-            symbol: Some(sub.symbol.clone()),
-            after_hours: if sub.after_hours { Some(true) } else { None },
-            ..Default::default()
-        };
-        self.subscriptions.subscribe(stored);
-        let _ = self.send_text(&request_str).await;
-        Ok(())
-    }
-
-    /// Unsubscribe a FutOpt streaming channel.
-    ///
-    /// Looks up the server-assigned id captured from the `subscribed` ack and
-    /// sends `{event:"unsubscribe", data:{ids:[server_id]}}` — matching the
-    /// Fugle protocol. If the ack hasn't been recorded yet (rare race), falls
-    /// back to the local key so the wire format stays valid.
-    pub async fn unsubscribe_futopt_channel(
-        &self,
-        sub: &crate::websocket::channels::FutOptSubscription,
-    ) -> Result<(), MarketDataError> {
-        if self.is_closed().await {
-            return Err(MarketDataError::ClientClosed);
-        }
-
-        let key = sub.key();
-        let server_id = self.subscriptions.take_server_id(&key);
-        self.subscriptions.unsubscribe(&key);
-
-        if self.is_connected().await {
-            let id = server_id.unwrap_or_else(|| key.clone());
-            let unsub_msg = crate::models::WebSocketRequest::unsubscribe(
-                crate::models::UnsubscribeRequest::by_ids(vec![id]),
-            );
-            let unsub_json = serde_json::to_string(&unsub_msg)
-                .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-            self.enqueue_write(unsub_json).await?;
-        }
-
-        Ok(())
-    }
-
-    /// Unsubscribe from server using subscription ID
-    ///
-    /// The ID is returned in the "subscribed" event after subscribing.
-    pub async fn unsubscribe_by_id(&self, subscription_id: &str) -> Result<(), MarketDataError> {
-        use crate::websocket::channels::StockSubscription;
-
-        let request = StockSubscription::to_unsubscribe_request(subscription_id);
-        let request_str = serde_json::to_string(&request)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
-        self.send_text(&request_str).await
     }
 
     /// Get list of active subscription keys
@@ -1578,6 +1483,7 @@ async fn try_connect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::websocket::channels::StockSubscription;
     use crate::AuthRequest;
 
     #[test]
@@ -1722,14 +1628,15 @@ mod tests {
         let client = WebSocketClient::new(config);
 
         // Subscribe while disconnected
-        let req = SubscribeRequest::new(Channel::Trades, "2330");
-        let result = client.subscribe(req.clone()).await;
+        let sub = StockSubscription::new(Channel::Trades, "2330");
+        let result = client.subscribe(sub).await;
         assert!(result.is_ok());
 
         // Subscription should be stored
         let subs = client.subscriptions();
         assert_eq!(subs.len(), 1);
-        assert_eq!(subs[0], req);
+        assert_eq!(subs[0].channel, "trades");
+        assert_eq!(subs[0].symbol.as_deref(), Some("2330"));
     }
 
     #[tokio::test]
@@ -1747,14 +1654,15 @@ mod tests {
         }
 
         // Subscribe while connected
-        let req = SubscribeRequest::new(Channel::Trades, "2330");
+        let sub = StockSubscription::new(Channel::Trades, "2330");
         // Note: This will fail without actual connection, but subscription should be stored
-        let _ = client.subscribe(req.clone()).await;
+        let _ = client.subscribe(sub).await;
 
         // Subscription should be stored regardless of send result
         let subs = client.subscriptions();
         assert_eq!(subs.len(), 1);
-        assert_eq!(subs[0], req);
+        assert_eq!(subs[0].channel, "trades");
+        assert_eq!(subs[0].symbol.as_deref(), Some("2330"));
     }
 
     #[tokio::test]
@@ -1766,12 +1674,12 @@ mod tests {
         let client = WebSocketClient::new(config);
 
         // Subscribe
-        let req = SubscribeRequest::new(Channel::Trades, "2330");
-        let _ = client.subscribe(req).await;
+        let sub = StockSubscription::new(Channel::Trades, "2330");
+        let _ = client.subscribe(sub).await;
         assert_eq!(client.subscriptions().len(), 1);
 
         // Unsubscribe
-        let result = client.unsubscribe("trades:2330").await;
+        let result = client.unsubscribe(["trades:2330"]).await;
         assert!(result.is_ok());
 
         // Subscription should be removed
@@ -1779,7 +1687,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_unsubscribe_futopt_channel_removes_from_state() {
+    async fn unsubscribe_removes_futopt_subscription_from_state() {
         use crate::websocket::channels::FutOptSubscription;
         use crate::FutOptChannel;
 
@@ -1787,15 +1695,11 @@ mod tests {
             ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
         let client = WebSocketClient::new(config);
 
-        let sub = FutOptSubscription {
-            channel: FutOptChannel::Books,
-            symbol: "TXFE6".to_string(),
-            after_hours: true,
-        };
-        let _ = client.subscribe_futopt_channel(sub.clone()).await;
+        let sub = FutOptSubscription::new(FutOptChannel::Books, "TXFE6").with_after_hours(true);
+        let _ = client.subscribe_futopt(sub.clone()).await;
         assert_eq!(client.subscriptions().len(), 1);
 
-        let result = client.unsubscribe_futopt_channel(&sub).await;
+        let result = client.unsubscribe(sub.keys()).await;
         assert!(result.is_ok());
         assert_eq!(client.subscriptions().len(), 0);
     }
@@ -1809,8 +1713,8 @@ mod tests {
         let client = WebSocketClient::new(config);
 
         // Add subscriptions
-        let _ = client.subscribe(SubscribeRequest::new(Channel::Trades, "2330")).await;
-        let _ = client.subscribe(SubscribeRequest::new(Channel::Candles, "2317")).await;
+        let _ = client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await;
+        let _ = client.subscribe(StockSubscription::new(Channel::Candles, "2317")).await;
 
         // Subscriptions should be stored
         let subs = client.subscriptions();
@@ -1907,7 +1811,7 @@ mod tests {
         }
 
         // Subscribe should fail with ClientClosed error
-        let result = client.subscribe(SubscribeRequest::new(Channel::Trades, "2330")).await;
+        let result = client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await;
         assert!(matches!(result, Err(MarketDataError::ClientClosed)));
     }
 
@@ -1919,7 +1823,7 @@ mod tests {
         let client = WebSocketClient::new(config);
 
         // First add a subscription while not closed
-        let _ = client.subscribe(SubscribeRequest::new(Channel::Trades, "2330")).await;
+        let _ = client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await;
 
         // Set to Closed state
         {
@@ -1931,7 +1835,7 @@ mod tests {
         }
 
         // Unsubscribe should fail with ClientClosed error
-        let result = client.unsubscribe("trades:2330").await;
+        let result = client.unsubscribe(["trades:2330"]).await;
         assert!(matches!(result, Err(MarketDataError::ClientClosed)));
     }
 
@@ -1992,7 +1896,7 @@ mod tests {
 
         // subscribe_channel should fail with ClientClosed error
         let sub = StockSubscription::new(Channel::Trades, "2330");
-        let result = client.subscribe_channel(sub).await;
+        let result = client.subscribe(sub).await;
         assert!(matches!(result, Err(MarketDataError::ClientClosed)));
     }
 
@@ -2073,7 +1977,7 @@ mod channel_tests {
 
         let sub = StockSubscription::new(Channel::Trades, "2330");
         // Note: This will fail to send (not connected) but should store locally
-        let _ = client.subscribe_channel(sub).await;
+        let _ = client.subscribe(sub).await;
 
         let keys = client.subscription_keys();
         assert!(keys.contains(&"trades:2330".to_string()));
@@ -2085,7 +1989,7 @@ mod channel_tests {
         let client = WebSocketClient::new(config);
 
         let sub = StockSubscription::new(Channel::Trades, "2330").with_odd_lot(true);
-        let _ = client.subscribe_channel(sub).await;
+        let _ = client.subscribe(sub).await;
 
         let keys = client.subscription_keys();
         assert!(keys.contains(&"trades:2330:oddlot".to_string()));
@@ -2098,13 +2002,13 @@ mod channel_tests {
 
         // Subscribe to multiple channels
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Trades, "2330"))
+            .subscribe(StockSubscription::new(Channel::Trades, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Candles, "2330"))
+            .subscribe(StockSubscription::new(Channel::Candles, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Books, "2330"))
+            .subscribe(StockSubscription::new(Channel::Books, "2330"))
             .await;
 
         let keys = client.subscription_keys();
@@ -2120,7 +2024,10 @@ mod channel_tests {
         let client = WebSocketClient::new(config);
 
         let _ = client
-            .subscribe_symbols(Channel::Trades, &["2330", "2317", "2454"], false)
+            .subscribe(StockSubscription::new(
+                Channel::Trades,
+                vec!["2330", "2317", "2454"],
+            ))
             .await;
 
         let keys = client.subscription_keys();
@@ -2131,32 +2038,30 @@ mod channel_tests {
     }
 
     #[tokio::test]
-    async fn test_unsubscribe_channel() {
+    async fn unsubscribe_removes_single_subscription() {
         let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
         let client = WebSocketClient::new(config);
 
         let sub = StockSubscription::new(Channel::Trades, "2330");
-        let _ = client.subscribe_channel(sub.clone()).await;
+        let _ = client.subscribe(sub.clone()).await;
         assert_eq!(client.subscription_keys().len(), 1);
 
-        // Unsubscribe
-        let _ = client.unsubscribe_channel(&sub).await;
+        let _ = client.unsubscribe(sub.keys()).await;
         assert_eq!(client.subscription_keys().len(), 0);
     }
 
     #[tokio::test]
-    async fn test_unsubscribe_does_not_affect_others() {
+    async fn unsubscribe_does_not_affect_other_subscriptions() {
         let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
         let client = WebSocketClient::new(config);
 
         let sub1 = StockSubscription::new(Channel::Trades, "2330");
         let sub2 = StockSubscription::new(Channel::Candles, "2330");
-        let _ = client.subscribe_channel(sub1.clone()).await;
-        let _ = client.subscribe_channel(sub2).await;
+        let _ = client.subscribe(sub1.clone()).await;
+        let _ = client.subscribe(sub2).await;
         assert_eq!(client.subscription_keys().len(), 2);
 
-        // Unsubscribe only sub1
-        let _ = client.unsubscribe_channel(&sub1).await;
+        let _ = client.unsubscribe(sub1.keys()).await;
 
         let keys = client.subscription_keys();
         assert_eq!(keys.len(), 1);
@@ -2164,12 +2069,14 @@ mod channel_tests {
     }
 
     #[tokio::test]
-    async fn test_subscribe_symbols_with_odd_lot() {
+    async fn batch_subscribe_with_odd_lot_expands_to_per_symbol_keys() {
         let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("test-key"));
         let client = WebSocketClient::new(config);
 
         let _ = client
-            .subscribe_symbols(Channel::Trades, &["2330", "2317"], true)
+            .subscribe(
+                StockSubscription::new(Channel::Trades, vec!["2330", "2317"]).with_odd_lot(true),
+            )
             .await;
 
         let keys = client.subscription_keys();
@@ -2185,19 +2092,19 @@ mod channel_tests {
 
         // Subscribe to all channel types
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Trades, "2330"))
+            .subscribe(StockSubscription::new(Channel::Trades, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Candles, "2330"))
+            .subscribe(StockSubscription::new(Channel::Candles, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Books, "2330"))
+            .subscribe(StockSubscription::new(Channel::Books, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Aggregates, "2330"))
+            .subscribe(StockSubscription::new(Channel::Aggregates, "2330"))
             .await;
         let _ = client
-            .subscribe_channel(StockSubscription::new(Channel::Indices, "IX0001"))
+            .subscribe(StockSubscription::new(Channel::Indices, "IX0001"))
             .await;
 
         let keys = client.subscription_keys();
@@ -2209,6 +2116,7 @@ mod channel_tests {
 #[cfg(test)]
 mod disconnect_tests {
     use super::*;
+    use crate::websocket::channels::StockSubscription;
     use crate::AuthRequest;
 
     #[tokio::test]
@@ -2386,8 +2294,8 @@ mod disconnect_tests {
         let _ = client.disconnect().await;
 
         // Subscribe should fail with ClientClosed
-        let req = SubscribeRequest::new(Channel::Trades, "2330");
-        let result = client.subscribe(req).await;
+        let sub = StockSubscription::new(Channel::Trades, "2330");
+        let result = client.subscribe(sub).await;
         assert!(matches!(result, Err(MarketDataError::ClientClosed)));
 
         // Reconnect should fail with ClientClosed

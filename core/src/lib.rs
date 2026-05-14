@@ -10,10 +10,10 @@
 //! # Stock Subscription Example
 //!
 //! ```rust
-//! use marketdata_core::{Quote, Trade, Channel, SubscribeRequest};
+//! use marketdata_core::{Quote, Trade, Channel, websocket::channels::StockSubscription};
 //!
 //! // Create a WebSocket subscription
-//! let sub = SubscribeRequest::trades("2330");
+//! let sub = StockSubscription::new(Channel::Trades, "2330");
 //! ```
 //!
 //! # FutOpt Subscription Example
@@ -70,7 +70,7 @@ pub use models::{
     HistoricalCandle, HistoricalCandlesResponse, IntradayCandle, IntradayCandlesResponse,
     Quote, Ticker, Trade, TradesResponse, VolumeAtPrice, VolumesResponse,
     // WebSocket types
-    AuthRequest, Channel, SubscribeRequest, UnsubscribeRequest, WebSocketMessage, WebSocketRequest,
+    AuthRequest, Channel, SymbolSpec, UnsubscribeRequest, WebSocketMessage, WebSocketRequest,
 };
 
 // Re-export streaming message types (Phase 4)

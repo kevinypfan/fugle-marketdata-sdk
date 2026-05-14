@@ -8,9 +8,8 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 
 use marketdata_core::models::futopt::{FutOptChannel, FutOptQuote, FutOptTicker, Product};
-use marketdata_core::models::SubscribeRequest;
 use marketdata_core::rest::Auth;
-use marketdata_core::websocket::channels::FutOptSubscription;
+use marketdata_core::websocket::channels::{FutOptSubscription, StockSubscription};
 use marketdata_core::{
     AuthRequest, Channel, ConnectionConfig, ReconnectionConfig, RestClient, WebSocketClient,
     Quote, Ticker, Trade,
@@ -265,18 +264,14 @@ async fn subscribe_on(
     match market {
         Market::Stock => {
             for ch in stock_channels_for(symbol) {
-                let req = SubscribeRequest::new(*ch, symbol);
-                client.subscribe(req).await?;
+                let sub = StockSubscription::new(*ch, symbol);
+                client.subscribe(sub).await?;
             }
         }
         Market::Futopt => {
             for ch in futopt_channels() {
-                let sub = FutOptSubscription {
-                    channel: *ch,
-                    symbol: symbol.to_string(),
-                    after_hours,
-                };
-                client.subscribe_futopt_channel(sub).await?;
+                let sub = FutOptSubscription::new(*ch, symbol).with_after_hours(after_hours);
+                client.subscribe_futopt(sub).await?;
             }
         }
     }
@@ -293,17 +288,13 @@ async fn unsubscribe_on(
         Market::Stock => {
             for ch in stock_channels_for(symbol) {
                 let key = format!("{}:{}", ch.as_str(), symbol);
-                client.unsubscribe(&key).await?;
+                client.unsubscribe([key]).await?;
             }
         }
         Market::Futopt => {
             for ch in futopt_channels() {
-                let sub = FutOptSubscription {
-                    channel: *ch,
-                    symbol: symbol.to_string(),
-                    after_hours,
-                };
-                client.unsubscribe_futopt_channel(&sub).await?;
+                let sub = FutOptSubscription::new(*ch, symbol).with_after_hours(after_hours);
+                client.unsubscribe(sub.keys()).await?;
             }
         }
     }

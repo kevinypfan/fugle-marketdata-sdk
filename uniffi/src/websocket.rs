@@ -500,7 +500,7 @@ impl WebSocketClient {
     async fn subscribe_impl(&self, channel: String, symbol: String) -> Result<(), MarketDataError> {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
-            use marketdata_core::models::{Channel, SubscribeRequest};
+            use marketdata_core::models::Channel;
 
             // Parse channel string to Channel enum
             let channel_enum = match channel.as_str() {
@@ -516,8 +516,8 @@ impl WebSocketClient {
                 }
             };
 
-            let req = SubscribeRequest::new(channel_enum, &symbol);
-            ws.subscribe(req).await?;
+            let sub = marketdata_core::StockSubscription::new(channel_enum, &symbol);
+            ws.subscribe(sub).await?;
             Ok(())
         } else {
             Err(MarketDataError::WebSocketError {
@@ -539,7 +539,7 @@ impl WebSocketClient {
         let guard = self.inner.lock().await;
         if let Some(ref ws) = *guard {
             let key = format!("{}:{}", channel, symbol);
-            ws.unsubscribe(&key).await?;
+            ws.unsubscribe([key]).await?;
             Ok(())
         } else {
             Err(MarketDataError::WebSocketError {

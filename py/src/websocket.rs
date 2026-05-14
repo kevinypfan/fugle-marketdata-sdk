@@ -1048,12 +1048,10 @@ impl StockWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        for sym in target_symbols {
-            let sub = marketdata_core::StockSubscription::new(ch, &sym)
-                .with_odd_lot(effective_odd_lot);
-            let result = runtime.block_on(async { state.inner.subscribe_channel(sub).await });
-            result.map_err(errors::to_py_err)?;
-        }
+        let sub = marketdata_core::StockSubscription::new(ch, target_symbols)
+            .with_odd_lot(effective_odd_lot);
+        let result = runtime.block_on(async { state.inner.subscribe(sub).await });
+        result.map_err(errors::to_py_err)?;
 
         Ok(())
     }
@@ -1109,10 +1107,8 @@ impl StockWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        for id in target_ids {
-            let result = runtime.block_on(async { state.inner.unsubscribe_by_id(&id).await });
-            result.map_err(errors::to_py_err)?;
-        }
+        let result = runtime.block_on(async { state.inner.unsubscribe(target_ids).await });
+        result.map_err(errors::to_py_err)?;
 
         Ok(())
     }
@@ -1421,12 +1417,10 @@ impl StockWebSocketClient {
                 Arc::clone(&state.inner)
             };
 
-            for sym in target_symbols {
-                let sub = marketdata_core::StockSubscription::new(ch, &sym)
-                    .with_odd_lot(effective_odd_lot);
-                ws_client.subscribe_channel(sub).await
-                    .map_err(crate::errors::to_py_err)?;
-            }
+            let sub = marketdata_core::StockSubscription::new(ch, target_symbols)
+                .with_odd_lot(effective_odd_lot);
+            ws_client.subscribe(sub).await
+                .map_err(crate::errors::to_py_err)?;
 
             Ok(())
         })
@@ -1886,19 +1880,10 @@ impl FutOptWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        for sym in target_symbols {
-            let request = marketdata_core::WebSocketRequest::subscribe(
-                marketdata_core::SubscribeRequest {
-                    channel: ch.as_str().to_string(),
-                    symbol: Some(sym.clone()),
-                    after_hours: if effective_after_hours { Some(true) } else { None },
-                    ..Default::default()
-                },
-            );
-
-            let result = runtime.block_on(async { state.inner.send(request).await });
-            result.map_err(errors::to_py_err)?;
-        }
+        let sub = marketdata_core::FutOptSubscription::new(ch, target_symbols)
+            .with_after_hours(effective_after_hours);
+        let result = runtime.block_on(async { state.inner.subscribe_futopt(sub).await });
+        result.map_err(errors::to_py_err)?;
 
         Ok(())
     }
@@ -1943,10 +1928,8 @@ impl FutOptWebSocketClient {
             pyo3::exceptions::PyRuntimeError::new_err("Runtime not initialized")
         })?;
 
-        for id in target_ids {
-            let result = runtime.block_on(async { state.inner.unsubscribe_by_id(&id).await });
-            result.map_err(errors::to_py_err)?;
-        }
+        let result = runtime.block_on(async { state.inner.unsubscribe(target_ids).await });
+        result.map_err(errors::to_py_err)?;
 
         Ok(())
     }

@@ -59,5 +59,6 @@ pub use volume::{VolumeAtPrice, VolumesResponse};
 
 // WebSocket types
 pub use subscription::{
-    AuthRequest, Channel, SubscribeRequest, UnsubscribeRequest, WebSocketMessage, WebSocketRequest,
+    AuthRequest, Channel, SubscribeRequest, SymbolSpec, UnsubscribeRequest, WebSocketMessage,
+    WebSocketRequest,
 };
