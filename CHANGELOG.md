@@ -7,9 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Rust 0.1.0] - TBD
+
+Initial public release of the Rust SDK on crates.io. Two crates ship together:
+
+- `fugle-marketdata-core` — internal kernel (also used by Python / Node.js /
+  Java / Go / C# bindings via FFI)
+- `fugle-marketdata` — user-facing facade; depend on this from your
+  `Cargo.toml`
+
+The Rust crate publishes on an independent 0.x track so the Rust API can
+stabilize without being yoked to the unified 3.x release cadence for the
+language-binding family. Once the public surface is judged stable, the crate
+will graduate to 1.0.
+
+All behavioral changes listed under [3.0.0] (especially the WebSocket
+read-site liveness rework) apply equally to this release; the version split
+is purely about release-cadence independence, not feature delta.
+
 ## [3.0.0] - TBD
 
-Major release — SDK graduates to 3.x. All language bindings bump together.
+Major release for the binding ecosystem — Python, Node.js, Java, Go, and C#
+bindings bump together. The Rust crate publishes separately at 0.1.0 (see
+above), sharing the same underlying core kernel.
 
 ### WebSocket connection liveness — read-site timeout (BREAKING)
 
