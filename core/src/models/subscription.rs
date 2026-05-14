@@ -33,20 +33,111 @@ impl Channel {
     }
 }
 
+/// A symbol specification: either a single symbol or a batch.
+///
+/// `impl Into<SymbolSpec>` is implemented for every reasonable input shape so
+/// the public `subscribe(channel, symbols)` API can accept a `&str`, `String`,
+/// `Vec<String>`, array literal `["A", "B"]`, or slice without forcing the
+/// caller to disambiguate.
+///
+/// Wire form depends on the variant:
+/// - `Single(s)`   serializes as `{"symbol": "s"}`
+/// - `Many(vec)`   serializes as `{"symbols": ["s1", "s2", ...]}`
+///
+/// The Fugle server gateway natively handles both forms (see
+/// `stock.gateway.ts:13`), returning a single ACK object for `Single` and an
+/// ACK array for `Many`. A `Many` batch is therefore a real 1-frame-in /
+/// 1-ACK-out round-trip, not an N-frame loop.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SymbolSpec {
+    /// Single-symbol subscription.
+    Single(String),
+    /// Batch subscription. Length-1 vectors are preserved as `Many` for
+    /// predictability — the server treats them as a single-element array.
+    Many(Vec<String>),
+}
+
+impl From<&str> for SymbolSpec {
+    fn from(s: &str) -> Self {
+        SymbolSpec::Single(s.to_owned())
+    }
+}
+
+impl From<String> for SymbolSpec {
+    fn from(s: String) -> Self {
+        SymbolSpec::Single(s)
+    }
+}
+
+impl From<&String> for SymbolSpec {
+    fn from(s: &String) -> Self {
+        SymbolSpec::Single(s.clone())
+    }
+}
+
+impl From<Vec<String>> for SymbolSpec {
+    fn from(v: Vec<String>) -> Self {
+        SymbolSpec::Many(v)
+    }
+}
+
+impl From<Vec<&str>> for SymbolSpec {
+    fn from(v: Vec<&str>) -> Self {
+        SymbolSpec::Many(v.into_iter().map(String::from).collect())
+    }
+}
+
+impl<const N: usize> From<[&str; N]> for SymbolSpec {
+    fn from(arr: [&str; N]) -> Self {
+        SymbolSpec::Many(arr.iter().map(|s| (*s).to_owned()).collect())
+    }
+}
+
+impl<const N: usize> From<[String; N]> for SymbolSpec {
+    fn from(arr: [String; N]) -> Self {
+        SymbolSpec::Many(arr.into_iter().collect())
+    }
+}
+
+impl From<&[&str]> for SymbolSpec {
+    fn from(s: &[&str]) -> Self {
+        SymbolSpec::Many(s.iter().map(|s| (*s).to_owned()).collect())
+    }
+}
+
+impl From<&[String]> for SymbolSpec {
+    fn from(s: &[String]) -> Self {
+        SymbolSpec::Many(s.to_vec())
+    }
+}
+
 /// Subscription request for WebSocket
 ///
 /// Modifier flags (`after_hours`, `intraday_odd_lot`) are preserved across
 /// reconnection so a 盤後 or 盤中零股 subscription comes back as the same
 /// session — previous design stored only `{channel, symbol}` which silently
 /// downgraded on resubscribe.
+///
+/// On the wire either `symbol` (single) or `symbols` (batch) is populated,
+/// never both — see [`SymbolSpec`]. The two fields are encoded separately
+/// because the Fugle server protocol uses the field presence to drive its
+/// ACK shape (`subscribed` event `data` is an object for single, array for
+/// batch).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct SubscribeRequest {
     /// Channel to subscribe to
     pub channel: String,
 
-    /// Stock symbol (optional for some channels)
+    /// Stock symbol for the single-symbol path. Mutually exclusive with
+    /// `symbols`. Both `None` is allowed for channel-only subscriptions
+    /// (e.g. indices) where the server doesn't require a symbol.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
+
+    /// Batch symbol list for the multi-symbol path. Mutually exclusive
+    /// with `symbol`. Serializes as `symbols: [...]` on the wire.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbols: Option<Vec<String>>,
 
     /// FutOpt after-hours session flag. Sent as `afterHours: true` on wire
     /// when set; absent otherwise so stock path serializes unchanged.
@@ -60,13 +151,33 @@ pub struct SubscribeRequest {
 }
 
 impl SubscribeRequest {
-    /// Create a new subscription request
+    /// Create a new single-symbol subscription request.
+    ///
+    /// For the polymorphic single/batch variant, use [`SubscribeRequest::with_symbols`].
     pub fn new(channel: Channel, symbol: impl Into<String>) -> Self {
         Self {
             channel: channel.as_str().to_string(),
             symbol: Some(symbol.into()),
             ..Default::default()
         }
+    }
+
+    /// Create a subscription request from a [`SymbolSpec`].
+    ///
+    /// Accepts `&str` / `String` / `Vec<String>` / array literal / slice via
+    /// `impl Into<SymbolSpec>`. Routes to the `symbol` or `symbols` wire field
+    /// based on the variant.
+    pub fn with_symbols(channel: Channel, symbols: impl Into<SymbolSpec>) -> Self {
+        let spec = symbols.into();
+        let mut req = Self {
+            channel: channel.as_str().to_string(),
+            ..Default::default()
+        };
+        match spec {
+            SymbolSpec::Single(s) => req.symbol = Some(s),
+            SymbolSpec::Many(v) => req.symbols = Some(v),
+        }
+        req
     }
 
     /// Create a trades channel subscription
@@ -362,6 +473,50 @@ mod tests {
         // wire payload must stay byte-identical to pre-fix behavior.
         assert!(!json.contains("afterHours"));
         assert!(!json.contains("intradayOddLot"));
+        // `symbols` array must not be emitted for the single-symbol path.
+        assert!(!json.contains("\"symbols\""));
+    }
+
+    #[test]
+    fn symbol_spec_accepts_common_input_shapes() {
+        // &str, String, &String → Single
+        let s1: SymbolSpec = "2330".into();
+        let s2: SymbolSpec = "2330".to_string().into();
+        let owned = "2330".to_string();
+        let s3: SymbolSpec = (&owned).into();
+        assert!(matches!(s1, SymbolSpec::Single(ref v) if v == "2330"));
+        assert!(matches!(s2, SymbolSpec::Single(ref v) if v == "2330"));
+        assert!(matches!(s3, SymbolSpec::Single(ref v) if v == "2330"));
+
+        // Vec<String>, Vec<&str>, [&str; N], [String; N], slices → Many
+        let m1: SymbolSpec = vec!["A".to_string(), "B".to_string()].into();
+        let m2: SymbolSpec = vec!["A", "B"].into();
+        let m3: SymbolSpec = ["A", "B"].into();
+        let m4: SymbolSpec = ["A".to_string(), "B".to_string()].into();
+        let arr: &[&str] = &["A", "B"];
+        let m5: SymbolSpec = arr.into();
+        for v in [m1, m2, m3, m4, m5] {
+            assert!(matches!(v, SymbolSpec::Many(ref x) if x == &["A", "B"]));
+        }
+    }
+
+    #[test]
+    fn subscribe_request_with_symbols_serializes_batch() {
+        let req = SubscribeRequest::with_symbols(Channel::Aggregates, vec!["2330", "0050", "2603"]);
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["channel"], "aggregates");
+        assert_eq!(json["symbols"], serde_json::json!(["2330", "0050", "2603"]));
+        // Single-symbol field must be absent.
+        assert!(json.get("symbol").is_none());
+    }
+
+    #[test]
+    fn subscribe_request_with_symbols_single_routes_to_symbol_field() {
+        // Single-input variants land on `symbol`, not `symbols`.
+        let req = SubscribeRequest::with_symbols(Channel::Trades, "2330");
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["symbol"], "2330");
+        assert!(json.get("symbols").is_none());
     }
 
     #[test]
