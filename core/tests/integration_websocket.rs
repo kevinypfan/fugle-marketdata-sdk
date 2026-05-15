@@ -26,10 +26,15 @@
 //!
 //! Some tests may timeout or receive no data outside of market hours.
 //! This is expected behavior - the streaming API only sends data during active trading.
+//!
+//! Async (tokio) variant. Gated behind `tokio-comp`. See
+//! `integration_websocket_sync.rs` for the sync mirror.
+#![cfg(feature = "tokio-comp")]
 
+use marketdata_core::aio::WebSocketClient;
 use marketdata_core::{
     AuthRequest, Channel, ConnectionConfig, ConnectionEvent, ConnectionState,
-    HealthCheckConfig, SubscribeRequest, WebSocketClient,
+    HealthCheckConfig,
 };
 use marketdata_core::websocket::StockSubscription;
 use std::env;
@@ -146,7 +151,7 @@ fn test_stock_subscription() {
         client.connect().await.expect("Failed to connect");
 
         // Subscribe to TSMC trades using SubscribeRequest
-        let sub = SubscribeRequest::trades("2330");
+        let sub = StockSubscription::new(Channel::Trades, "2330");
         let result = client.subscribe(sub).await;
 
         match result {
@@ -157,7 +162,7 @@ fn test_stock_subscription() {
                 tokio::time::sleep(Duration::from_secs(1)).await;
 
                 // Unsubscribe using the key format
-                client.unsubscribe("trades:2330").await.ok();
+                client.unsubscribe(["trades:2330"]).await.ok();
             }
             Err(e) => {
                 panic!("Failed to subscribe: {:?}", e);
@@ -184,7 +189,7 @@ fn test_multiple_subscriptions() {
         let mut subscription_count = 0;
 
         for symbol in symbols {
-            let sub = SubscribeRequest::trades(symbol);
+            let sub = StockSubscription::new(Channel::Trades, symbol);
             match client.subscribe(sub).await {
                 Ok(()) => {
                     println!("Subscribed to {} trades", symbol);
@@ -202,7 +207,7 @@ fn test_multiple_subscriptions() {
         // Cleanup
         for symbol in symbols {
             let key = format!("trades:{}", symbol);
-            client.unsubscribe(&key).await.ok();
+            client.unsubscribe([key]).await.ok();
         }
 
         client.disconnect().await.ok();
@@ -225,7 +230,7 @@ fn test_receive_stock_messages() {
         client.connect().await.expect("Failed to connect");
 
         // Subscribe to trades for a liquid stock
-        let sub = SubscribeRequest::trades("2330");
+        let sub = StockSubscription::new(Channel::Trades, "2330");
         client.subscribe(sub).await.expect("Failed to subscribe");
 
         println!("Waiting for messages (10 seconds)...");
@@ -247,7 +252,7 @@ fn test_receive_stock_messages() {
         println!("Received {} messages in {:?}", message_count, start.elapsed());
 
         // Cleanup
-        client.unsubscribe("trades:2330").await.ok();
+        client.unsubscribe(["trades:2330"]).await.ok();
         client.disconnect().await.ok();
     });
 }
@@ -264,7 +269,7 @@ fn test_message_latency() {
         client.connect().await.expect("Failed to connect");
 
         // Subscribe to aggregates for snapshot data
-        let sub = SubscribeRequest::aggregates("2330");
+        let sub = StockSubscription::new(Channel::Aggregates, "2330");
         client.subscribe(sub).await.expect("Failed to subscribe");
 
         let receiver = client.messages();
@@ -311,7 +316,7 @@ fn test_reconnection_preserves_subscriptions() {
         client.connect().await.expect("Failed to connect");
 
         // Subscribe to a symbol
-        let sub = SubscribeRequest::trades("2330");
+        let sub = StockSubscription::new(Channel::Trades, "2330");
         client.subscribe(sub).await.expect("Failed to subscribe");
 
         println!("Initial connection established");
@@ -346,12 +351,12 @@ fn test_futopt_subscription() {
 
         // Subscribe to TX futures trades using SubscribeRequest
         // Note: Symbol format may need adjustment based on current contracts
-        let sub = SubscribeRequest::trades("TXFK4");
+        let sub = StockSubscription::new(Channel::Trades, "TXFK4");
         match client.subscribe(sub).await {
             Ok(()) => {
                 println!("Subscribed to TXFK4 trades");
                 tokio::time::sleep(Duration::from_secs(2)).await;
-                client.unsubscribe("trades:TXFK4").await.ok();
+                client.unsubscribe(["trades:TXFK4"]).await.ok();
             }
             Err(e) => {
                 eprintln!("FutOpt subscription error (symbol may be expired): {:?}", e);
@@ -378,7 +383,7 @@ fn test_graceful_disconnect() {
         client.connect().await.expect("Failed to connect");
 
         // Subscribe to something
-        let sub = SubscribeRequest::trades("2330");
+        let sub = StockSubscription::new(Channel::Trades, "2330");
         client.subscribe(sub).await.expect("Failed to subscribe");
 
         // Graceful disconnect with close handshake
@@ -439,9 +444,9 @@ fn test_subscribe_channel_trades() {
 
         client.connect().await.expect("Failed to connect");
 
-        // Use subscribe_channel API with StockSubscription
+        // StockSubscription single-symbol form
         let sub = StockSubscription::new(Channel::Trades, "2330");
-        let result = client.subscribe_channel(sub).await;
+        let result = client.subscribe(sub).await;
 
         match result {
             Ok(()) => {
@@ -468,9 +473,9 @@ fn test_subscribe_multiple_symbols() {
 
         client.connect().await.expect("Failed to connect");
 
-        // Use subscribe_symbols API for bulk subscription
-        let symbols = &["2330", "2317", "2454"];
-        let result = client.subscribe_symbols(Channel::Trades, symbols, false).await;
+        // Batch-symbol form via StockSubscription::new with Vec<&str>
+        let sub = StockSubscription::new(Channel::Trades, vec!["2330", "2317", "2454"]);
+        let result = client.subscribe(sub).await;
 
         match result {
             Ok(()) => {

@@ -67,7 +67,8 @@ impl WebSocketClient {
     /// # Example
     ///
     /// ```rust
-    /// use marketdata_core::websocket::{ConnectionConfig, WebSocketClient};
+    /// use marketdata_core::aio::WebSocketClient;
+    /// use marketdata_core::websocket::ConnectionConfig;
     /// use marketdata_core::AuthRequest;
     ///
     /// let config = ConnectionConfig::fugle_stock(
@@ -135,7 +136,8 @@ impl WebSocketClient {
     /// # Example
     ///
     /// ```rust
-    /// use marketdata_core::websocket::{ConnectionConfig, WebSocketClient, ConnectionState};
+    /// use marketdata_core::aio::WebSocketClient;
+    /// use marketdata_core::websocket::{ConnectionConfig, ConnectionState};
     /// use marketdata_core::AuthRequest;
     ///
     /// let config = ConnectionConfig::fugle_stock(
@@ -172,7 +174,8 @@ impl WebSocketClient {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use marketdata_core::websocket::{ConnectionConfig, WebSocketClient, ConnectionState};
+    /// use marketdata_core::aio::WebSocketClient;
+    /// use marketdata_core::websocket::{ConnectionConfig, ConnectionState};
     /// use marketdata_core::AuthRequest;
     ///
     /// # async fn example() {
@@ -228,7 +231,8 @@ impl WebSocketClient {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use marketdata_core::websocket::{WebSocketClient, ConnectionConfig, ConnectionEvent};
+    /// use marketdata_core::aio::WebSocketClient;
+    /// use marketdata_core::websocket::{ConnectionConfig, ConnectionEvent};
     /// use marketdata_core::AuthRequest;
     /// use std::sync::Arc;
     ///
