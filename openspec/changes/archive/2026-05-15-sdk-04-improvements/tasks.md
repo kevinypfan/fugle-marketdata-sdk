@@ -71,7 +71,7 @@
 
 - [x] 8.1 Run `openspec validate sdk-04-improvements --strict`
 - [x] 8.2 Bump `core/Cargo.toml` version to `0.4.0`
-- [ ] 8.3 Tag and publish: `cargo publish -p marketdata-core` (after CI green on all binding workspaces)
+- [x] 8.3 Tag and publish: `cargo publish -p marketdata-core` (after CI green on all binding workspaces)
 - [x] 8.4 Update `.planning/intel/` notes (if any) reflecting the binding compensation pattern for future core bumps  
   *(N/A — `.planning/intel/` does not exist in this repo; binding compensation pattern is documented in `MIGRATION-0.4.md` "Bindings" section and enforced by `core/tests/binding_compensation.rs`.)*
-- [ ] 8.5 Run `openspec archive sdk-04-improvements` after release lands
+- [x] 8.5 Run `openspec archive sdk-04-improvements` after release lands
