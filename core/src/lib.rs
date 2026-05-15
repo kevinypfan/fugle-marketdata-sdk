@@ -32,7 +32,6 @@
 pub mod errors;
 pub mod models;
 pub mod rest;
-pub mod runtime;
 pub mod tls;
 pub mod websocket;
 
@@ -91,8 +90,8 @@ pub use models::futopt::{
 };
 pub use websocket::channels::FutOptSubscription;
 
-// Re-export runtime
-pub use runtime::AsyncRuntime;
+// Re-export runtime (lives under websocket::aio in 0.3)
+pub use websocket::aio::AsyncRuntime;
 
 // Future modules (to be added in later phases):
 // pub mod rest;

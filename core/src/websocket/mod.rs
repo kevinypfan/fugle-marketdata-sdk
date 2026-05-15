@@ -7,9 +7,9 @@
 //! - Event notifications for connection events
 //! - Channel-specific subscription and parsing
 
+pub mod aio;
 pub mod channels;
 pub mod config;
-pub mod connection;
 pub mod connection_event;
 pub mod health_check;
 pub mod message;
@@ -18,9 +18,9 @@ pub mod reconnection;
 pub mod subscription;
 
 // Re-export public types
+pub use aio::WebSocketClient;
 pub use channels::StockSubscription;
 pub use config::ConnectionConfig;
-pub use connection::WebSocketClient;
 pub use connection_event::{ConnectionEvent, ConnectionState};
 pub use health_check::HealthCheckConfig;
 pub use message::MessageReceiver;
