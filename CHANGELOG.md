@@ -88,8 +88,15 @@ tokio-comp = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 Python / Node.js / UniFFI / Tauri all enable `tokio-comp` on their
 `marketdata-core` workspace dep and import
 `marketdata_core::aio::WebSocketClient` explicitly. No FFI surface
-change. A follow-up will evaluate whether each binding should switch to
-the sync core (drops `pyo3-async-runtimes`, `napi tokio_rt`, etc.).
+change.
+
+Per-binding sync-vs-async evaluation completed in
+[docs/FFI-BINDING-RUNTIME-DECISION.md](docs/FFI-BINDING-RUNTIME-DECISION.md):
+**all four bindings keep `tokio-comp`** because each maps its target
+language's idiomatic async surface (Python `await`, Node `Promise`,
+UniFFI `suspend fun` / Swift async, Tauri's tokio runtime) onto the
+async client. Sync core remains the canonical entry point for
+third-party Rust applications that don't want a runtime imposed.
 
 ## [Rust 0.2.0] - TBD
 
