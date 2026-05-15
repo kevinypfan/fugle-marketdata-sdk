@@ -10,15 +10,18 @@
 pub mod channels;
 pub mod config;
 pub mod connection;
+pub mod connection_event;
 pub mod health_check;
 pub mod message;
+pub(crate) mod protocol;
 pub mod reconnection;
 pub mod subscription;
 
 // Re-export public types
 pub use channels::StockSubscription;
 pub use config::ConnectionConfig;
-pub use connection::{ConnectionEvent, ConnectionState, WebSocketClient};
+pub use connection::WebSocketClient;
+pub use connection_event::{ConnectionEvent, ConnectionState};
 pub use health_check::HealthCheckConfig;
 pub use message::MessageReceiver;
 pub use reconnection::{ReconnectionConfig, ReconnectionManager};

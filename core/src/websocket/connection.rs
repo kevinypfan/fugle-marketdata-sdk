@@ -1,9 +1,14 @@
 //! WebSocket connection lifecycle management
 
 use crate::models::{SubscribeRequest, WebSocketMessage, WebSocketRequest};
+use crate::websocket::connection_event::emit_event;
+use crate::websocket::protocol::{
+    classify_auth_response, frame_auth, frame_request, frame_subscribe, frame_subscribe_futopt,
+    frame_subscribe_raw, frame_unsubscribe, AuthOutcome,
+};
 use crate::websocket::{
-    ConnectionConfig, HealthCheckConfig, MessageReceiver, ReconnectionConfig,
-    ReconnectionManager, SubscriptionManager,
+    ConnectionConfig, ConnectionEvent, ConnectionState, HealthCheckConfig, MessageReceiver,
+    ReconnectionConfig, ReconnectionManager, SubscriptionManager,
 };
 use crate::MarketDataError;
 use futures_util::stream::{SplitSink, SplitStream};
@@ -31,72 +36,6 @@ fn tls_connector_for(
 type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
 /// Type alias for WebSocket read half
 type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
-
-/// Emit a [`ConnectionEvent`] on the bounded event channel.
-///
-/// The channel is `std::sync::mpsc::sync_channel(1024)`. We use `try_send`
-/// here so that a stuck consumer can never block the connection task. On
-/// saturation we drop the new event and surface a `stderr` warning so an
-/// operator can detect the wedge.
-///
-/// We accept *drop-newest* over the theoretically nicer drop-oldest because
-/// `std::sync::mpsc` does not expose receiver-side access to the sender, and
-/// switching to a primitive that does (e.g. `tokio::sync::broadcast`) would
-/// break the public `events()` / `state_events()` API shape that the binding
-/// crates depend on. The cap of 1024 is large enough that saturation is
-/// itself the bug signal — a healthy consumer never approaches it.
-pub(crate) fn emit_event(tx: &mpsc::SyncSender<ConnectionEvent>, event: ConnectionEvent) {
-    if let Err(mpsc::TrySendError::Full(dropped)) = tx.try_send(event) {
-        eprintln!(
-            "[fugle-marketdata-core] event channel saturated (cap=1024); \
-             dropped {:?}. Consumer is likely stuck.",
-            dropped
-        );
-    }
-}
-
-/// WebSocket connection state machine
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConnectionState {
-    /// Not connected
-    Disconnected,
-    /// Connecting to server
-    Connecting,
-    /// Authenticating with server
-    Authenticating,
-    /// Connected and authenticated
-    Connected,
-    /// Reconnecting after disconnection
-    Reconnecting { attempt: u32 },
-    /// Connection closed
-    Closed { code: Option<u16>, reason: String },
-}
-
-/// Events emitted by WebSocket connection
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConnectionEvent {
-    /// Connection attempt started
-    Connecting,
-    /// Connection established
-    Connected,
-    /// Authentication successful
-    Authenticated,
-    /// Authentication rejected by the server (parallels old SDKs' `unauthenticated` event)
-    Unauthenticated { message: String },
-    /// Connection closed
-    Disconnected { code: Option<u16>, reason: String },
-    /// Reconnection attempt started
-    Reconnecting { attempt: u32 },
-    /// Reconnection failed after max attempts
-    ReconnectFailed { attempts: u32 },
-    /// Heartbeat timeout: no inbound frame received within the configured
-    /// `heartbeat_timeout` window. Emitted by the dispatch loop when the
-    /// read-site `tokio::time::timeout` fires; the dispatch loop returns
-    /// immediately afterwards, which lets the reconnect path take over.
-    HeartbeatTimeout { elapsed: Duration },
-    /// Error occurred
-    Error { message: String, code: i32 },
-}
 
 /// WebSocket client for real-time market data
 pub struct WebSocketClient {
@@ -465,9 +404,7 @@ impl WebSocketClient {
         }
 
         // Send authentication message
-        let auth_msg = WebSocketRequest::auth(self.config.auth.clone());
-        let auth_json = serde_json::to_string(&auth_msg)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+        let auth_json = frame_auth(self.config.auth.clone())?;
 
         ws_sink
             .send(Message::Text(auth_json.into()))
@@ -488,15 +425,12 @@ impl WebSocketClient {
                             // Forward ALL messages to channel (including auth)
                             let _ = message_tx.send(ws_msg.clone()).await;
 
-                            if ws_msg.is_authenticated() {
-                                return Ok(());
-                            }
-                            if ws_msg.is_error() {
-                                return Err(MarketDataError::AuthError {
-                                    msg: ws_msg
-                                        .error_message()
-                                        .unwrap_or_else(|| "Unknown error".to_string()),
-                                });
+                            match classify_auth_response(&ws_msg) {
+                                AuthOutcome::Authenticated => return Ok(()),
+                                AuthOutcome::Failed(msg) => {
+                                    return Err(MarketDataError::AuthError { msg })
+                                }
+                                AuthOutcome::Pending => {}
                             }
                         }
                     }
@@ -730,35 +664,19 @@ impl WebSocketClient {
         &self,
         sub: crate::websocket::channels::StockSubscription,
     ) -> Result<(), MarketDataError> {
-        use crate::models::{SubscribeRequest, SymbolSpec};
-
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
 
-        let mut wire_req = SubscribeRequest {
-            channel: sub.channel.as_str().to_string(),
-            ..Default::default()
-        };
-        match &sub.symbols {
-            SymbolSpec::Single(s) => wire_req.symbol = Some(s.clone()),
-            SymbolSpec::Many(v) => wire_req.symbols = Some(v.clone()),
-        }
-        if sub.intraday_odd_lot {
-            wire_req.intraday_odd_lot = Some(true);
-        }
+        let (sub_json, expanded) = frame_subscribe(sub)?;
 
         // Internal bookkeeping: store N per-symbol rows (1 for single,
         // len() for batch). Each row has its own local key for ACK
         // recording. On reconnect each row sends its own frame — refolding
         // back into batches is a future optimization.
-        for entry in wire_req.clone().expand() {
+        for entry in expanded {
             self.subscriptions.subscribe(entry);
         }
-
-        let sub_msg = WebSocketRequest::subscribe(wire_req);
-        let sub_json = serde_json::to_string(&sub_msg)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
 
         if self.is_connected().await {
             self.enqueue_write(sub_json).await?;
@@ -775,31 +693,15 @@ impl WebSocketClient {
         &self,
         sub: crate::websocket::channels::FutOptSubscription,
     ) -> Result<(), MarketDataError> {
-        use crate::models::{SubscribeRequest, SymbolSpec};
-
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
 
-        let mut wire_req = SubscribeRequest {
-            channel: sub.channel.as_str().to_string(),
-            ..Default::default()
-        };
-        match &sub.symbols {
-            SymbolSpec::Single(s) => wire_req.symbol = Some(s.clone()),
-            SymbolSpec::Many(v) => wire_req.symbols = Some(v.clone()),
-        }
-        if sub.after_hours {
-            wire_req.after_hours = Some(true);
-        }
+        let (sub_json, expanded) = frame_subscribe_futopt(sub)?;
 
-        for entry in wire_req.clone().expand() {
+        for entry in expanded {
             self.subscriptions.subscribe(entry);
         }
-
-        let sub_msg = WebSocketRequest::subscribe(wire_req);
-        let sub_json = serde_json::to_string(&sub_msg)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
 
         if self.is_connected().await {
             self.enqueue_write(sub_json).await?;
@@ -826,8 +728,6 @@ impl WebSocketClient {
         &self,
         ids: impl IntoIterator<Item = impl Into<String>>,
     ) -> Result<(), MarketDataError> {
-        use crate::models::UnsubscribeRequest;
-
         if self.is_closed().await {
             return Err(MarketDataError::ClientClosed);
         }
@@ -853,14 +753,7 @@ impl WebSocketClient {
             return Ok(());
         }
 
-        let unsub_req = if wire_ids.len() == 1 {
-            UnsubscribeRequest::by_id(wire_ids.into_iter().next().unwrap())
-        } else {
-            UnsubscribeRequest::by_ids(wire_ids)
-        };
-        let unsub_msg = WebSocketRequest::unsubscribe(unsub_req);
-        let unsub_json = serde_json::to_string(&unsub_msg)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+        let unsub_json = frame_unsubscribe(wire_ids)?;
         self.enqueue_write(unsub_json).await?;
         Ok(())
     }
@@ -912,9 +805,7 @@ impl WebSocketClient {
         let subs = self.subscriptions.get_all();
 
         for req in subs {
-            let sub_msg = WebSocketRequest::subscribe(req);
-            let sub_json = serde_json::to_string(&sub_msg)
-                .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+            let sub_json = frame_subscribe_raw(req)?;
             self.enqueue_write(sub_json).await?;
         }
 
@@ -933,8 +824,7 @@ impl WebSocketClient {
             return Err(MarketDataError::ClientClosed);
         }
 
-        let json = serde_json::to_string(&request)
-            .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+        let json = frame_request(&request)?;
         self.enqueue_write(json).await
     }
 
@@ -1307,8 +1197,7 @@ async fn try_reconnect(
                         // Resubscribe all stored subscriptions through the new writer
                         let subs = subscriptions.get_all();
                         for req in subs {
-                            let sub_msg = WebSocketRequest::subscribe(req);
-                            if let Ok(sub_json) = serde_json::to_string(&sub_msg) {
+                            if let Ok(sub_json) = frame_subscribe_raw(req) {
                                 let _ = new_write_tx.send(sub_json).await;
                             }
                         }
@@ -1406,9 +1295,7 @@ async fn try_connect(
         *st = ConnectionState::Authenticating;
     }
 
-    let auth_msg = WebSocketRequest::auth(config.auth.clone());
-    let auth_json = serde_json::to_string(&auth_msg)
-        .map_err(|e| MarketDataError::DeserializationError { source: e })?;
+    let auth_json = frame_auth(config.auth.clone())?;
 
     new_ws_sink
         .send(Message::Text(auth_json.into()))
@@ -1424,15 +1311,12 @@ async fn try_connect(
                 Ok(Message::Text(text)) => {
                     if let Ok(ws_msg) = serde_json::from_str::<WebSocketMessage>(&text) {
                         let _ = msg_tx.send(ws_msg.clone()).await;
-                        if ws_msg.is_authenticated() {
-                            return Ok(());
-                        }
-                        if ws_msg.is_error() {
-                            return Err(MarketDataError::AuthError {
-                                msg: ws_msg
-                                    .error_message()
-                                    .unwrap_or_else(|| "Unknown error".to_string()),
-                            });
+                        match classify_auth_response(&ws_msg) {
+                            AuthOutcome::Authenticated => return Ok(()),
+                            AuthOutcome::Failed(msg) => {
+                                return Err(MarketDataError::AuthError { msg })
+                            }
+                            AuthOutcome::Pending => {}
                         }
                     }
                 }
