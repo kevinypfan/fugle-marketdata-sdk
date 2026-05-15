@@ -7,18 +7,24 @@ Rust SDK for [Fugle](https://developer.fugle.tw) market data. Provides REST API 
 - **REST Client**: Synchronous HTTP client for market data queries
   - Stock intraday data (quote, ticker, candles, trades, volumes)
   - FutOpt (futures/options) intraday data
-- **WebSocket Client**: Async real-time streaming
+- **WebSocket Client**: real-time streaming, **sync by default**, optional
+  tokio variant under `aio::` behind the `tokio-comp` feature
   - Stock channels: trades, candles, books, aggregates, indices
   - FutOpt channels: trades, candles, books, aggregates
   - Automatic reconnection with exponential backoff
   - Health check monitoring
 - **Authentication**: API key, bearer token, or SDK token
+- **Optional `tokio-comp` feature** — opt in for the async client. Sync
+  consumers pay zero tokio in their `Cargo.lock`.
 
 ## Installation
 
-```bash
-cargo add fugle-marketdata
-cargo add tokio --features rt-multi-thread,macros
+```toml
+# sync (no tokio in the dependency tree)
+fugle-marketdata = "0.3"
+
+# async (tokio + tokio-tungstenite)
+fugle-marketdata = { version = "0.3", features = ["tokio-comp"] }
 ```
 
 ## Quick Start
@@ -53,7 +59,7 @@ println!("Futures close price: {:?}", futopt_quote.close_price);
 # }
 ```
 
-### WebSocket Streaming
+### WebSocket Streaming (sync, default)
 
 ```rust,no_run
 use fugle_marketdata::{
@@ -62,36 +68,31 @@ use fugle_marketdata::{
 };
 use std::time::Duration;
 
-# async fn run() -> Result<(), fugle_marketdata::MarketDataError> {
+# fn run() -> Result<(), fugle_marketdata::MarketDataError> {
 let config = ConnectionConfig::fugle_stock(
     AuthRequest::with_api_key(
         std::env::var("FUGLE_API_KEY").expect("FUGLE_API_KEY not set")
     )
 );
 let client = WebSocketClient::new(config);
-
-client.connect().await?;
+client.connect()?;
 
 // Single symbol
-client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+client.subscribe(StockSubscription::new(Channel::Trades, "2330"))?;
 
 // Batch — one frame subscribes N symbols
 client.subscribe(StockSubscription::new(
     Channel::Aggregates,
     vec!["2330", "0050", "2603"],
-)).await?;
+))?;
 
 // Odd-lot session: builder modifier applies to every symbol
 client.subscribe(
     StockSubscription::new(Channel::Trades, "2330").with_odd_lot(true)
-).await?;
+)?;
 
 let messages = client.messages();
 for _ in 0..10 {
-    // receive_timeout returns Result<Option<msg>, _>:
-    //   Ok(Some(msg)) — message received
-    //   Ok(None)      — timeout elapsed, no message
-    //   Err(_)        — channel closed
     if let Ok(Some(msg)) = messages.receive_timeout(Duration::from_secs(5)) {
         if msg.is_data() {
             println!("Data: {:?} - {:?}", msg.channel, msg.symbol);
@@ -100,33 +101,40 @@ for _ in 0..10 {
 }
 
 // Unsubscribe by server id(s) — accepts a single id or a batch.
-client.unsubscribe(["server-id-1", "server-id-2"]).await?;
+client.unsubscribe(["server-id-1", "server-id-2"])?;
 
+client.disconnect()?;
+# Ok(())
+# }
+```
+
+### WebSocket Streaming (async, `features = ["tokio-comp"]`)
+
+Same API surface — replace `WebSocketClient` with `aio::WebSocketClient`
+and add `.await`:
+
+```rust,ignore
+use fugle_marketdata::aio::WebSocketClient;
+use fugle_marketdata::{AuthRequest, Channel, websocket::{ConnectionConfig, StockSubscription}};
+
+# async fn run() -> Result<(), fugle_marketdata::MarketDataError> {
+let config = ConnectionConfig::fugle_stock(AuthRequest::with_api_key("..."));
+let client = WebSocketClient::new(config);
+client.connect().await?;
+client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+
+let mut stream = client.message_stream();
+while let Some(msg) = stream.recv().await {
+    if msg.is_data() { /* ... */ }
+}
 client.disconnect().await?;
 # Ok(())
 # }
 ```
 
-#### Pure-async consumers
-
-Prefer `message_stream()` over `messages()` to skip the std-mpsc bridge hop:
-
-```rust,no_run
-# use fugle_marketdata::{WebSocketClient, websocket::ConnectionConfig, AuthRequest};
-# async fn run(client: WebSocketClient) -> Result<(), fugle_marketdata::MarketDataError> {
-let mut stream = client.message_stream();
-while let Some(msg) = stream.recv().await {
-    if msg.is_data() {
-        println!("Data: {:?} - {:?}", msg.channel, msg.symbol);
-    }
-}
-# Ok(())
-# }
-```
-
-`messages()` and `message_stream()` are mutually exclusive — each takes
-ownership of the underlying tokio receiver; calling the other afterwards
-will panic. Pick one based on consumer style.
+The async client lives under `fugle_marketdata::aio::` and is only available
+when the `tokio-comp` feature is enabled. Upgrading from 0.2: see
+[MIGRATION-0.3.md](../MIGRATION-0.3.md).
 
 ## Authentication
 

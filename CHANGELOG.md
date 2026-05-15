@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Rust 0.3.0] - TBD
+
+Third Rust crate release — **sync-default `WebSocketClient` with optional
+tokio runtime**, following the redis-rs `tokio-comp` pattern. REST already
+ran on `ureq` (sync); WebSocket joins it as the default surface. Consumers
+that need the async client opt in via a feature flag.
+
+### Breaking — default `WebSocketClient` is now sync
+
+```rust
+// 0.2
+let client = WebSocketClient::new(config);
+client.connect().await?;
+client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+
+// 0.3 (default, no tokio)
+let client = WebSocketClient::new(config);
+client.connect()?;
+client.subscribe(StockSubscription::new(Channel::Trades, "2330"))?;
+
+// 0.3 (async, requires `features = ["tokio-comp"]`)
+use fugle_marketdata::aio::WebSocketClient;
+let client = WebSocketClient::new(config);
+client.connect().await?;
+client.subscribe(StockSubscription::new(Channel::Trades, "2330")).await?;
+```
+
+`.await` on `connect()`/`subscribe()`/etc. is a compile error after the
+upgrade — that's the migration signal. Names and arguments are identical
+between the two clients (redis-rs convention).
+
+### New — `tokio-comp` feature
+
+```toml
+[features]
+default = []
+tokio-comp = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
+```
+
+- `fugle-marketdata` and `fugle-marketdata-core` both expose `tokio-comp`.
+- Sync consumers compile with **zero tokio** in `Cargo.lock` (~80 fewer
+  transitive crates, ~30-40s faster cold build, ~600-900KB lighter binary).
+- Async consumers see no change in dep graph: `tokio-tungstenite 0.29`
+  already depends on the same `tungstenite 0.29` that the sync path uses.
+
+### Moved — async API under `aio::`
+
+| 0.2 path | 0.3 path |
+|---|---|
+| `marketdata_core::WebSocketClient` (async) | `marketdata_core::aio::WebSocketClient` |
+| `marketdata_core::AsyncRuntime` | `marketdata_core::aio::AsyncRuntime` (gated) |
+| `fugle_marketdata::WebSocketClient` (async) | `fugle_marketdata::aio::WebSocketClient` |
+
+### Removed — redundant async wrappers
+
+- `state_async()` — drop; the sync `state()` reads the same `RwLock`.
+- `is_closed()` (async) — folded into the sync `is_closed()`. The 0.2
+  `is_closed_sync()` rename intermediate is gone; just use `is_closed()`.
+- `message_stream()` — only available on `aio::WebSocketClient` (returns
+  `tokio::sync::mpsc::Receiver`). Sync callers use `messages()`.
+
+### Internal refactors (no behavior change)
+
+- New `core/src/websocket/protocol.rs`: framing/parsing helpers shared
+  between sync + async paths (wraps existing `WebSocketRequest::{auth,
+  subscribe, unsubscribe}` model constructors).
+- New `core/src/websocket/connection_event.rs`: runtime-free
+  `ConnectionState`, `ConnectionEvent`, `emit_event`.
+- New `core/src/websocket/sync/`: blocking client backed by `tungstenite`
+  + `std::thread`. Single owner thread per connection with a bounded
+  outbound queue (`sync_channel(64)`) and `set_read_timeout`-based
+  polling. Supervisor handles automatic reconnect with exponential
+  backoff matching the async path.
+- `core/src/runtime.rs` moved to `core/src/websocket/aio/runtime.rs`
+  (only consumed by FFI bindings; gated behind `tokio-comp`).
+
+### FFI bindings
+
+Python / Node.js / UniFFI / Tauri all enable `tokio-comp` on their
+`marketdata-core` workspace dep and import
+`marketdata_core::aio::WebSocketClient` explicitly. No FFI surface
+change. A follow-up will evaluate whether each binding should switch to
+the sync core (drops `pyo3-async-runtimes`, `napi tokio_rt`, etc.).
+
 ## [Rust 0.2.0] - TBD
 
 Second Rust crate release — clean-slate subscribe/unsubscribe API and
