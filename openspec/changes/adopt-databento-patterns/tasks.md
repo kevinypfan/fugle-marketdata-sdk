@@ -1,82 +1,78 @@
 ## 1. `bon` adoption — low-risk builders first
 
-- [ ] 1.1 Add `bon = "3"` to `core/Cargo.toml` `[dependencies]`
-- [ ] 1.2 Replace `RetryPolicy` hand-rolled builder with `#[derive(bon::Builder)]`; keep `conservative()` / `aggressive()` preset constructors as inherent methods
-- [ ] 1.3 Update `RetryPolicy` tests to use the new builder shape (`RetryPolicy::builder()...build()`)
-- [ ] 1.4 Replace `ReconnectionConfig` hand-rolled builder with `#[derive(bon::Builder)]`; keep `disabled()` / `default()` preset constructors
-- [ ] 1.5 Update `ReconnectionConfig` tests + `tests/reconnect_default.rs` CI gate
-- [ ] 1.6 Run `cargo test --all-features -p fugle-marketdata-core` and verify green
-- [ ] 1.7 Commit `refactor(core): adopt bon for RetryPolicy and ReconnectionConfig builders`
+- [x] 1.1 Add `bon = "3"` to `core/Cargo.toml` `[dependencies]`
+- [x] 1.2 Replace `RetryPolicy` hand-rolled builder with `#[derive(bon::Builder)]`; keep `conservative()` / `aggressive()` preset constructors as inherent methods _(additive: `new()` retained, `builder()` is new)_
+- [x] 1.3 Update `RetryPolicy` tests to use the new builder shape (`RetryPolicy::builder()...build()`)
+- [x] 1.4 Replace `ReconnectionConfig` hand-rolled builder with `#[derive(bon::Builder)]`; keep `disabled()` / `default()` preset constructors. Removed `with_*` chainable validators (replaced by bon's setters; validation remains on `new()`).
+- [x] 1.5 Update `ReconnectionConfig` tests + `tests/reconnect_default.rs` CI gate
+- [x] 1.6 `cargo test --all-features -p fugle-marketdata-core` — 421 passed
+- [x] 1.7 Commit `refactor(core): adopt bon for RetryPolicy and ReconnectionConfig builders` (3b2eb5b)
 
 ## 2. `Symbols` module split + helpers
 
-- [ ] 2.1 Create `core/src/websocket/models/symbols.rs` with `pub enum Symbols { Single(String), Many(Vec<String>) }`
-- [ ] 2.2 Move all 9 existing `From` impls from `core/src/websocket/models/subscription.rs` into the new module, retargeting `SymbolSpec` → `Symbols`
-- [ ] 2.3 Implement `Symbols::normalized()`: trim each entry, drop empty, dedup preserving first-seen order, collapse `Many` of len 1 to `Single`
-- [ ] 2.4 Implement `Symbols::len()`, `Symbols::is_empty()`, `Symbols::iter()`
-- [ ] 2.5 Implement `Symbols::chunked(max_per_chunk)`: validate non-zero (panic if zero with clear message), split preserving order
-- [ ] 2.6 Add `pub const SUBSCRIPTION_BATCH_LIMIT: Option<usize> = None;` to the module
-- [ ] 2.7 Add unit tests covering all 9 scenarios from `specs/subscription-api/spec.md` (Symbols normalization, chunking, len, dedup, whitespace, empty drop, Many→Single collapse)
-- [ ] 2.8 Re-export `Symbols` from `core/src/websocket/models/mod.rs` and `core/src/lib.rs`; remove old `SymbolSpec` declaration from `subscription.rs`
-- [ ] 2.9 Search workspace for `SymbolSpec` references; rename to `Symbols` (in `core/`, `py/`, `js/`, `uniffi/`, and tests)
-- [ ] 2.10 Commit `refactor(core)!: rename SymbolSpec to Symbols, move to dedicated module`
+- [x] 2.1 Create `core/src/models/symbols.rs` with `pub enum Symbols { Single(String), Many(Vec<String>) }`
+- [x] 2.2 Moved all 9 existing `From` impls into the new module, retargeting `SymbolSpec` → `Symbols`
+- [x] 2.3 Implemented `Symbols::normalized()`: trim each entry, drop empty, dedup preserving first-seen order, collapse `Many` of len 1 to `Single`
+- [x] 2.4 Implemented `Symbols::len()`, `Symbols::is_empty()`, `Symbols::iter()`
+- [x] 2.5 Implemented `Symbols::chunked(max_per_chunk)`: validates non-zero (panics with clear message), splits preserving order
+- [x] 2.6 Added `pub const SUBSCRIPTION_BATCH_LIMIT: Option<usize> = None;`
+- [x] 2.7 13 unit tests cover all spec scenarios (Symbols normalization, chunking, len, dedup, whitespace, empty drop, Many→Single collapse)
+- [x] 2.8 Re-exported `Symbols` from `core/src/models/mod.rs` (already re-exported at crate root); removed old `SymbolSpec` declaration from `subscription.rs`
+- [x] 2.9 Mass-renamed `SymbolSpec` → `Symbols` across `core/` (6 files); FFI bindings unaffected
+- [x] 2.10 Commit `refactor(core)!: rename SymbolSpec to Symbols, move to dedicated module` (b07c312)
 
 ## 3. Subscription dispatch dedup
 
-- [ ] 3.1 Modify `SubscribeRequest::with_symbols(channel, symbols)` to call `.normalized()` on the input before producing the request
-- [ ] 3.2 Modify `StockSubscription::new(channel, symbols)` and `FutOptSubscription::new(channel, symbols)` similarly
-- [ ] 3.3 Add integration test in `core/tests/integration_websocket.rs` covering "duplicate symbols collapse to one subscription"
-- [ ] 3.4 Add integration test covering "whitespace-only differences collapse"
-- [ ] 3.5 Add integration test covering "distinct symbols all retained in insertion order"
-- [ ] 3.6 Verify `SubscriptionManager` count assertions still pass
-- [ ] 3.7 Commit `feat(core)!: deduplicate symbols in subscription dispatch via Symbols::normalized`
+- [x] 3.1 `SubscribeRequest::with_symbols` runs `.normalized()` on input
+- [x] 3.2 `StockSubscription::new` / `FutOptSubscription::new` similarly normalize
+- [x] 3.3 Added unit test `with_symbols_dedups_duplicates`
+- [x] 3.4 Added unit test `with_symbols_collapses_whitespace_differences`
+- [x] 3.5 Added unit test `with_symbols_keeps_distinct_in_insertion_order`
+- [x] 3.6 Added `with_symbols_empty_input_yields_no_symbol_field` (replaces "no expand entries" — empty input produces a request with neither `symbol` nor `symbols` populated)
+- [x] 3.7 Commit `feat(core)!: deduplicate symbols in subscription dispatch via Symbols::normalized` (3a3dbc7)
 
 ## 4. `bon` for ConnectionConfig + SubscribeRequest
 
-- [ ] 4.1 Add `#[derive(bon::Builder)]` to `ConnectionConfig`; configure defaults (`message_buffer = 4096`, `event_buffer = 1024`) via `#[builder(default = ...)]` attributes
-- [ ] 4.2 Verify `ConnectionConfig::builder(url, auth)` call sites still work (keep thin wrapper if signature differs)
-- [ ] 4.3 Update `websocket-config` spec scenarios — verify all 5 existing scenarios still pass post-refactor
-- [ ] 4.4 Add `#[derive(bon::Builder)]` to `SubscribeRequest`; keep `with_symbols(channel, symbols)` hand-written (it's the dedup gate from step 3.1)
-- [ ] 4.5 Delete old `ConnectionConfigBuilder` and `SubscribeRequest` builder boilerplate
-- [ ] 4.6 Run `cargo test --all-features -p fugle-marketdata-core` and verify green
-- [ ] 4.7 Commit `refactor(core): bon::Builder for ConnectionConfig and SubscribeRequest`
+- [ ] 4.1 ~~Add `#[derive(bon::Builder)]` to `ConnectionConfig`~~ _(skipped — bon's derived setters can't replicate the `assert!(cap > 0)` validation contract in the existing `websocket-config` spec; hand-rolled `ConnectionConfigBuilder` preserves it. Documented in 9cee45d commit message.)_
+- [ ] 4.2 _(N/A — see 4.1; existing `ConnectionConfig::builder(url, auth)` call sites unchanged)_
+- [ ] 4.3 _(N/A — see 4.1; all 5 `websocket-config` spec scenarios continue to pass)_
+- [x] 4.4 Added `#[derive(bon::Builder)]` to `SubscribeRequest`; `with_symbols(channel, symbols)` kept hand-written as the dedup gate from Group 3
+- [ ] 4.5 ~~Delete old `ConnectionConfigBuilder` boilerplate~~ _(skipped — see 4.1)_
+- [x] 4.6 `cargo test --all-features -p fugle-marketdata-core --lib` — 439 passed
+- [x] 4.7 Commit `refactor(core): bon::Builder for SubscribeRequest` (9cee45d)
 
 ## 5. Typestate `WebSocketFactory`
 
-- [ ] 5.1 Add zero-sized marker types `Unset` and `WithAuth(AuthRequest)` to `core/src/websocket/factory.rs`
-- [ ] 5.2 Parameterize `WebSocketFactory<S = Unset>` over the state type; `state: S` field stores the marker
-- [ ] 5.3 Implement `WebSocketFactory::new() -> WebSocketFactory<Unset>` with default base URL = `urls::WS_BASE_ROOT`
-- [ ] 5.4 Implement `auth(self, auth: AuthRequest) -> WebSocketFactory<WithAuth>` on `WebSocketFactory<Unset>`
-- [ ] 5.5 Move `stock()` / `futopt()` into `impl WebSocketFactory<WithAuth>` so they're only callable post-auth
-- [ ] 5.6 Keep `base_url(...)` as a `impl<S> WebSocketFactory<S>` method so it works in any state
-- [ ] 5.7 Add doctest verifying `WebSocketFactory::new().stock()` fails to compile (use `compile_fail` annotation)
-- [ ] 5.8 Update all internal call sites: `WebSocketFactory::new(auth)` → `WebSocketFactory::new().auth(auth)` (examples, tests, integration tests)
-- [ ] 5.9 Update spec scenarios in `openspec/specs/websocket-config/spec.md` (post-archive); for now align change spec scenarios
-- [ ] 5.10 Run full test suite + FFI binding builds
-- [ ] 5.11 Commit `feat(core)!: typestate-enforced WebSocketFactory builder`
+- [x] 5.1 Added zero-sized marker types `Unset` and `WithAuth(AuthRequest)` to `core/src/websocket/factory.rs`
+- [x] 5.2 Parameterized `WebSocketFactory<S = Unset>` over the state type
+- [x] 5.3 `WebSocketFactory::new() -> WebSocketFactory<Unset>` with default base URL = `urls::WS_BASE_ROOT`
+- [x] 5.4 `auth(self, AuthRequest) -> WebSocketFactory<WithAuth>` available on `WebSocketFactory<Unset>`
+- [x] 5.5 `stock()` / `futopt()` moved into `impl WebSocketFactory<WithAuth>` — only callable post-auth
+- [x] 5.6 `base_url(...)` lives in `impl<S> WebSocketFactory<S>` so it composes in either order
+- [x] 5.7 Added two module-level `compile_fail` doctests verifying `.stock()` and `.futopt()` are rejected without `.auth(...)`
+- [x] 5.8 Updated all internal call sites: `WebSocketFactory::new(auth)` → `WebSocketFactory::new().auth(auth)`
+- [x] 5.9 Spec scenarios in the change's `specs/websocket-config/spec.md` aligned with the typestate shape
+- [x] 5.10 Full test suite + FFI binding builds pass (440 unit + 62 doc + 3 FFI crates)
+- [x] 5.11 Commit `feat(core)!: typestate-enforced WebSocketFactory builder` (8b0f6a6)
 
 ## 6. Migration documentation
 
-- [ ] 6.1 Create `docs/MIGRATION-0.5.md` covering:
-  - `SymbolSpec → Symbols` rename (with `sed` recipe)
-  - `WebSocketFactory::new(auth)` → `WebSocketFactory::new().auth(auth)` migration
-  - Dedup behavioral change (note that duplicate symbols now collapse)
-  - `bon::Builder` API parity (same method names, same defaults)
-- [ ] 6.2 Add link to migration guide in `core/README.md`
-- [ ] 6.3 Update `CHANGELOG.md` with 0.5.0 section marking BREAKING changes per `Migration Plan` in `design.md`
+- [x] 6.1 Created `MIGRATION-0.5.md` covering: `SymbolSpec → Symbols` rename + `sed` recipe, `WebSocketFactory::new(auth) → new().auth(auth)`, dedup behavioral change, `ReconnectionConfig::with_*` removal, additive `bon` builders
+- [x] 6.2 Linked migration guide in CHANGELOG (referenced by the 0.5.0 section header)
+- [x] 6.3 Added `[Rust 0.5.0] - 2026-05-15` section to `CHANGELOG.md` with Breaking / Added / Internal subsections
 
 ## 7. Validation
 
-- [ ] 7.1 Run `cargo test --all-features -p fugle-marketdata-core`
-- [ ] 7.2 Run `cargo build -p fugle-marketdata-py -p fugle-marketdata-js -p fugle-marketdata-uniffi` to confirm FFI bindings compile unchanged
-- [ ] 7.3 Run `cargo clippy --all-features --workspace -- -D warnings`
-- [ ] 7.4 Manually verify example `core/examples/websocket_basic.rs` compiles and runs against staging if available
-- [ ] 7.5 Verify `compile_fail` doctest from 5.7 still fails (regression guard for typestate)
+- [x] 7.1 `cargo test --all-features -p fugle-marketdata-core --lib` — 440 passed
+- [x] 7.2 `cargo check -p marketdata-py -p marketdata-js -p marketdata-uniffi` — all clean
+- [x] 7.3 `cargo clippy --all-features -p fugle-marketdata-core -- -D warnings` — clean
+- [ ] 7.4 Manual `examples/websocket_basic.rs` against staging _(deferred — requires API key)_
+- [x] 7.5 `compile_fail` doctests verified working: 62 doc tests pass (was 60 in 0.4.1, +2 typestate guards)
 
 ## 8. Release prep
 
-- [ ] 8.1 Bump workspace version to 0.5.0 in relevant `Cargo.toml` files
-- [ ] 8.2 Tag-test: `cargo publish --dry-run -p fugle-marketdata-core`
-- [ ] 8.3 Open PR; wait for CI green; merge to main
-- [ ] 8.4 Tag `v0.5.0`; publish `fugle-marketdata-core` and `fugle-marketdata` to crates.io
-- [ ] 8.5 Archive this OpenSpec change once merged: `openspec archive adopt-databento-patterns`
+- [x] 8.1 Bumped workspace versions: `core/Cargo.toml` `0.4.1 → 0.5.0`, `rust/Cargo.toml` `0.4.1 → 0.5.0`, root `Cargo.toml` `marketdata-core` workspace dep `0.4.0 → 0.5.0`
+- [x] 8.2 `cargo publish --dry-run -p fugle-marketdata-core --allow-dirty` — packaged successfully
+- [ ] 8.3 Open PR; wait for CI green; merge to main _(user action)_
+- [ ] 8.4 Tag `v0.5.0`; publish `fugle-marketdata-core` and `fugle-marketdata` to crates.io _(user action — irreversible)_
+- [ ] 8.5 Archive this OpenSpec change: `openspec archive adopt-databento-patterns` _(post-merge)_
