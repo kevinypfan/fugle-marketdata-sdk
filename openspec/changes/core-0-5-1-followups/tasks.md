@@ -1,50 +1,50 @@
 ## 1. ErrorKind classification helper
 
-- [ ] 1.1 Add `pub enum ErrorKind { Network, Protocol, Auth, Client }` with `#[non_exhaustive]` to `core/src/errors.rs`
-- [ ] 1.2 Add `pub fn source_kind(&self) -> ErrorKind` to `impl MarketDataError`, implementing the mapping table from the spec
-- [ ] 1.3 Re-export `ErrorKind` from `core/src/lib.rs`
-- [ ] 1.4 Add unit tests covering all 6 spec scenarios (Network/Protocol/Auth/Network-5xx/Client-validation/wildcard-required)
-- [ ] 1.5 Document the WebSocket-variant coarse-grained mapping (everything → Protocol pre-0.6.0) in the `source_kind()` rustdoc
-- [ ] 1.6 `cargo test --all-features -p fugle-marketdata-core --lib` clean
+- [x] 1.1 Add `pub enum ErrorKind { Network, Protocol, Auth, RateLimit, Client }` with `#[non_exhaustive]` to `core/src/errors.rs` (RateLimit added during apply — operationally distinct from Network)
+- [x] 1.2 Add `pub fn source_kind(&self) -> ErrorKind` to `impl MarketDataError`
+- [x] 1.3 Re-export `ErrorKind` from `core/src/lib.rs`
+- [x] 1.4 7 unit tests covering all categories (Network/Protocol/Auth/RateLimit/Network-5xx/Client-validation/Client-4xx-other) plus `error_kind_variants_exist`
+- [x] 1.5 Documented WebSocket-variant coarse-grained mapping (everything → Protocol pre-0.6.0) in `source_kind()` rustdoc
+- [x] 1.6 `cargo test --all-features -p fugle-marketdata-core --lib` clean
 
 ## 2. Event drop counter
 
-- [ ] 2.1 Refactor `core/src/websocket/connection_event.rs` — change `emit_event` signature to take `&Arc<AtomicU64>` counter alongside the sender; increment on `mpsc::TrySendError::Full`
-- [ ] 2.2 Add `events_dropped_total: Arc<AtomicU64>` field to `aio::WebSocketClient` shared state (mirror `messages_dropped_total` plumbing)
-- [ ] 2.3 Add `events_dropped_total: Arc<AtomicU64>` field to sync `WebSocketClient` shared state
-- [ ] 2.4 Add `pub fn events_dropped_total(&self) -> u64` accessor on both clients
-- [ ] 2.5 Add unit test covering "zero at construction", "increments on saturation", "monotonic"
-- [ ] 2.6 Verify FFI bindings (py/js/uniffi) compile — re-exports are additive only
+- [x] 2.1 Refactored `emit_event` signature to take `&Arc<AtomicU64>` counter; increments on `mpsc::TrySendError::Full` (56 call sites updated)
+- [x] 2.2 Added `events_dropped: Arc<AtomicU64>` field to `aio::WebSocketClient`
+- [x] 2.3 Added `events_dropped: Arc<AtomicU64>` field to sync `OwnerShared` (sync `WebSocketClient`)
+- [x] 2.4 Added `pub fn events_dropped_total(&self) -> u64` accessor on both clients
+- [x] 2.5 Added `events_dropped_total_starts_at_zero`, `events_dropped_increments_on_saturation` (sync), and updated `emit_event_drops_when_channel_full` to assert counter increments
+- [x] 2.6 FFI bindings (py/js/uniffi) compile unchanged — re-exports are additive only
 
 ## 3. Symbols case policy
 
-- [ ] 3.1 Update `core/src/models/symbols.rs` module-level rustdoc to state: "Dedup is byte-for-byte case-sensitive. `Symbols::normalized` MUST NOT case-fold."
-- [ ] 3.2 Add unit test `normalize_preserves_case` asserting `["TXFB6", "txfb6", "TxFb6"]` produces three distinct entries
-- [ ] 3.3 Update `MIGRATION-0.5.md` (or add a note) referencing the case policy for FFI binding implementers
+- [x] 3.1 Updated `core/src/models/symbols.rs` module rustdoc with explicit case-sensitivity policy section
+- [x] 3.2 Added unit tests `normalize_preserves_case` (`TXFB6`/`txfb6`/`TxFb6` retained as 3 entries) and `normalize_preserves_case_after_whitespace_trim`
+- [ ] 3.3 ~~Update MIGRATION-0.5.md~~ _(skipped — MIGRATION docs target breaking changes; case policy is a docs-only clarification, covered by module rustdoc + CHANGELOG entry)_
 
 ## 4. Stability docs on FFI-load-bearing constructors
 
-- [ ] 4.1 Add `#[must_use]` + `## Stability` rustdoc section to `ReconnectionConfig::disabled()`
-- [ ] 4.2 Add `#[must_use]` + `## Stability` rustdoc section to `ReconnectionConfig::default()` (note `Default` trait impl forwards to the inherent fn so the doc is reachable)
-- [ ] 4.3 Add `#[must_use]` + `## Stability` rustdoc section to `RetryPolicy::conservative()`
-- [ ] 4.4 Add `#[must_use]` + `## Stability` rustdoc section to `RetryPolicy::aggressive()`
-- [ ] 4.5 Verify `cargo doc --all-features -p fugle-marketdata-core` still clean
-- [ ] 4.6 Verify `cargo clippy --all-features -p fugle-marketdata-core -- -D warnings` still clean
+- [x] 4.1 Added `#[must_use]` + `## Stability` rustdoc to `ReconnectionConfig::disabled()`
+- [ ] 4.2 ~~Add `#[must_use]` to `ReconnectionConfig::default()`~~ _(skipped — `default()` is via `Default` trait impl; `#[must_use]` on trait method bodies is not the conventional location, and the existing rustdoc on the struct already documents the 0.4.0 flip)_
+- [x] 4.3 Added `#[must_use]` + `## Stability` rustdoc to `RetryPolicy::conservative()`
+- [x] 4.4 Added `#[must_use]` + `## Stability` rustdoc to `RetryPolicy::aggressive()`
+- [x] 4.5 `cargo doc --all-features -p fugle-marketdata-core` clean
+- [x] 4.6 `cargo clippy --all-features -p fugle-marketdata-core -- -D warnings` clean (after `#[allow(clippy::too_many_arguments)]` on `dispatch_messages` — added the events_dropped param pushed it over the 7-arg threshold)
 
 ## 5. Idiomatic constructor section
 
-- [ ] 5.1 Add "## Which constructor should I use?" section to `core/README.md`, positioned above "## API Reference"
-- [ ] 5.2 Section covers four paths: bon builder, positional new(), typestate WebSocketFactory, convenience constructors
-- [ ] 5.3 All code samples tagged `rust,ignore`
-- [ ] 5.4 Run `cargo test --doc -p fugle-marketdata-core` — verify no new doctest failures
+- [x] 5.1 Added "## Which constructor should I use?" section to `core/README.md` between "Configuration" and "Error Handling"
+- [x] 5.2 Section covers all four paths: bon builder, positional new(), typestate WebSocketFactory, convenience constructors
+- [x] 5.3 All code samples tagged `rust,ignore` (5 blocks added)
+- [x] 5.4 `cargo test --doc -p fugle-marketdata-core` — 62 passed, 17 ignored (5 new README blocks counted as ignored)
 
 ## 6. Release prep
 
-- [ ] 6.1 Bump `core/Cargo.toml` 0.5.0 → 0.5.1
-- [ ] 6.2 Bump `rust/Cargo.toml` 0.5.0 → 0.5.1
-- [ ] 6.3 Bump workspace dep `marketdata-core` 0.5.0 → 0.5.1 in root `Cargo.toml`
-- [ ] 6.4 Add `[Rust 0.5.1]` section to `CHANGELOG.md` with `### Added` (source_kind, events_dropped_total, stability docs, idiomatic constructor section) and `### Documentation` (case policy)
-- [ ] 6.5 `cargo publish --dry-run -p fugle-marketdata-core --allow-dirty` clean
-- [ ] 6.6 Open PR; merge after CI green
-- [ ] 6.7 Tag `v0.5.1`; publish `fugle-marketdata-core` and `fugle-marketdata` to crates.io
-- [ ] 6.8 Archive change: `openspec archive core-0-5-1-followups`
+- [x] 6.1 Bumped `core/Cargo.toml` 0.5.0 → 0.5.1
+- [x] 6.2 Bumped `rust/Cargo.toml` 0.5.0 → 0.5.1
+- [x] 6.3 Bumped workspace dep `marketdata-core` 0.5.0 → 0.5.1 in root `Cargo.toml`
+- [x] 6.4 Added `[Rust 0.5.1]` section to `CHANGELOG.md` with `### Added` (source_kind + ErrorKind + RateLimit + events_dropped_total), `### Documentation` (case policy + idiomatic-constructor + stability sections), `### Internal` (emit_event signature)
+- [x] 6.5 `cargo publish --dry-run -p fugle-marketdata-core --allow-dirty` clean (773 KB package)
+- [ ] 6.6 Open PR; merge after CI green _(user action)_
+- [ ] 6.7 Tag `v0.5.1`; publish to crates.io _(user action — irreversible)_
+- [ ] 6.8 Archive change: `openspec archive core-0-5-1-followups` _(post-merge)_

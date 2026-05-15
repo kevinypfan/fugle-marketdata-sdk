@@ -2,7 +2,9 @@
 
 ### Requirement: ErrorKind classification helper
 
-The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants `Network`, `Protocol`, `Auth`, `Client`. The enum MUST be `#[non_exhaustive]` so future additions are non-breaking. `MarketDataError` SHALL provide `pub fn source_kind(&self) -> ErrorKind` that returns the variant best describing the source of the failure, per the table below.
+The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants `Network`, `Protocol`, `Auth`, `RateLimit`, `Client`. The enum MUST be `#[non_exhaustive]` so future additions are non-breaking. `MarketDataError` SHALL provide `pub fn source_kind(&self) -> ErrorKind` that returns the variant best describing the source of the failure, per the table below.
+
+`RateLimit` is distinct from `Network` because operational response differs: rate-limit rejections require the caller to **reduce** request volume (de-parallelize, slow down), whereas `Network` failures call for retry with backoff. Conflating the two leads monitor incident playbooks to take the wrong action (adding parallel retries when the right move is to throttle).
 
 | `MarketDataError` variant | `ErrorKind` |
 |---|---|
@@ -10,7 +12,8 @@ The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants 
 | `WebSocketError` | `Protocol` (refined in 0.6.0 once the variant is split) |
 | `AuthError` | `Auth` |
 | `ApiError { status: 401 \| 403 }` | `Auth` |
-| `ApiError { status: 429 \| 500..=599 }` | `Network` |
+| `ApiError { status: 429 }` | `RateLimit` |
+| `ApiError { status: 500..=599 }` | `Network` |
 | `ApiError { status: other 4xx }` | `Client` |
 | `InvalidSymbol`, `InvalidParameter`, `ConfigError`, `DeserializationError`, `ClientClosed` | `Client` |
 | `RuntimeError`, `Other` | `Client` |
@@ -27,7 +30,11 @@ The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants 
 - **WHEN** `MarketDataError::ApiError { status: 401, message: "x".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::Auth`
 
-#### Scenario: Network category for 5xx and 429
+#### Scenario: RateLimit category for 429
+- **WHEN** `MarketDataError::ApiError { status: 429, message: "throttle".into() }.source_kind()` is evaluated
+- **THEN** the result MUST equal `ErrorKind::RateLimit`
+
+#### Scenario: Network category for 5xx (not for 429)
 - **WHEN** `MarketDataError::ApiError { status: 503, message: "x".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::Network`
 
@@ -36,5 +43,5 @@ The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants 
 - **THEN** the result MUST equal `ErrorKind::Client`
 
 #### Scenario: ErrorKind requires wildcard arm
-- **WHEN** downstream code writes `match err.source_kind() { ErrorKind::Network => .., ErrorKind::Protocol => .., ErrorKind::Auth => .., ErrorKind::Client => .. }` without a wildcard
+- **WHEN** downstream code writes `match err.source_kind() { ErrorKind::Network => .., ErrorKind::Protocol => .., ErrorKind::Auth => .., ErrorKind::RateLimit => .., ErrorKind::Client => .. }` without a wildcard
 - **THEN** the code MUST fail to compile with a `non-exhaustive` error pointing at the missing `_` arm
