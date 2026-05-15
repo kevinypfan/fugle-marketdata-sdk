@@ -496,7 +496,8 @@ impl StockWebSocketClient {
         thread::Builder::new()
             .name("stock_ws_worker".to_string())
             .spawn(move || {
-                use marketdata_core::websocket::{ConnectionConfig, WebSocketClient as CoreClient};
+                use marketdata_core::aio::WebSocketClient as CoreClient;
+                use marketdata_core::websocket::ConnectionConfig;
                 use marketdata_core::AuthRequest;
                 use marketdata_core::models::Channel;
                 use marketdata_core::websocket::channels::StockSubscription;
@@ -990,7 +991,8 @@ impl FutOptWebSocketClient {
         thread::Builder::new()
             .name("futopt_ws_worker".to_string())
             .spawn(move || {
-                use marketdata_core::websocket::{ConnectionConfig, WebSocketClient as CoreClient};
+                use marketdata_core::aio::WebSocketClient as CoreClient;
+                use marketdata_core::websocket::ConnectionConfig;
                 use marketdata_core::AuthRequest;
                 use marketdata_core::models::futopt::FutOptChannel;
                 use marketdata_core::websocket::channels::FutOptSubscription;

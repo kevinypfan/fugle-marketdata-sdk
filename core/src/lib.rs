@@ -90,7 +90,12 @@ pub use models::futopt::{
 };
 pub use websocket::channels::FutOptSubscription;
 
-// Re-export runtime (lives under websocket::aio in 0.3)
+// Re-export the async module + runtime (gated behind `tokio-comp`).
+#[cfg(feature = "tokio-comp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio-comp")))]
+pub use websocket::aio;
+#[cfg(feature = "tokio-comp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio-comp")))]
 pub use websocket::aio::AsyncRuntime;
 
 // Future modules (to be added in later phases):

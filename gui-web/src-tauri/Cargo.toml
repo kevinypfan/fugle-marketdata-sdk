@@ -20,7 +20,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-store = "2"
 
-marketdata-core = { workspace = true }
+marketdata-core = { workspace = true, features = ["tokio-comp"] }
 
 tokio = { workspace = true }
 serde = { workspace = true }

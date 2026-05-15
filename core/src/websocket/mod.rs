@@ -7,7 +7,6 @@
 //! - Event notifications for connection events
 //! - Channel-specific subscription and parsing
 
-pub mod aio;
 pub mod channels;
 pub mod config;
 pub mod connection_event;
@@ -16,9 +15,14 @@ pub mod message;
 pub(crate) mod protocol;
 pub mod reconnection;
 pub mod subscription;
+pub mod sync;
 
-// Re-export public types
-pub use aio::WebSocketClient;
+#[cfg(feature = "tokio-comp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio-comp")))]
+pub mod aio;
+
+// Default `WebSocketClient` is the sync implementation. Async users opt in via
+// `marketdata_core::aio::WebSocketClient` with `--features tokio-comp`.
 pub use channels::StockSubscription;
 pub use config::ConnectionConfig;
 pub use connection_event::{ConnectionEvent, ConnectionState};
@@ -26,3 +30,4 @@ pub use health_check::HealthCheckConfig;
 pub use message::MessageReceiver;
 pub use reconnection::{ReconnectionConfig, ReconnectionManager};
 pub use subscription::SubscriptionManager;
+pub use sync::WebSocketClient;

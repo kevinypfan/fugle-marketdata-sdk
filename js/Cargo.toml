@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Core library
-marketdata-core.workspace = true
+marketdata-core = { workspace = true, features = ["tokio-comp"] }
 
 # NAPI-RS 2.x for Node.js bindings
 napi.workspace = true

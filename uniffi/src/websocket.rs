@@ -26,9 +26,8 @@
 
 use crate::errors::MarketDataError;
 use crate::models::StreamMessage;
-use marketdata_core::websocket::{
-    ConnectionConfig, MessageReceiver, WebSocketClient as CoreWebSocketClient,
-};
+use marketdata_core::aio::WebSocketClient as CoreWebSocketClient;
+use marketdata_core::websocket::{ConnectionConfig, MessageReceiver};
 use marketdata_core::AuthRequest;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

@@ -10,8 +10,9 @@ use tokio::task::JoinHandle;
 use marketdata_core::models::futopt::{FutOptChannel, FutOptQuote, FutOptTicker, Product};
 use marketdata_core::rest::Auth;
 use marketdata_core::websocket::channels::{FutOptSubscription, StockSubscription};
+use marketdata_core::aio::WebSocketClient;
 use marketdata_core::{
-    AuthRequest, Channel, ConnectionConfig, ReconnectionConfig, RestClient, WebSocketClient,
+    AuthRequest, Channel, ConnectionConfig, ReconnectionConfig, RestClient,
     Quote, Ticker, Trade,
 };
 

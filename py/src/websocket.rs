@@ -571,7 +571,7 @@ impl WebSocketClient {
 /// The `inner` is wrapped in Arc to allow cloning the reference out of
 /// the Mutex before async operations (avoiding holding MutexGuard across await).
 struct WebSocketState {
-    inner: Arc<marketdata_core::WebSocketClient>,
+    inner: Arc<marketdata_core::aio::WebSocketClient>,
     receiver: Arc<marketdata_core::MessageReceiver>,
 }
 
@@ -758,7 +758,7 @@ impl StockWebSocketClient {
 
         // Create WebSocket client with full config
         let config = self.build_config();
-        let ws_client = marketdata_core::WebSocketClient::with_full_config(
+        let ws_client = marketdata_core::aio::WebSocketClient::with_full_config(
             config,
             self.reconnect_config.to_core(),
             self.health_check_config.to_core(),
@@ -1256,7 +1256,7 @@ impl StockWebSocketClient {
                 }
                 None => marketdata_core::ConnectionConfig::fugle_stock(auth),
             };
-            let ws_client = marketdata_core::WebSocketClient::with_full_config(
+            let ws_client = marketdata_core::aio::WebSocketClient::with_full_config(
                 config,
                 reconnect_config,
                 health_check_config,
@@ -1607,7 +1607,7 @@ impl FutOptWebSocketClient {
 
         // Create WebSocket client for FutOpt endpoint with full config
         let config = self.build_config();
-        let ws_client = marketdata_core::WebSocketClient::with_full_config(
+        let ws_client = marketdata_core::aio::WebSocketClient::with_full_config(
             config,
             self.reconnect_config.to_core(),
             self.health_check_config.to_core(),

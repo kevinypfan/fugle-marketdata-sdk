@@ -18,7 +18,7 @@ name = "marketdata_uniffi"
 
 [dependencies]
 # Core dependency
-marketdata-core.workspace = true
+marketdata-core = { workspace = true, features = ["tokio-comp"] }
 
 # UniFFI for cross-language bindings (tokio feature enables async_runtime = "tokio")
 uniffi = { workspace = true }

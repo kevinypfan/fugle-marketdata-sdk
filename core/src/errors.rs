@@ -69,9 +69,9 @@ pub enum MarketDataError {
     Other(#[from] anyhow::Error),
 }
 
-impl From<tokio_tungstenite::tungstenite::Error> for MarketDataError {
-    fn from(err: tokio_tungstenite::tungstenite::Error) -> Self {
-        use tokio_tungstenite::tungstenite::Error as WsError;
+impl From<tungstenite::Error> for MarketDataError {
+    fn from(err: tungstenite::Error) -> Self {
+        use tungstenite::Error as WsError;
 
         match err {
             // Retryable connection errors
