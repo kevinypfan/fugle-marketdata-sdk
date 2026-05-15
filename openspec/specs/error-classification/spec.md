@@ -7,12 +7,19 @@ Defines the coarse-grained classification surface for `MarketDataError`. The `Er
 
 The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants `Network`, `Protocol`, `Auth`, `RateLimit`, `Client`. The enum MUST be `#[non_exhaustive]` so future additions are non-breaking. `MarketDataError` SHALL provide `pub fn source_kind(&self) -> ErrorKind` that returns the variant best describing the source of the failure, per the table below.
 
-`RateLimit` is distinct from `Network` because operational response differs: rate-limit rejections require the caller to **reduce** request volume (de-parallelize, slow down), whereas `Network` failures call for retry with backoff. Conflating the two leads monitor incident playbooks to take the wrong action (adding parallel retries when the right move is to throttle).
+`RateLimit` is distinct from `Network` because operational response differs: rate-limit rejections require the caller to **reduce** request volume, whereas `Network` failures call for retry with backoff.
 
 | `MarketDataError` variant | `ErrorKind` |
 |---|---|
 | `ConnectionError`, `TimeoutError`, `HeartbeatTimeout` | `Network` |
-| `WebSocketError` | `Protocol` (refined in 0.6.0 once the variant is split) |
+| `WebSocketError { kind: WebSocketErrorKind::Protocol \| Capacity \| Utf8 }` | `Protocol` |
+| `WebSocketError { kind: WebSocketErrorKind::Tls }` | `Auth` |
+| `WebSocketError { kind: WebSocketErrorKind::Io }` | `Network` |
+| `WebSocketError { kind: WebSocketErrorKind::Http(401 \| 403) }` | `Auth` |
+| `WebSocketError { kind: WebSocketErrorKind::Http(429) }` | `RateLimit` |
+| `WebSocketError { kind: WebSocketErrorKind::Http(500..=599) }` | `Network` |
+| `WebSocketError { kind: WebSocketErrorKind::Http(other) }` | `Client` |
+| `WebSocketError { kind: WebSocketErrorKind::Other }` | `Protocol` |
 | `AuthError` | `Auth` |
 | `ApiError { status: 401 \| 403 }` | `Auth` |
 | `ApiError { status: 429 }` | `RateLimit` |
@@ -25,9 +32,25 @@ The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants 
 - **WHEN** `MarketDataError::ConnectionError { msg: "x".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::Network`
 
-#### Scenario: Protocol category for WebSocket failures (coarse pre-0.6.0)
-- **WHEN** `MarketDataError::WebSocketError { msg: "x".into() }.source_kind()` is evaluated in 0.5.1
+#### Scenario: Protocol kind routes to Protocol category
+- **WHEN** `MarketDataError::WebSocketError { kind: WebSocketErrorKind::Protocol, msg: "x".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::Protocol`
+
+#### Scenario: Io kind routes to Network category
+- **WHEN** `MarketDataError::WebSocketError { kind: WebSocketErrorKind::Io, msg: "reset".into() }.source_kind()` is evaluated
+- **THEN** the result MUST equal `ErrorKind::Network`
+
+#### Scenario: Tls kind routes to Auth category
+- **WHEN** `MarketDataError::WebSocketError { kind: WebSocketErrorKind::Tls, msg: "cert".into() }.source_kind()` is evaluated
+- **THEN** the result MUST equal `ErrorKind::Auth`
+
+#### Scenario: WebSocket HTTP 401 routes to Auth category
+- **WHEN** `MarketDataError::WebSocketError { kind: WebSocketErrorKind::Http(401), msg: "x".into() }.source_kind()` is evaluated
+- **THEN** the result MUST equal `ErrorKind::Auth`
+
+#### Scenario: WebSocket HTTP 429 routes to RateLimit category
+- **WHEN** `MarketDataError::WebSocketError { kind: WebSocketErrorKind::Http(429), msg: "x".into() }.source_kind()` is evaluated
+- **THEN** the result MUST equal `ErrorKind::RateLimit`
 
 #### Scenario: Auth category for 401/403 API errors
 - **WHEN** `MarketDataError::ApiError { status: 401, message: "x".into() }.source_kind()` is evaluated
@@ -37,7 +60,7 @@ The crate SHALL expose `pub enum ErrorKind` in `core::errors` with the variants 
 - **WHEN** `MarketDataError::ApiError { status: 429, message: "throttle".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::RateLimit`
 
-#### Scenario: Network category for 5xx (not for 429)
+#### Scenario: Network category for 5xx (not 429)
 - **WHEN** `MarketDataError::ApiError { status: 503, message: "x".into() }.source_kind()` is evaluated
 - **THEN** the result MUST equal `ErrorKind::Network`
 
