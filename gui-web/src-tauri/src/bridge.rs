@@ -330,9 +330,10 @@ fn spawn_message_pump(
     tx: UnboundedSender<TaggedMarketEvent>,
 ) -> JoinHandle<()> {
     let receiver = client.messages();
-    tokio::task::spawn_blocking(move || loop {
-        match receiver.receive() {
-            Ok(ws_msg) => {
+    tokio::task::spawn_blocking(move || {
+        // Ends when the receiver closes — the client shutting down is the
+        // normal exit, not an error worth logging.
+        while let Ok(ws_msg) = receiver.receive() {
                 // Control frames (subscribed ack, auth, errors) at info;
                 // per-tick `data`/`snapshot` at debug so an active multi-
                 // channel subscription doesn't flood logs at info level.
@@ -365,8 +366,6 @@ fn spawn_message_pump(
                         ws_msg.data
                     );
                 }
-            }
-            Err(_) => break,
         }
     })
 }
