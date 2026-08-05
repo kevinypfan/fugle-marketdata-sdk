@@ -1,6 +1,6 @@
 [package]
 name = "fugle-marketdata-core"
-version = "0.7.3"
+version = "0.8.0-rc.1"
 edition.workspace = true
 rust-version = "1.82"
 license.workspace = true
@@ -74,6 +74,9 @@ rustls-native-certs = "0.8"
 rustls-pemfile = "2.0"
 exponential-backoff = "2.0"
 indexmap = "2.2"
+# Path-segment escaping for symbols. Already in the graph via `url`, so this
+# adds no new compilation unit.
+percent-encoding = "2.3"
 
 # Declarative builder generation. Drives builders for `ConnectionConfig`,
 # `SubscribeRequest`, `RetryPolicy`, and `ReconnectionConfig`.

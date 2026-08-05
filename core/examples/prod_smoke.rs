@@ -1,10 +1,34 @@
 //! Prod-environment smoke sweep.
 //!
-//! Hits every REST endpoint + every WebSocket channel against **production**
-//! with `FUGLE_API_KEY`, fully deserialising each response, and emits one
-//! JSON record per probe to stdout. Surfaces decode landmines (server sends a
-//! field in a shape the Rust type can't accept — e.g. `endSession: "1"` vs
-//! `Option<i32>`) so they can be fixed in a follow-up patch.
+//! Hits every REST endpoint + every WebSocket channel against **production**,
+//! fully deserialising each response, and emits one JSON record per probe to
+//! stdout. Surfaces decode landmines (server sends a field in a shape the Rust
+//! type can't accept — e.g. `endSession: "1"` vs `Option<i32>`) so they can be
+//! fixed in a follow-up patch.
+//!
+//! # Credentials
+//!
+//! Exactly one of these must be set:
+//!
+//! | Variable | Auth header | Where it comes from |
+//! |---|---|---|
+//! | `FUGLE_API_KEY` | `X-API-KEY` | a Fugle developer API key |
+//! | `FUGLE_SDK_TOKEN` | `X-SDK-TOKEN` | a realtime token exchanged by a broker SDK (e.g. `fubon_neo`'s `exchange_realtime_token()`) |
+//!
+//! `FUGLE_API_KEY` wins if both are set.
+//!
+//! Two optional overrides point the sweep at a non-public deployment. Both
+//! take **host and path prefix only** — no version segment, which the SDK
+//! appends itself.
+//!
+//! | Variable | Redirects |
+//! |---|---|
+//! | `FUGLE_REST_BASE_URL` | the REST half (e.g. `https://api-dev.fugle.tw/marketdata`) |
+//! | `FUGLE_WS_BASE_URL` | the streaming half (a broker SDK token is usually not accepted by the public gateway) |
+//!
+//! `FUGLE_FUTOPT_SYMBOL` overrides contract discovery — comma-separated, and
+//! continuous aliases work (`TXF1!,MXF1!`). The alias always resolves to the
+//! current near-month, so it subscribes to a contract that actually trades.
 //!
 //! # Run
 //! ```bash
@@ -15,6 +39,13 @@
 //! jq -c 'select(.outcome != "Pass" and .outcome != "NoData")' report.jsonl
 //! ```
 //!
+//! With a broker token (Fubon Speed mode):
+//! ```bash
+//! export FUGLE_SDK_TOKEN="$(...exchange_realtime_token...)"
+//! export FUGLE_WS_BASE_URL="wss://express.fugle.tw/marketdata"
+//! cargo run -p fugle-marketdata-core --example prod_smoke --features tokio-comp
+//! ```
+//!
 //! Exit code is non-zero if any probe is not `Pass`/`NoData`.
 
 use marketdata_core::{
@@ -23,11 +54,107 @@ use marketdata_core::{
     StockSubscription,
 };
 use marketdata_core::websocket::channels::FutOptSubscription;
+use marketdata_core::websocket::WebSocketFactory;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
+
+/// How the sweep authenticates.
+///
+/// A Fugle developer API key and a broker-issued realtime SDK token reach the
+/// same endpoints through different headers, so the sweep accepts either. The
+/// token path matters because some endpoints (`stock/ownership/etf-holdings`)
+/// are only granted to real brokerage accounts.
+#[derive(Clone)]
+enum Credential {
+    ApiKey(String),
+    SdkToken(String),
+}
+
+impl Credential {
+    fn from_env() -> Self {
+        // API key wins when both are set — it is the more common case and the
+        // one the docs lead with.
+        if let Ok(key) = std::env::var("FUGLE_API_KEY") {
+            if !key.trim().is_empty() {
+                return Self::ApiKey(key);
+            }
+        }
+        if let Ok(token) = std::env::var("FUGLE_SDK_TOKEN") {
+            if !token.trim().is_empty() {
+                return Self::SdkToken(token);
+            }
+        }
+        panic!(
+            "no credential: set FUGLE_API_KEY (a Fugle developer key) or \
+             FUGLE_SDK_TOKEN (a broker-issued realtime token)"
+        );
+    }
+
+    fn rest_auth(&self) -> Auth {
+        match self {
+            Self::ApiKey(k) => Auth::ApiKey(k.clone()),
+            Self::SdkToken(t) => Auth::SdkToken(t.clone()),
+        }
+    }
+
+    fn ws_auth(&self) -> AuthRequest {
+        match self {
+            Self::ApiKey(k) => AuthRequest::with_api_key(k),
+            Self::SdkToken(t) => AuthRequest::with_sdk_token(t),
+        }
+    }
+
+    /// Label for the report header. Never includes the secret.
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::ApiKey(_) => "FUGLE_API_KEY",
+            Self::SdkToken(_) => "FUGLE_SDK_TOKEN",
+        }
+    }
+}
+
+/// Build the REST client, honouring `FUGLE_REST_BASE_URL`.
+///
+/// Staging and broker-specific deployments serve a different host — Fubon's
+/// dev build points at `https://api-dev.fugle.tw/marketdata`. Host and path
+/// prefix only; the SDK appends the version.
+///
+/// Uses `try_base_url` rather than `base_url` so a bad prefix is reported here
+/// instead of surfacing identically on all 30 probes.
+fn rest_client(credential: &Credential) -> Result<RestClient, MarketDataError> {
+    let client = RestClient::new(credential.rest_auth());
+    match std::env::var("FUGLE_REST_BASE_URL") {
+        Ok(base) if !base.trim().is_empty() => client.try_base_url(base.trim()),
+        _ => Ok(client),
+    }
+}
+
+/// Build the two streaming configs, honouring `FUGLE_WS_BASE_URL`.
+///
+/// A broker-issued SDK token is generally scoped to that broker's streaming
+/// gateway rather than the public one — Fubon's Speed mode serves
+/// `wss://express.fugle.tw/marketdata`, Normal mode
+/// `wss://fubon-api.fugle.tw/marketdata`. Both are host+prefix, which is
+/// exactly what 0.8.0's `base_url` takes.
+fn ws_configs(
+    credential: &Credential,
+) -> Result<(ConnectionConfig, ConnectionConfig), MarketDataError> {
+    match std::env::var("FUGLE_WS_BASE_URL") {
+        Ok(base) if !base.trim().is_empty() => {
+            let factory = WebSocketFactory::new()
+                .base_url(base.trim())
+                .auth(credential.ws_auth());
+            Ok((factory.stock()?.build(), factory.futopt()?.build()))
+        }
+        _ => Ok((
+            ConnectionConfig::fugle_stock(credential.ws_auth()),
+            ConnectionConfig::fugle_futopt(credential.ws_auth()),
+        )),
+    }
+}
 
 /// One probe result.
 ///
@@ -102,6 +229,36 @@ fn classify(e: &MarketDataError) -> Outcome {
     }
 }
 
+/// Find a futures contract that is currently listed.
+///
+/// The plain-session tickers list is empty at most times; the AFTERHOURS list
+/// is populated, and a TXF contract code is valid on the regular-session
+/// endpoints too. Prefers a TXF* symbol, falls back to the first listed one,
+/// then to the `TXF1!` continuous alias.
+async fn discover_futopt_symbol(rest: Arc<RestClient>) -> String {
+    tokio::task::spawn_blocking(move || {
+        rest.futopt()
+            .intraday()
+            .tickers()
+            .typ(FutOptType::Future)
+            .after_hours()
+            .send()
+            .ok()
+            .and_then(|v| {
+                v.iter()
+                    .map(|t| t.symbol.clone())
+                    .find(|s| s.starts_with("TXF"))
+                    .or_else(|| v.into_iter().next().map(|t| t.symbol))
+            })
+    })
+    .await
+    .ok()
+    .flatten()
+    // Continuous alias: always resolves to the current near-month, so it does
+    // not rot the way a hardcoded contract code does.
+    .unwrap_or_else(|| "TXF1!".to_string())
+}
+
 fn spawn_rest<F>(name: &'static str, rest: Arc<RestClient>, f: F) -> JoinHandle<Row>
 where
     F: FnOnce(&RestClient) -> Result<(), MarketDataError> + Send + 'static,
@@ -117,8 +274,30 @@ where
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
-    let key = std::env::var("FUGLE_API_KEY").expect("FUGLE_API_KEY environment variable not set");
-    let rest = Arc::new(RestClient::new(Auth::ApiKey(key.clone())));
+    let credential = Credential::from_env();
+    eprintln!("auth: {}", credential.kind());
+
+    // Resolve streaming config before the REST sweep so a bad
+    // `FUGLE_WS_BASE_URL` fails immediately instead of after 30 requests.
+    let (stock_cfg, futopt_cfg) = match ws_configs(&credential) {
+        Ok(pair) => pair,
+        Err(e) => {
+            eprintln!("FUGLE_WS_BASE_URL rejected: {e}");
+            std::process::exit(2);
+        }
+    };
+    let rest = match rest_client(&credential) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("FUGLE_REST_BASE_URL rejected: {e}");
+            std::process::exit(2);
+        }
+    };
+    eprintln!("rest:      {}", rest.resolved_base_url());
+    eprintln!("ws stock:  {}", stock_cfg.url);
+    eprintln!("ws futopt: {}", futopt_cfg.url);
+
+    let rest = Arc::new(rest);
 
     // === REST sweep: every call on the tokio blocking pool, all in flight at
     // once. ureq is synchronous, so spawn_blocking is what gives overlap. ===
@@ -151,6 +330,11 @@ async fn main() {
     rest_probe!("rest stock/snapshot/actives TSE", |c: &RestClient| c
         .stock().snapshot().actives().market("TSE").trade("volume").send());
 
+    // Stock ownership (1) — new in 0.8.0. 0050 is the largest, longest-lived
+    // ETF, so it always has a holdings series to decode.
+    rest_probe!("rest stock/ownership/etf-holdings 0050", |c: &RestClient| c
+        .stock().ownership().etf_holdings().symbol("0050").send());
+
     // Stock historical (2) — StatsResponse is all-non-Option, watch closely
     rest_probe!("rest stock/historical/candles 2330", |c: &RestClient| c
         .stock().historical().candles().symbol("2330").send());
@@ -178,13 +362,41 @@ async fn main() {
         .futopt().intraday().products().typ(FutOptType::Future).send());
     rest_probe!("rest futopt/intraday/tickers FUTURE", |c: &RestClient| c
         .futopt().intraday().tickers().typ(FutOptType::Future).send());
+    // isSpread filter, new in 0.8.0.
+    rest_probe!("rest futopt/intraday/tickers FUTURE isSpread", |c: &RestClient| c
+        .futopt().intraday().tickers().typ(FutOptType::Future)
+        .after_hours().is_spread(true).send());
 
     // Resolve a live futures contract off-thread. The plain-session tickers
     // list is empty at most times; the AFTERHOURS list is populated, and a
     // TXF contract code (e.g. TXFF6) is valid on the regular-session quote/
     // candles/etc endpoints too. Prefer a discovered TXF* symbol; fall back to
     // the current near-month. PROBE, not a GATE — the sweep runs regardless.
-    let futopt_symbol = {
+    // `FUGLE_FUTOPT_SYMBOL` overrides discovery. Continuous-contract aliases
+    // (`TXF1!`, `MXF1!`) are the useful values here: they always resolve to
+    // the current near-month, which is the contract that actually trades, so
+    // the streaming half gets frames instead of subscribing to a dormant
+    // contract. Comma-separated to subscribe several at once.
+    let futopt_symbol = match std::env::var("FUGLE_FUTOPT_SYMBOL") {
+        Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => discover_futopt_symbol(rest.clone()).await,
+    };
+
+    let futopt_ws_symbols: Vec<String> = futopt_symbol
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    // REST probes take a single symbol; the first one wins.
+    let futopt_symbol = futopt_ws_symbols
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "TXF1!".to_string());
+
+    // Resolve a live SPREAD contract (價差). Its symbol carries a `/`, which
+    // is what the 0.8.0 percent-encoding covers. PROBE, not a GATE — if no
+    // spread contract is listed right now, the probe is skipped.
+    let spread_symbol = {
         let r = rest.clone();
         tokio::task::spawn_blocking(move || {
             r.futopt()
@@ -192,20 +404,30 @@ async fn main() {
                 .tickers()
                 .typ(FutOptType::Future)
                 .after_hours()
+                .is_spread(true)
                 .send()
                 .ok()
-                .and_then(|v| {
-                    v.iter()
-                        .map(|t| t.symbol.clone())
-                        .find(|s| s.starts_with("TXF"))
-                        .or_else(|| v.into_iter().next().map(|t| t.symbol))
-                })
+                .and_then(|v| v.into_iter().map(|t| t.symbol).find(|s| s.contains('/')))
         })
         .await
         .ok()
         .flatten()
-        .unwrap_or_else(|| "TXFF6".to_string()) // near-month TXF as of 2026-05-16
     };
+
+    match &spread_symbol {
+        Some(sym) => {
+            let s = sym.clone();
+            rest_probe!("rest futopt/intraday/quote SPREAD", move |c: &RestClient| c
+                .futopt().intraday().quote().symbol(&s).send());
+            let s = sym.clone();
+            rest_probe!("rest futopt/intraday/trades SPREAD", move |c: &RestClient| c
+                .futopt().intraday().trades().symbol(&s).send());
+        }
+        None => eprintln!(
+            "note: no spread contract listed — skipping the SPREAD probes. \
+             Percent-encoding of `/` in symbols is left unverified this run."
+        ),
+    }
 
     let s = futopt_symbol.clone();
     rest_probe!("rest futopt/intraday/quote", move |c: &RestClient| c
@@ -242,9 +464,12 @@ async fn main() {
     }
 
     // === WS sweep: stock + futopt connections opened concurrently. ===
+    // futopt resolves to streaming v1.1 since 0.8.0, so the frames drained
+    // here may carry `isTrial` / `derivedBid` / `derivedAsk`. A decode failure
+    // on those is exactly what this sweep is meant to catch.
     let (mut stock_rows, mut futopt_rows) = tokio::join!(
-        smoke_ws_stock(&key, "2330", "IX0001"),
-        smoke_ws_futopt(&key, &futopt_symbol),
+        smoke_ws_stock(stock_cfg, "2330", "IX0001"),
+        smoke_ws_futopt(futopt_cfg, &futopt_ws_symbols),
     );
     rows.append(&mut stock_rows);
     rows.append(&mut futopt_rows);
@@ -267,7 +492,7 @@ async fn main() {
 /// Subscribe every stock channel on one connection, then drain frames until
 /// each channel has yielded one snapshot/data frame (force-parsed via the
 /// public `parse_channel_data`) or the global deadline passes.
-async fn smoke_ws_stock(key: &str, equity: &str, index: &str) -> Vec<Row> {
+async fn smoke_ws_stock(cfg: ConnectionConfig, equity: &str, index: &str) -> Vec<Row> {
     let want: &[(Channel, &str, &str)] = &[
         (Channel::Trades, equity, "ws stock trades"),
         (Channel::Candles, equity, "ws stock candles"),
@@ -275,7 +500,6 @@ async fn smoke_ws_stock(key: &str, equity: &str, index: &str) -> Vec<Row> {
         (Channel::Aggregates, equity, "ws stock aggregates"),
         (Channel::Indices, index, "ws stock indices"),
     ];
-    let cfg = ConnectionConfig::fugle_stock(AuthRequest::with_api_key(key));
     let client = AsyncWs::new(cfg);
     let mut rx = client.message_stream();
 
@@ -283,7 +507,7 @@ async fn smoke_ws_stock(key: &str, equity: &str, index: &str) -> Vec<Row> {
         return vec![Row { name: "ws stock connect".into(), outcome: classify(&e) }];
     }
     for (ch, sym, _) in want {
-        let _ = client.subscribe(StockSubscription::new(ch.clone(), *sym)).await;
+        let _ = client.subscribe(StockSubscription::new(*ch, *sym)).await;
     }
 
     let labels: BTreeMap<&str, &str> = want
@@ -298,24 +522,39 @@ async fn smoke_ws_stock(key: &str, equity: &str, index: &str) -> Vec<Row> {
 
 /// FutOpt counterpart. Channels: trades, books, candles, aggregates (no
 /// indices on the futopt feed).
-async fn smoke_ws_futopt(key: &str, symbol: &str) -> Vec<Row> {
+async fn smoke_ws_futopt(cfg: ConnectionConfig, symbols: &[String]) -> Vec<Row> {
     let want: &[(FutOptChannel, &str)] = &[
         (FutOptChannel::Trades, "ws futopt trades"),
         (FutOptChannel::Books, "ws futopt books"),
         (FutOptChannel::Candles, "ws futopt candles"),
         (FutOptChannel::Aggregates, "ws futopt aggregates"),
     ];
-    let cfg = ConnectionConfig::fugle_futopt(AuthRequest::with_api_key(key));
     let client = AsyncWs::new(cfg);
     let mut rx = client.message_stream();
 
     if let Err(e) = client.connect().await {
         return vec![Row { name: "ws futopt connect".into(), outcome: classify(&e) }];
     }
+    // Subscribe BOTH sessions. Futures trade in a regular session and an
+    // after-hours (夜盤) session, and a subscription only receives the one it
+    // asked for — during the night session a regular-session subscription is
+    // acknowledged and then stays silent forever, which reads exactly like a
+    // dead feed. Taking both means the sweep gets frames whatever time it runs.
+    //
+    // Subscribing several contracts widens the chance of catching a frame on a
+    // thin session too. Rows are keyed by channel, so extra subscriptions only
+    // help.
     for (ch, _) in want {
-        let _ = client
-            .subscribe_futopt(FutOptSubscription::new(ch.clone(), symbol))
-            .await;
+        for symbol in symbols {
+            for after_hours in [false, true] {
+                let _ = client
+                    .subscribe_futopt(
+                        FutOptSubscription::new(*ch, symbol.as_str())
+                            .with_after_hours(after_hours),
+                    )
+                    .await;
+            }
+        }
     }
 
     let labels: BTreeMap<&str, &str> =

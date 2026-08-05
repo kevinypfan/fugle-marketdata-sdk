@@ -85,6 +85,12 @@
 //!     print(f"Error {e.args[1]}: {e.args[0]}")
 //! ```
 
+// Every `#[pyo3(signature = (...))]` keyword argument is a separate Rust
+// parameter — pyo3 has no way to express a Python kwargs surface other than
+// positionally. Collapsing them into a struct to satisfy the lint would change
+// the public Python API, which is the one thing these bindings must not do.
+#![allow(clippy::too_many_arguments)]
+
 use pyo3::prelude::*;
 
 mod callback;
@@ -108,6 +114,7 @@ fn fugle_marketdata(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<client::StockSnapshotClient>()?;
     m.add_class::<client::StockTechnicalClient>()?;
     m.add_class::<client::StockCorporateActionsClient>()?;
+    m.add_class::<client::StockOwnershipClient>()?;
 
     // Register futopt client classes
     m.add_class::<client::FutOptClient>()?;

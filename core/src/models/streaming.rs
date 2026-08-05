@@ -137,6 +137,21 @@ pub struct TradesData {
     /// Total statistics
     #[serde(default)]
     pub total: Option<TotalStats>,
+    /// Marks the frame as trial-matching (試撮) — a simulated match, not a
+    /// trade. **Branch on this before acting on a price.**
+    ///
+    /// Only reaches futopt clients on streaming v1.1
+    /// ([`FutOptVersion::V1_1`](crate::websocket::FutOptVersion::V1_1), the
+    /// default since 0.8.0). Stock has always streamed its trials, so there
+    /// was never a version to gate them behind.
+    ///
+    /// The server omits the field entirely rather than sending `false`.
+    #[serde(
+        rename = "isTrial",
+        default,
+        deserialize_with = "crate::models::common::deserialize_bool_lenient"
+    )]
+    pub is_trial: bool,
     /// Unix microseconds
     #[serde(default)]
     pub time: Option<i64>,
@@ -149,8 +164,10 @@ pub struct TradesData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamTrade {
     /// Trade price
+    #[serde(default)]
     pub price: f64,
     /// Trade size
+    #[serde(default)]
     pub size: i64,
     /// Best bid at trade time
     #[serde(default)]
@@ -158,6 +175,22 @@ pub struct StreamTrade {
     /// Best ask at trade time
     #[serde(default)]
     pub ask: Option<f64>,
+    /// Trade timestamp (Unix microseconds)
+    #[serde(default)]
+    pub time: Option<i64>,
+    /// Exchange sequence number, normalised to a string.
+    ///
+    /// See [`deserialize_serial`](crate::models::common::deserialize_serial) —
+    /// the server types this field inconsistently across products.
+    #[serde(default, deserialize_with = "crate::models::common::deserialize_serial")]
+    pub serial: Option<String>,
+    /// Whether this trade replaces a previously published one
+    #[serde(
+        rename = "isReplaced",
+        default,
+        deserialize_with = "crate::models::common::deserialize_bool_lenient"
+    )]
+    pub is_replaced: bool,
 }
 
 /// Candles snapshot (special: entire day of 1-min candles)
@@ -221,12 +254,32 @@ pub struct CandleData {
 pub struct BooksData {
     /// Stock symbol
     pub symbol: String,
+    /// Data type
+    #[serde(rename = "type", default)]
+    pub data_type: Option<String>,
+    /// Exchange code
+    #[serde(default)]
+    pub exchange: Option<String>,
     /// Bid levels
     #[serde(default)]
     pub bids: Vec<PriceLevel>,
     /// Ask levels
     #[serde(default)]
     pub asks: Vec<PriceLevel>,
+    /// Extended (6th) bid level, present on some futopt contracts
+    #[serde(rename = "derivedBid", default)]
+    pub derived_bid: Option<PriceLevel>,
+    /// Extended (6th) ask level, present on some futopt contracts
+    #[serde(rename = "derivedAsk", default)]
+    pub derived_ask: Option<PriceLevel>,
+    /// Marks the frame as trial-matching (試撮) — a simulated book, not a
+    /// live one. See [`TradesData::is_trial`].
+    #[serde(
+        rename = "isTrial",
+        default,
+        deserialize_with = "crate::models::common::deserialize_bool_lenient"
+    )]
+    pub is_trial: bool,
     /// Unix microseconds
     #[serde(default)]
     pub time: Option<i64>,
@@ -294,6 +347,23 @@ pub struct AggregatesData {
     /// Last trade info
     #[serde(rename = "lastTrade", default)]
     pub last_trade: Option<TradeInfo>,
+    /// Last trial match (試撮). Absent outside a trial session.
+    #[serde(rename = "lastTrial", default)]
+    pub last_trial: Option<TradeInfo>,
+    /// Marks the frame as trial-matching (試撮).
+    ///
+    /// **`aggregates` is not version-gated.** Unlike `trades` / `books`,
+    /// trial data reaches this channel on every streaming version — during a
+    /// trial session `last_price` / `last_size` *are* the trial values, and
+    /// this flag is the only thing distinguishing them from a real trade.
+    /// Pinning [`FutOptVersion::V1_0`](crate::websocket::FutOptVersion::V1_0)
+    /// does not opt out of it.
+    #[serde(
+        rename = "isTrial",
+        default,
+        deserialize_with = "crate::models::common::deserialize_bool_lenient"
+    )]
+    pub is_trial: bool,
     // Timestamps
     /// Unix microseconds
     #[serde(default)]
@@ -517,6 +587,151 @@ mod tests {
         assert_eq!(books.asks.len(), 1);
         assert_eq!(books.bids[0].price, 582.0);
         assert_eq!(books.asks[0].size, 50);
+        assert!(!books.is_trial, "omitted isTrial means false");
+        assert!(books.derived_bid.is_none());
+    }
+
+    #[test]
+    fn test_parse_futopt_trial_trades_frame() {
+        // A v1.1 trial frame: same shape as a real trade plus `isTrial`.
+        // Acting on this price as if it were a trade is the bug this field
+        // exists to prevent.
+        let json = r#"{
+            "symbol": "TXFH6",
+            "type": "FUTURE",
+            "exchange": "TAIFEX",
+            "trades": [{
+                "bid": 17549.0, "ask": 17550.0, "price": 17550.0, "size": 2,
+                "time": 1785900000000000, "serial": "981234", "isReplaced": false
+            }],
+            "isTrial": true,
+            "time": 1785900000000000,
+            "serial": 981234
+        }"#;
+        let trades: TradesData = serde_json::from_str(json).unwrap();
+        assert!(trades.is_trial);
+        assert_eq!(trades.trades[0].serial.as_deref(), Some("981234"));
+        assert!(!trades.trades[0].is_replaced);
+        assert_eq!(trades.trades[0].time, Some(1785900000000000));
+    }
+
+    #[test]
+    fn test_parse_futopt_books_with_derived_levels() {
+        let json = r#"{
+            "symbol": "TXFH6",
+            "type": "FUTURE",
+            "exchange": "TAIFEX",
+            "bids": [{"price": 17549.0, "size": 50}],
+            "asks": [{"price": 17550.0, "size": 30}],
+            "derivedBid": {"price": 17548.0, "size": 12},
+            "derivedAsk": {"price": 17551.0, "size": 8},
+            "isTrial": true
+        }"#;
+        let books: BooksData = serde_json::from_str(json).unwrap();
+        assert!(books.is_trial);
+        assert_eq!(books.derived_bid.unwrap().price, 17548.0);
+        assert_eq!(books.derived_ask.unwrap().size, 8);
+        assert_eq!(books.exchange.as_deref(), Some("TAIFEX"));
+    }
+
+    #[test]
+    fn test_parse_live_futopt_v1_1_books_frame() {
+        // Captured verbatim from wss://.../v1.1/futopt/streaming during an
+        // after-hours session. Two things this pins that a hand-written
+        // fixture would miss:
+        //   - `type` is "FUTURE_AH", not "FUTURE", in the night session
+        //   - derivedBid/derivedAsk are present but ZEROED when no extended
+        //     level is active — present-and-zero, not absent
+        let json = r#"{
+            "symbol": "TXFH6",
+            "type": "FUTURE_AH",
+            "exchange": "TAIFEX",
+            "bids": [{"price": 44160, "size": 2}, {"price": 44159, "size": 2}],
+            "asks": [{"price": 44161, "size": 1}, {"price": 44162, "size": 5}],
+            "derivedBid": {"price": 0, "size": 0},
+            "derivedAsk": {"price": 0, "size": 0},
+            "time": 1785919636330000
+        }"#;
+        let books: BooksData = serde_json::from_str(json).unwrap();
+        assert_eq!(books.data_type.as_deref(), Some("FUTURE_AH"));
+        assert_eq!(books.derived_bid.unwrap().price, 0.0);
+        assert_eq!(books.derived_ask.unwrap().size, 0);
+        assert!(!books.is_trial, "absent isTrial means false");
+        assert_eq!(books.serial, None, "books frames carry no serial");
+    }
+
+    #[test]
+    fn test_flags_tolerate_explicit_null() {
+        // Absent and explicit-null must behave identically. `#[serde(default)]`
+        // alone only covers absent — a literal `null` would fail with
+        // "invalid type: null, expected a boolean". The API is inconsistent
+        // about which spelling it uses for an unset optional flag, and a frame
+        // must not fail to decode over that distinction.
+        let books: BooksData = serde_json::from_str(
+            r#"{"symbol": "TXFH6", "isTrial": null, "serial": null}"#,
+        )
+        .unwrap();
+        assert!(!books.is_trial);
+
+        let trades: TradesData = serde_json::from_str(
+            r#"{"symbol": "TXFH6", "isTrial": null,
+                "trades": [{"price": 1.0, "size": 1, "isReplaced": null, "serial": null}]}"#,
+        )
+        .unwrap();
+        assert!(!trades.is_trial);
+        assert!(!trades.trades[0].is_replaced);
+        assert_eq!(trades.trades[0].serial, None);
+    }
+
+    #[test]
+    fn test_parse_live_futopt_v1_1_trades_frame() {
+        // Captured verbatim from the same session. Note the serial lives at
+        // the TOP level of the frame and is a number; the individual trade
+        // objects carry no serial at all here.
+        let json = r#"{
+            "symbol": "TXFH6",
+            "type": "FUTURE_AH",
+            "exchange": "TAIFEX",
+            "trades": [{"price": 44195, "size": 1, "bid": 44195, "ask": 44200}],
+            "total": {"tradeVolume": 8266, "totalBidMatch": 6309, "totalAskMatch": 6008},
+            "time": 1785919638455000,
+            "serial": 55110
+        }"#;
+        let trades: TradesData = serde_json::from_str(json).unwrap();
+        assert_eq!(trades.serial, Some(55110));
+        assert_eq!(trades.trades[0].price, 44195.0);
+        assert_eq!(trades.trades[0].serial, None);
+        assert!(!trades.trades[0].is_replaced);
+        assert!(!trades.is_trial);
+    }
+
+    #[test]
+    fn test_aggregates_trial_is_not_version_gated() {
+        // `aggregates` carries trial data on every streaming version, with
+        // lastPrice/lastSize holding the trial values. Only `isTrial` tells
+        // them apart — pinning v1.0 does not opt out.
+        let json = r#"{
+            "symbol": "TXFH6",
+            "lastPrice": 17550.0,
+            "lastSize": 2,
+            "isTrial": true,
+            "lastTrial": {"price": 17550.0, "size": 2, "time": 1785900000000}
+        }"#;
+        let agg: AggregatesData = serde_json::from_str(json).unwrap();
+        assert!(agg.is_trial);
+        assert_eq!(agg.last_price, Some(17550.0));
+        assert!(agg.last_trial.is_some());
+    }
+
+    #[test]
+    fn test_stock_frames_default_is_trial_false() {
+        // Stock frames never carry `isTrial`; the field must not make them
+        // look like trials.
+        let trades: TradesData = serde_json::from_str(
+            r#"{"symbol": "2330", "trades": [{"price": 583.0, "size": 100}]}"#,
+        )
+        .unwrap();
+        assert!(!trades.is_trial);
     }
 
     #[test]

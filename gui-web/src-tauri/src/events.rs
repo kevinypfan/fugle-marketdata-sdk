@@ -93,10 +93,11 @@ impl From<FutOptHistoricalCandle> for CandleDto {
             high: c.high,
             low: c.low,
             close: c.close,
-            // Futures volume is u64 contract count; cast down — real contract
-            // counts never approach i64::MAX and the frontend treats it as a
-            // plain number anyway.
-            volume: c.volume as i64,
+            // Futures volume is an optional u64 contract count; cast down —
+            // real contract counts never approach i64::MAX and the frontend
+            // treats it as a plain number anyway. Absent means no volume was
+            // reported, which for a candle is indistinguishable from zero.
+            volume: c.volume.unwrap_or(0) as i64,
         }
     }
 }
@@ -139,7 +140,12 @@ pub struct TaggedMarketEvent {
 // etc.), and flatten would overwrite the enum discriminant.
 #[serde(tag = "kind")]
 pub enum MarketEventDto {
-    Aggregate(AggregatesData),
+    /// Boxed: `AggregatesData` is far larger than the other variants, and
+    /// this enum is allocated per tick and pushed through a channel, so an
+    /// unboxed variant would make every trade/book event pay the aggregate's
+    /// footprint. `Box<T>` serializes transparently, so the JSON the frontend
+    /// receives is unchanged.
+    Aggregate(Box<AggregatesData>),
     TradeTick(TradesData),
     BookSnap(BooksData),
     CandleTick(CandleData),
@@ -172,6 +178,19 @@ impl MarketEventDto {
                                 size,
                                 bid: obj.get("bid").and_then(serde_json::Value::as_f64),
                                 ask: obj.get("ask").and_then(serde_json::Value::as_f64),
+                                // Carried on futopt v1.1 frames; absent on the
+                                // flat stock "data" shape this branch handles.
+                                time: obj.get("time").and_then(serde_json::Value::as_i64),
+                                serial: obj
+                                    .get("serial")
+                                    .map(|v| match v.as_str() {
+                                        Some(s) => s.to_string(),
+                                        None => v.to_string(),
+                                    }),
+                                is_replaced: obj
+                                    .get("isReplaced")
+                                    .and_then(serde_json::Value::as_bool)
+                                    .unwrap_or(false),
                             });
                         }
                     }
@@ -181,7 +200,7 @@ impl MarketEventDto {
             ("data" | "snapshot", ChannelData::Books(b)) => Some(Self::BookSnap(b)),
             ("data", ChannelData::CandleData(c)) => Some(Self::CandleTick(c)),
             ("snapshot", ChannelData::CandlesSnapshot(s)) => Some(Self::CandleHistory(s)),
-            ("data" | "snapshot", ChannelData::Aggregates(a)) => Some(Self::Aggregate(a)),
+            ("data" | "snapshot", ChannelData::Aggregates(a)) => Some(Self::Aggregate(Box::new(a))),
             ("data" | "snapshot", ChannelData::Indices(i)) => Some(Self::Indices(i)),
             _ => None,
         }

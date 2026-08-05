@@ -7,6 +7,196 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Bindings 3.0.0-rc.1 / uniffi 0.1.0-rc.1] - 2026-08-05
+
+First release of the Python, Node and UniFFI bindings, aligned with core
+0.8.0-rc.1 and therefore with official `@fugle/marketdata` 1.5.0 /
+`fugle-marketdata` 2.5.0 from day one.
+
+Because these bindings have never shipped, **none of core's 0.8.0 breaking
+changes are breaking for them** — a binding user has never seen the 0.6-era
+`base_url` rule. The reversal described below affects only the Rust crates on
+crates.io.
+
+### Version tracks
+
+| Artifact | Registry | Version | Why |
+|---|---|---|---|
+| `fugle-marketdata` | PyPI | `3.0.0rc1` | must exceed the official package's 2.5.0 |
+| `@fugle/marketdata` | npm | `3.0.0-rc.1` | must exceed the official package's 1.5.0 |
+| C# / Go / Java / C++ | — | `0.1.0-rc.1` | never published, no namespace to supersede |
+
+### Added — Python
+
+- `RestClient(base_url=...)` takes host + path prefix only; a version segment
+  raises `TypeError` at construction, matching the official SDK.
+- `RestClient.base_url` and `client.stock.base_url` expose the resolved prefix.
+- `WebSocketClient(version={"futopt": "v1.0"})`. Omitted products get their
+  latest (stock v1.0, futopt v1.1). An unsupported pairing raises `TypeError`
+  with the official SDK's wording.
+- `client.stock.ownership.etf_holdings(...)` (async + sync). `sort` accepts
+  only `"asc"` / `"desc"`; anything else raises `ValueError` rather than being
+  dropped, since a typo would otherwise return the opposite series.
+- `futopt.intraday.tickers(is_spread=...)`.
+- `cargo test -p marketdata-py --no-default-features` now links and runs.
+  `extension-module` became an optional (default-on) feature; previously the
+  crate's Rust tests could not build at all.
+
+### Added — Node
+
+- Same surface as Python: `baseUrl` semantics, `RestClient.baseUrl` /
+  `StockClient.baseUrl` getters, `version` option (typed as
+  `StreamingVersionOptions`, so TypeScript rejects an unknown product at
+  compile time), `stock.ownership.etfHoldings(...)`, `isSpread`.
+- `types.d.ts` gains `EtfHoldingComponent` / `EtfHoldingsEntry` /
+  `EtfHoldingsResponse` — `etfHoldings` referenced `EtfHoldingsResponse` in its
+  return type without defining it.
+
+### Added — UniFFI (C# / Go / Java / C++)
+
+- `StreamingVersionRecord` for per-product version selection.
+- `stock.ownership.etf_holdings` (async + `cpp`-feature sync variant) and the
+  three ETF holdings records.
+- `RestClient.base_url` / `StockClient.base_url`, `is_spread` on futopt
+  tickers.
+
+### Fixed — UniFFI
+
+- **The crate did not compile at all**, on `main`, for an unknown span: 29
+  type errors where the mirror records had drifted from core after the
+  0.7.2/0.7.3 decode fixes loosened fields to `Option`. Mirrors now match core
+  rather than papering over absence with `unwrap_or_default()`.
+- `KdjResponse` exposed a single `period`; the endpoint has taken
+  `r_period` / `k_period` / `d_period` since 0.7.2.
+
+### Fixed — Tauri GUI
+
+- `StreamTrade` construction and an `Option<u64>` cast; the latter had been
+  broken on `main` since core loosened the futopt candle volume field.
+
+### Fixed — Python test suite
+
+- 102 of 138 tests were failing on `main`. They constructed clients
+  positionally (removed in 0.4.0), asserted the 2.x `HealthCheckConfig` shape
+  (`interval_ms` / `max_missed_pongs` — this SDK has neither), and expected
+  `ValueError` where both this SDK and the official one raise `TypeError`.
+  Now 142 passed.
+
+  Note: run `maturin develop` before `pytest` — a stale gitignored `.so` under
+  `py/fugle_marketdata/` shadows the installed wheel.
+
+## [Rust 0.8.0-rc.1] - 2026-08-05
+
+Aligns with the official `@fugle/marketdata` 1.5.0-rc.5 and
+`fugle-marketdata` 2.5.0rc5. Released as a pre-release while the official
+SDKs are still in rc.
+
+See [MIGRATION-0.8.md](MIGRATION-0.8.md).
+
+### ⚠️ Breaking
+
+- **`base_url` no longer accepts a version segment — this reverses 0.6.0.**
+  A base URL carries the host and path prefix only; the SDK appends the
+  version. Passing a 0.6-era base URL (one ending in `/v1.0`) is now
+  rejected with a `ConfigError` naming the prefix to use instead.
+
+  This follows the official SDKs, whose rationale is that letting two
+  options decide the same path segment forces precedence rules — and those
+  rules make anyone who only wants to change host manage the version by
+  hand. That matters more now that streaming versions are per-product: with
+  `futopt` on `v1.1` and `stock` on `v1.0`, one baked-in segment cannot be
+  right for both.
+
+  Unlike the 0.6.0 change, this failure is loud rather than silent.
+
+- **`WebSocketFactory::stock()` / `::futopt()` now return `Result`**, so a
+  rejected `base_url` surfaces at the earliest honest point. `RestClient`
+  keeps an infallible `base_url()` and surfaces the rejection from the first
+  request; `try_base_url()` reports it immediately instead.
+
+### ⚠️ Behaviour change
+
+- **futopt streaming defaults to `v1.1`**, which delivers trial-matching
+  (試撮, TAIFEX I022/I082) frames on `trades` / `books`. A trial frame is a
+  simulated match, not a trade — branch on `is_trial` before acting on a
+  price. Pin `FutOptVersion::V1_0` to opt out.
+
+  `urls::FUTOPT_WS` and `ConnectionConfig::fugle_futopt` moved to `v1.1`
+  in step, so they cannot drift from the factory.
+
+  Note that `aggregates` is **not** version-gated: it carries trial data on
+  every version, and pinning `V1_0` does not opt out of it.
+
+### Added
+
+- `stock().ownership().etf_holdings()` — `GET
+  /stock/ownership/etf-holdings/{symbol}` with `from` / `to` / `sort`.
+- `StockVersion` / `FutOptVersion` enums and
+  `WebSocketFactory::{stock_version, futopt_version}`. One enum per product
+  makes an unsupported pairing unrepresentable, so unlike the official SDKs'
+  runtime-validated version map, a bad combination does not compile.
+- `RestClient::resolved_base_url()` — the fully resolved request prefix.
+  Since the SDK owns the version segment, this is the only way to see what a
+  client actually resolved to.
+- `RestClient::try_base_url()`.
+- `futopt().intraday().tickers().is_spread(bool)` filter, and `is_spread` on
+  `FutOptTicker`.
+- `FutOptQuote`: `market`, `price_limits`, `last_trial`, `trading_halt`,
+  `is_trial`, `is_delayed_open`, `is_delayed_close`, `is_continuous`,
+  `is_open`, `is_close`, `serial`. `FutOptTotalStats` goes from 3 fields to
+  8; `FutOptLastTrade` gains `bid` / `ask` / `serial`. New
+  `FutOptPriceLimits` and `FutOptTradingHalt`.
+- Streaming frames: `is_trial` on `TradesData` / `BooksData` /
+  `AggregatesData`; `derived_bid` / `derived_ask` / `data_type` / `exchange`
+  on `BooksData`; `time` / `serial` / `is_replaced` on `StreamTrade`;
+  `last_trial` on `AggregatesData`.
+- `TradeInfo` gains `serial: Option<String>` — stock's `lastTrade` /
+  `lastTrial` carry one and it was previously discarded.
+- Optional boolean flags (`is_trial`, `is_replaced`) now tolerate an explicit
+  JSON `null` as well as an absent key. `#[serde(default)]` alone only covers
+  the absent case; a literal `null` failed the whole decode. The API
+  demonstrably uses explicit nulls for unset fields on dormant contracts.
+  Precautionary — no `isTrial: null` has been observed in the wild.
+- `prod_smoke` probes for etf-holdings, the `isSpread` filter, and spread
+  contracts (discovered dynamically).
+
+### Fixed
+
+- **`lastTrade.serial` / `lastTrial.serial` decode correctly on futopt.**
+  The server sends a zero-padded **string** (`"00379320"`) for futopt and a
+  **number** (`17738549`) for stock — the same field, different JSON types
+  per product. The official TypeScript interface declares `serial: number`
+  for both, which is wrong for futopt; typing it that way made
+  `futopt/intraday/quote` fail to decode outright, and would have broken
+  futopt's streaming `aggregates` frame too, since it carries the same
+  object. Both spellings now normalise to `String` — a serial is an opaque
+  identifier, never an operand, and futopt's padding is significant.
+
+  Found by running the sweep against a live environment. Same class of bug
+  as 0.7.2/0.7.3: the published type did not match the payload.
+
+- **Symbol path segments are percent-encoded.** Spread contract symbols
+  carry a `/` (e.g. `BRFJ6/F7`). Applied to all 19 endpoints that put a
+  symbol in the path. The encoder reproduces `encodeURIComponent`'s reserved
+  set exactly, so a symbol encodes identically here and in the Node SDK.
+
+  Measured caveat: the live gateway currently *tolerates* an unencoded
+  slash — encoded and unencoded requests return identical responses. So
+  this is correctness-by-spec and protection against any symbol containing
+  reserved characters, not the repair of an observed outage.
+
+### Notes
+
+- The official SDKs' 1.5.0 health-check rework (freshness-based detection
+  plus a disconnect reason, and the `maxMissedPongs >= 1` clamp) needs no
+  counterpart: this SDK has used a single async-native timeout window since
+  0.3.0, and has no missed-pong counter to clamp. `health_check`'s module
+  docs now carry a mapping table for anyone porting config from Node or
+  Python.
+- `name` / `previous_close` were dropped from the official futopt quote
+  response in 1.5.0 but are retained here as `Option`, so payloads still
+  carrying them keep decoding.
+
 ## [Rust 0.7.3] - 2026-05-16
 
 Follow-up to 0.7.2: a deeper prod sweep showed the futopt

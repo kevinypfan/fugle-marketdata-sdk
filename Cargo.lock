@@ -1325,14 +1325,14 @@ dependencies = [
 
 [[package]]
 name = "fugle-marketdata"
-version = "0.7.3"
+version = "0.8.0-rc.1"
 dependencies = [
  "fugle-marketdata-core",
 ]
 
 [[package]]
 name = "fugle-marketdata-core"
-version = "0.7.3"
+version = "0.8.0-rc.1"
 dependencies = [
  "anyhow",
  "bon",
@@ -1342,6 +1342,7 @@ dependencies = [
  "indexmap 2.13.0",
  "metrics",
  "metrics-util",
+ "percent-encoding",
  "rustls",
  "rustls-native-certs",
  "rustls-pemfile",
@@ -2422,7 +2423,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-js"
-version = "3.0.0"
+version = "3.0.0-rc.1"
 dependencies = [
  "fugle-marketdata-core",
  "napi",
@@ -2435,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-py"
-version = "3.0.0"
+version = "3.0.0-rc.1"
 dependencies = [
  "fugle-marketdata-core",
  "pyo3",
@@ -2447,7 +2448,7 @@ dependencies = [
 
 [[package]]
 name = "marketdata-uniffi"
-version = "3.0.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "fugle-marketdata-core",
  "serde_json",

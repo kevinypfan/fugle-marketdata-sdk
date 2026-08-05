@@ -24,6 +24,18 @@
 //! Console.WriteLine(quote.LastPrice); // Strongly typed access
 //! ```
 
+// UniFFI exports each optional argument as a separate parameter — there is no
+// way to express an options object that reads naturally in C#, Go, Java and
+// C++ at once. Collapsing them into a record to satisfy the lint would change
+// the generated API in all four languages.
+#![allow(clippy::too_many_arguments)]
+// The `cpp` feature strips the async surface (uniffi-bindgen-cpp cannot
+// express async fns). The request builders and their imports are only reached
+// from those async wrappers, so under `cpp` they are legitimately unused —
+// config-dependent dead code, not rot. Deleting them would break every other
+// language binding.
+#![cfg_attr(feature = "cpp", allow(dead_code, unused_imports))]
+
 mod client;
 mod errors;
 mod models;
@@ -104,7 +116,7 @@ fn build_rest_client_with_tls(
 ) -> Result<Arc<RestClient>, MarketDataError> {
     let mut client = RestClient::with_tls(auth, tls.to_core())?;
     if let Some(url) = base_url {
-        client = client.with_base_url(&url);
+        client = client.with_base_url(&url)?;
     }
     Ok(Arc::new(client))
 }

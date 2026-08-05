@@ -86,6 +86,15 @@ fn bench_subscription_creation(c: &mut Criterion) {
 }
 
 /// Benchmark channel enum operations
+///
+/// The `*_channel_clone` cases measure `.clone()` on a `Copy` enum, which is
+/// a register move — they exist as a floor to compare the `as_str` cases
+/// against, not because cloning a channel is ever a real cost.
+#[allow(
+    clippy::clone_on_copy,
+    reason = "cloning a Copy enum is the thing being measured; \
+              removing the clone would leave the bench measuring nothing"
+)]
 fn bench_channel_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("channel_operations");
 
@@ -238,16 +247,23 @@ fn bench_subscription_key_generation(c: &mut Criterion) {
     group.bench_function("subscription_to_key", |b| {
         b.iter(|| {
             // Use actual subscription key method
-            black_box(subscription.key())
+            black_box(subscription.keys())
         })
     });
 
     // Test with longer symbol names
     group.bench_function("subscription_to_key_long_symbol", |b| {
         let long_sub = StockSubscription::new(Channel::Trades, "TXFA4-2024-01-W3");
-        b.iter(|| {
-            black_box(long_sub.key())
-        })
+        b.iter(|| black_box(long_sub.keys()))
+    });
+
+    // Batch case: 0.5.0 turned this into one key per symbol, so the cost is
+    // now N formats plus the Vec — the single-symbol benches above no longer
+    // represent what a real batch subscription pays.
+    group.bench_function("subscription_to_key_batch_50", |b| {
+        let symbols: Vec<String> = (0..50).map(|i| format!("{:04}", 1000 + i)).collect();
+        let batch = StockSubscription::new(Channel::Trades, symbols);
+        b.iter(|| black_box(batch.keys()))
     });
 
     group.finish();
